@@ -10,41 +10,100 @@ jobs:
   build:
     runs-on: windows-latest
     
+    strategy:
+      matrix:
+        platform: [ARM, x64, Win32]
+        configuration: [Release, Debug]
+    
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '5.0.x'
+    - name: Setup Visual Studio
+      uses: microsoft/setup-msbuild@v2
     
     - name: Install Windows SDK 19041
       run: |
         choco install windows-sdk-19041-all -y
+      shell: cmd
     
-    - name: Clone and build TDLib
+    - name: Clone TDLib 1.8.63
       run: |
         git clone https://github.com/tdlib/td.git
         cd td
         git checkout v1.8.63
-        mkdir build && cd build
-        cmake .. -G "Visual Studio 16 2019" -A ARM -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0.15254.603 -DTD_ENABLE_DOTNET=ON -DCMAKE_BUILD_TYPE=Release
-        cmake --build . --config Release
+      shell: cmd
     
-    - name: Build Unigram
+    - name: Build TDLib (ARM)
+      if: matrix.platform == 'ARM'
+      run: |
+        cd td
+        mkdir build_arm
+        cd build_arm
+        cmake .. -G "Visual Studio 17 2022" -A ARM -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0.15254.603 -DTD_ENABLE_DOTNET=ON -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+        cmake --build . --config ${{ matrix.configuration }}
+      shell: cmd
+    
+    - name: Build TDLib (x64)
+      if: matrix.platform == 'x64'
+      run: |
+        cd td
+        mkdir build_x64
+        cd build_x64
+        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0.19041.0 -DTD_ENABLE_DOTNET=ON -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+        cmake --build . --config ${{ matrix.configuration }}
+      shell: cmd
+    
+    - name: Build TDLib (Win32)
+      if: matrix.platform == 'Win32'
+      run: |
+        cd td
+        mkdir build_win32
+        cd build_win32
+        cmake .. -G "Visual Studio 17 2022" -A Win32 -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0.19041.0 -DTD_ENABLE_DOTNET=ON -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+        cmake --build . --config ${{ matrix.configuration }}
+      shell: cmd
+    
+    - name: Build Unigram Solution
       run: |
         cd Unigram
-        msbuild UnigramMobile.sln /p:Configuration=Release /p:Platform=ARM
+        msbuild UnigramMobile.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:AppxPackageSigningEnabled=false
+      shell: cmd
     
     - name: Create App Package
       run: |
-        cd Unigram
-        msbuild Unigram/Unigram.csproj /p:Configuration=Release /p:Platform=ARM /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+        cd Unigram/Unigram
+        msbuild Unigram.csproj /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+      shell: cmd
     
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+    - name: Upload Build Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
       with:
-        name: unigram-arm-release
-        path: Unigram/Unigram/bin/ARM/Release/
+        name: unigram-${{ matrix.platform }}-${{ matrix.configuration }}
+        path: Unigram/Unigram/bin/${{ matrix.platform }}/${{ matrix.configuration }}/
+        retention-days: 30
+        compression-level: 6
+    
+    - name: Upload Logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ matrix.platform }}-${{ matrix.configuration }}
+        path: |
+          **/*.log
+          **/*-errors.txt
+        retention-days: 7
+
+    - name: Create Release (на успешной сборке)
+      if: success() && github.event_name == 'push'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: Unigram/Unigram/bin/${{ matrix.platform }}/${{ matrix.configuration }}/**/*.appx
+        tag_name: v1.0.0-${{ matrix.platform }}-${{ github.run_number }}
+        draft: false
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
