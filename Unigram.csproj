@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net5.0-android</TargetFramework>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.10000.0</TargetPlatformMinVersion>
+   <!-- other properties -->
+  </PropertyGroup>
+</Project>

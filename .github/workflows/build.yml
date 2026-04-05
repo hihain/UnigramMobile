@@ -1,0 +1,50 @@
+name: Build Unigram for Windows 10 Mobile
+
+on:
+  push:
+    branches: [ beta-20220212 ]
+  pull_request:
+    branches: [ beta-20220212 ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.x'
+    
+    - name: Install Windows SDK 19041
+      run: |
+        choco install windows-sdk-19041-all -y
+    
+    - name: Clone and build TDLib
+      run: |
+        git clone https://github.com/tdlib/td.git
+        cd td
+        git checkout v1.8.63
+        mkdir build && cd build
+        cmake .. -G "Visual Studio 16 2019" -A ARM -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0.15254.603 -DTD_ENABLE_DOTNET=ON -DCMAKE_BUILD_TYPE=Release
+        cmake --build . --config Release
+    
+    - name: Build Unigram
+      run: |
+        cd Unigram
+        msbuild UnigramMobile.sln /p:Configuration=Release /p:Platform=ARM
+    
+    - name: Create App Package
+      run: |
+        cd Unigram
+        msbuild Unigram/Unigram.csproj /p:Configuration=Release /p:Platform=ARM /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: unigram-arm-release
+        path: Unigram/Unigram/bin/ARM/Release/
