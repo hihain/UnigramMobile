@@ -10,77 +10,103 @@ namespace Unigram.Common
 {
     public class Toast
     {
-        public static async Task RegisterBackgroundTasks()
+        private const string NotificationTaskName = "NotificationTask";
+        private const string NotificationTaskEntryPoint = "Unigram.Native.Tasks.NotificationTask";
+        private const string InteractiveTaskName = "NewInteractiveTask";
+
+        private static readonly HashSet<string> LegacyTaskNames = new HashSet<string>
         {
+            NotificationTaskName,
+            "NewNotificationTask",
+            "NewNotificationTask2",
+            "InProcessNotificationTask",
+            InteractiveTaskName
+        };
+
+        public static async Task<bool> RegisterBackgroundTasks()
+        {
+            BackgroundAccessStatus access;
+            Logs.PushDiagnostics.Write("background.access.request");
             try
             {
-                //BackgroundExecutionManager.RemoveAccess();
-
-                foreach (var t in BackgroundTaskRegistration.AllTasks)
-                {
-                    if (t.Value.Name == "NotificationTask" || t.Value.Name == "NewNotificationTask")
-                    {
-                        t.Value.Unregister(false);
-                    }
-                }
-
-                var access = await BackgroundExecutionManager.RequestAccessAsync();
-                if (access == BackgroundAccessStatus.DeniedByUser || access == BackgroundAccessStatus.DeniedBySystemPolicy)
-                {
-                    return;
-                }
-
-                Register("InProcessNotificationTask", null, () => new PushNotificationTrigger());
-                //Register("NewNotificationTask2", null, () => new PushNotificationTrigger());
-                Register("NewInteractiveTask", null, () => new ToastNotificationActionTrigger());
-                //BackgroundTaskManager.Register("InteractiveTask", "Unigram.Tasks.InteractiveTask", new ToastNotificationActionTrigger());
+                access = await BackgroundExecutionManager.RequestAccessAsync();
             }
-            catch { }
-        }
-
-        private static bool Register(string name, string entryPoint, Func<IBackgroundTrigger> trigger, Action onCompleted = null)
-        {
-            //var access = await BackgroundExecutionManager.RequestAccessAsync();
-            //if (access == BackgroundAccessStatus.DeniedByUser || access == BackgroundAccessStatus.DeniedBySystemPolicy)
-            //{
-            //    return false;
-            //}
-            try
+            catch (Exception ex)
             {
-                foreach (var t in BackgroundTaskRegistration.AllTasks)
-                {
-                    if (t.Value.Name == name)
-                    {
-                        //t.Value.Unregister(false);
-                        return false;
-                    }
-                }
-
-                var builder = new BackgroundTaskBuilder();
-                builder.Name = name;
-
-                if (entryPoint != null)
-                {
-                    builder.TaskEntryPoint = entryPoint;
-                }
-
-                builder.SetTrigger(trigger());
-
-                var registration = builder.Register();
-                if (onCompleted != null)
-                {
-                    registration.Completed += (s, a) =>
-                    {
-                        onCompleted();
-                    };
-                }
-
-                return true;
-            }
-            catch
-            {
+                Logs.Logger.Error(Logs.Target.Notifications, $"Unable to request background access: {ex.Message}");
+                Logs.PushDiagnostics.WriteException("background.access.result", ex);
                 return false;
             }
+
+            Logs.PushDiagnostics.Write("background.access.result", $"status={access}");
+            if (!IsBackgroundAccessAllowed(access))
+            {
+                Logs.Logger.Warning(Logs.Target.Notifications, $"Background notifications are disabled: {access}");
+                return false;
+            }
+
+            foreach (var task in BackgroundTaskRegistration.AllTasks)
+            {
+                Logs.PushDiagnostics.Write("background.task.found", $"name={task.Value.Name};id={task.Key}");
+                if (LegacyTaskNames.Contains(task.Value.Name))
+                {
+                    task.Value.Unregister(true);
+                    Logs.PushDiagnostics.Write("background.task.removed", $"name={task.Value.Name};id={task.Key}");
+                }
+            }
+
+            var registered = true;
+            try
+            {
+                var registration = Register(NotificationTaskName, NotificationTaskEntryPoint, new PushNotificationTrigger());
+                Logs.Logger.Info(Logs.Target.Notifications, "Registered out-of-process push notification task");
+                Logs.PushDiagnostics.Write("background.task.registered", $"name={NotificationTaskName};entrypoint={NotificationTaskEntryPoint};id={registration.TaskId};trigger=PushNotificationTrigger");
+            }
+            catch (Exception ex)
+            {
+                registered = false;
+                Logs.Logger.Error(Logs.Target.Notifications, $"Unable to register push notification task: {ex.Message}");
+                Logs.PushDiagnostics.WriteException("background.task.push.failed", ex);
+            }
+
+            try
+            {
+                var registration = Register(InteractiveTaskName, null, new ToastNotificationActionTrigger());
+                Logs.Logger.Info(Logs.Target.Notifications, "Registered in-process toast action task");
+                Logs.PushDiagnostics.Write("background.task.registered", $"name={InteractiveTaskName};entrypoint=in-process;id={registration.TaskId};trigger=ToastNotificationActionTrigger");
+            }
+            catch (Exception ex)
+            {
+                registered = false;
+                Logs.Logger.Error(Logs.Target.Notifications, $"Unable to register toast action task: {ex.Message}");
+                Logs.PushDiagnostics.WriteException("background.task.toast.failed", ex);
+            }
+
+            return registered;
+        }
+
+        private static bool IsBackgroundAccessAllowed(BackgroundAccessStatus access)
+        {
+            return access == BackgroundAccessStatus.AllowedMayUseActiveRealTimeConnectivity
+                || access == BackgroundAccessStatus.AllowedWithAlwaysOnRealTimeConnectivity
+                || access == BackgroundAccessStatus.AllowedSubjectToSystemPolicy
+                || access == BackgroundAccessStatus.AlwaysAllowed;
+        }
+
+        private static BackgroundTaskRegistration Register(string name, string entryPoint, IBackgroundTrigger trigger)
+        {
+            var builder = new BackgroundTaskBuilder
+            {
+                Name = name
+            };
+
+            if (entryPoint != null)
+            {
+                builder.TaskEntryPoint = entryPoint;
+            }
+
+            builder.SetTrigger(trigger);
+            return builder.Register();
         }
 
         public static int? GetSession(IActivatedEventArgs args)

@@ -49,5 +49,15 @@ namespace Unigram.Views
                 await SharePopup.GetForCurrentView().ShowAsync(new InputMessageDocument(new InputFileLocal(log.Path), null, true, null));
             }
         }
+
+        private async void PushLog_Click(object sender, RoutedEventArgs e)
+        {
+            var folder = await ApplicationData.Current.LocalFolder.TryGetItemAsync(Logs.PushDiagnostics.DirectoryName) as StorageFolder;
+            var log = folder == null ? null : await folder.TryGetItemAsync(Logs.PushDiagnostics.FileName) as StorageFile;
+            if (log != null)
+            {
+                await SharePopup.GetForCurrentView().ShowAsync(new InputMessageDocument(new InputFileLocal(log.Path), null, true, null));
+            }
+        }
     }
 }

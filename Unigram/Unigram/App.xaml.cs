@@ -235,6 +235,7 @@ namespace Unigram
         protected override async void OnBackgroundActivated(BackgroundActivatedEventArgs args)
         {
             base.OnBackgroundActivated(args);
+            Logs.PushDiagnostics.Write("managed.background.run", $"task_name={args.TaskInstance.Task.Name};trigger={args.TaskInstance.TriggerDetails?.GetType().Name ?? "null"}");
 
             //if (args.TaskInstance.TriggerDetails is AppServiceTriggerDetails appService && string.Equals(appService.CallerPackageFamilyName, Package.Current.Id.FamilyName))
             //{
@@ -250,65 +251,108 @@ namespace Unigram
             //else
             {
                 var deferral = args.TaskInstance.GetDeferral();
-
-                if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
+                try
                 {
-                    var data = Toast.GetData(triggerDetail);
-                    if (data == null)
+                    if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
                     {
-                        deferral.Complete();
-                        return;
-                    }
-
-                    var session = TLContainer.Current.Lifetime.ActiveItem.Id;
-                    if (data.TryGetValue("session", out string value) && int.TryParse(value, out int result))
-                    {
-                        session = result;
-                    }
-
-                    if (TLContainer.Current.TryResolve(session, out INotificationsService service))
-                    {
-                        await service.ProcessAsync(data);
-                    }
-                }
-                else if (args.TaskInstance.TriggerDetails is RawNotification notification)
-                {
-                    int? GetSession(long id)
-                    {
-                        if (ApplicationData.Current.LocalSettings.Values.TryGet($"User{id}", out int value))
+                        var data = Toast.GetData(triggerDetail);
+                        if (data == null)
                         {
-                            return value;
+                            Logs.PushDiagnostics.Write("managed.background.toast.invalid");
+                            return;
                         }
 
-                        return null;
-                    }
-
-                    var receiver = Client.Execute(new GetPushReceiverId(notification.Content)) as PushReceiverId;
-                    if (receiver == null)
-                    {
-                        deferral.Complete();
-                        return;
-                    }
-
-                    var session = GetSession(receiver.Id);
-                    if (session == null)
-                    {
-                        deferral.Complete();
-                        return;
-                    }
-
-                    if (TLContainer.Current.TryResolve(session.Value, out IProtoService service))
-                    {
-                        var response = await service.SendAsync(new ProcessPushNotification(notification.Content));
-                        if (response is Error error && error.Code == 406)
+                        var session = TLContainer.Current.Lifetime.ActiveItem.Id;
+                        if (data.TryGetValue("session", out string value) && int.TryParse(value, out int result))
                         {
-                            // xd memes
-                            await Task.Delay(5000);
+                            session = result;
+                        }
+
+                        if (TLContainer.Current.TryResolve(session, out INotificationsService service))
+                        {
+                            await service.ProcessAsync(data);
+                        }
+                    }
+                    else if (args.TaskInstance.TriggerDetails is RawNotification notification)
+                    {
+                        Logs.PushDiagnostics.Write("managed.raw.received", $"length={notification.Content?.Length ?? 0}");
+
+                        int? GetSession(long id)
+                        {
+                            if (ApplicationData.Current.LocalSettings.Values.TryGet($"PushReceiverId{id}", out int receiverSession))
+                            {
+                                return receiverSession;
+                            }
+
+                            if (ApplicationData.Current.LocalSettings.Values.TryGet($"User{id}", out int value))
+                            {
+                                return value;
+                            }
+
+                            return null;
+                        }
+
+                        var receiver = Client.Execute(new GetPushReceiverId(notification.Content)) as PushReceiverId;
+                        if (receiver == null)
+                        {
+                            Logs.PushDiagnostics.Write("tdlib.get_push_receiver.result", "result=missing");
+                            return;
+                        }
+
+                        var session = GetSession(receiver.Id);
+                        Logs.PushDiagnostics.Write("tdlib.get_push_receiver.result", $"result=success;receiver_hash={Logs.PushDiagnostics.HashIdentifier(receiver.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))};mapping_found={session != null}");
+                        if (session == null)
+                        {
+                            return;
+                        }
+
+                        if (TLContainer.Current.TryResolve(session.Value, out IProtoService service))
+                        {
+                            for (var attempt = 1; attempt <= 3; attempt++)
+                            {
+                                Logs.PushDiagnostics.Write("tdlib.process_push.request", $"session={session.Value};attempt={attempt}");
+                                var response = await service.SendAsync(new ProcessPushNotification(notification.Content));
+                                if (!(response is Error error) || error.Code != 406)
+                                {
+                                    if (response is Error finalError)
+                                    {
+                                        Logs.Logger.Error(Logs.Target.Notifications, $"Unable to process push notification: {finalError}");
+                                        Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=error;code={finalError.Code};attempt={attempt}");
+                                    }
+                                    else
+                                    {
+                                        Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=success;type={response?.GetType().Name ?? "null"};attempt={attempt}");
+                                    }
+
+                                    break;
+                                }
+
+                                if (attempt == 3)
+                                {
+                                    Logs.Logger.Error(Logs.Target.Notifications, $"Unable to process push notification after {attempt} attempts: {error}");
+                                    Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=error;code={error.Code};attempt={attempt}");
+                                    break;
+                                }
+
+                                Logs.PushDiagnostics.Write("tdlib.process_push.retry", $"session={session.Value};code={error.Code};attempt={attempt}");
+                                await Task.Delay(5000);
+                            }
+                        }
+                        else
+                        {
+                            Logs.PushDiagnostics.Write("tdlib.process_push.unavailable", $"session={session.Value};reason=service_not_resolved");
                         }
                     }
                 }
-
-                deferral.Complete();
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("managed.background.failed", ex);
+                }
+                finally
+                {
+                    deferral.Complete();
+                    Logs.PushDiagnostics.Write("managed.background.complete");
+                }
             }
         }
 
@@ -446,12 +490,6 @@ namespace Unigram
             //#endif
 
             await Toast.RegisterBackgroundTasks();
-
-            try
-            {
-                TileUpdateManager.CreateTileUpdaterForApplication("App").Clear();
-            }
-            catch { }
 
             try
             {
