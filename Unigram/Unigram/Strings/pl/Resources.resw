@@ -8617,7 +8617,7 @@ Aby włączyć tę funkcję, włącz usługi lokalizacyjne.</value>
     <value>Polityka prywatności i Warunki świadczenia usługi</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy</value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>Zdjęcie profilowe</value>

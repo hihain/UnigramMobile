@@ -551,6 +551,7 @@
     <Compile Include="Logs\Logger.cs" />
     <Compile Include="Logs\LogHelper.cs" />
     <Compile Include="Logs\LogLevel.cs" />
+    <Compile Include="Logs\PushDiagnostics.cs" />
     <Compile Include="Navigation\BindableBase.cs" />
     <Compile Include="Navigation\BootStrapper.cs" />
     <Compile Include="Navigation\DispatcherWrapper.cs" />
@@ -2708,6 +2709,10 @@
       <Project>{3adbf08f-0550-4a1c-9794-fea30cf69e3a}</Project>
       <Name>Unigram.Native.Media</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Unigram.Native.Tasks\Unigram.Native.Tasks.vcxproj">
+      <Project>{ca0c2cc0-3d83-4556-a9a3-0923ece8c1d3}</Project>
+      <Name>Unigram.Native.Tasks</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Unigram.Native\Unigram.Native.vcxproj">
       <Project>{1b521e77-46bd-4d60-89f6-d68e9bb9abff}</Project>
       <Name>Unigram.Native</Name>
@@ -2749,6 +2754,7 @@
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+  <Import Project="StorePackaging.targets" />
   <PropertyGroup>
     <PreBuildEvent>powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -file "$(ProjectDir)\..\UpdateManifest.ps1" -path $(ProjectDir) -config $(ConfigurationName)</PreBuildEvent>
   </PropertyGroup>

@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libogg", "Libraries\libogg\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libopusfile", "Libraries\libopusfile\libopusfile.vcxproj", "{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Unigram.Native.Tasks", "Unigram.Native.Tasks\Unigram.Native.Tasks.vcxproj", "{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Unigram.Native.Shared", "Unigram.Native.Shared\Unigram.Native.Shared.vcxitems", "{C50F57B3-33E1-4235-9D02-0C9F1C4176A8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Unigram.Native.Media", "Unigram.Native.Media\Unigram.Native.Media.vcxproj", "{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}"
@@ -134,6 +136,20 @@ Global
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x64.Build.0 = Release|x64
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x86.ActiveCfg = Release|Win32
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x86.Build.0 = Release|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM.ActiveCfg = Debug|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM.Build.0 = Debug|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|x64.ActiveCfg = Debug|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|x64.Build.0 = Debug|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|x86.ActiveCfg = Debug|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|x86.Build.0 = Debug|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|ARM.ActiveCfg = Release|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|ARM.Build.0 = Release|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|ARM64.ActiveCfg = Release|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x64.ActiveCfg = Release|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x64.Build.0 = Release|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x86.ActiveCfg = Release|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x86.Build.0 = Release|Win32
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM.ActiveCfg = Debug|ARM
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM.Build.0 = Debug|ARM
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM64.ActiveCfg = Debug|ARM64

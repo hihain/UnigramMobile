@@ -8202,7 +8202,7 @@ a부터 z 사이 글자, 0부터 9 사이 숫자와 밑줄을 사용하실 수 �
     <value>개인 정보 정책 및 이용 약관</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy</value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>프로필 사진</value>

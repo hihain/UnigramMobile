@@ -8661,7 +8661,7 @@ Vous pouvez les modifier dans Paramètres > Confidentialité et Sécurité > Num
     <value>Politique de confidentialité et conditions de service</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy</value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>Photo de profil</value>

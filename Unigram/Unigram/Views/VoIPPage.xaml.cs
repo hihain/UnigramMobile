@@ -539,11 +539,11 @@ namespace Unigram.Views
         {
             if (_call.IsOutgoing && _call.State is CallStateDiscarded discarded && discarded.Reason is CallDiscardReasonDeclined)
             {
-                _protoService.Send(new CreateCall(_call.UserId, new CallProtocol(true, true, 65, 74, new string[0]), false));
+                _protoService.Send(new CreateCall(_call.UserId, new CallProtocol(true, true, 65, libtgvoip.VoIPControllerWrapper.GetConnectionMaxLayer(), new string[0]), false));
             }
             else
             {
-                _protoService.Send(new AcceptCall(_call.Id, new CallProtocol(true, true, 65, 74, new string[0])));
+                _protoService.Send(new AcceptCall(_call.Id, new CallProtocol(true, true, 65, libtgvoip.VoIPControllerWrapper.GetConnectionMaxLayer(), new string[0])));
             }
         }
 

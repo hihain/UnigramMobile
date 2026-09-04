@@ -44,6 +44,14 @@ namespace Unigram.ViewModels
                 LogOldSize = basic.Size;
             }
 
+            var pushLog = await ApplicationData.Current.LocalFolder.TryGetItemAsync(Logs.PushDiagnostics.DirectoryName) as StorageFolder;
+            var pushLogFile = pushLog == null ? null : await pushLog.TryGetItemAsync(Logs.PushDiagnostics.FileName) as StorageFile;
+            if (pushLogFile != null)
+            {
+                var basic = await pushLogFile.GetBasicPropertiesAsync();
+                PushLogSize = basic.Size;
+            }
+
             var properties = typeof(IOptionsService).GetProperties();
 
             foreach (var prop in properties)
@@ -240,6 +248,13 @@ namespace Unigram.ViewModels
         {
             get => _logOldSize;
             set => Set(ref _logOldSize, value);
+        }
+
+        private ulong _pushLogSize;
+        public ulong PushLogSize
+        {
+            get => _pushLogSize;
+            set => Set(ref _pushLogSize, value);
         }
 
         public RelayCommand VerbosityCommand { get; }

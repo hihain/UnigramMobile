@@ -435,8 +435,22 @@ namespace Unigram.Services
             }
             set
             {
+                var previous = PushReceiverId;
+                if (previous != 0 && previous != value)
+                {
+                    var key = $"PushReceiverId{previous}";
+                    if (_local.Values.ContainsKey(key) && _local.Values[key] is int session && session == Session)
+                    {
+                        _local.Values.Remove(key);
+                    }
+                }
+
                 _pushReceiverId = value;
-                AddOrUpdateValue(_local, $"PushReceiverId{value}", Session);
+                if (value != 0)
+                {
+                    AddOrUpdateValue(_local, $"PushReceiverId{value}", Session);
+                }
+
                 AddOrUpdateValue(_own, "PushReceiverId", value);
             }
         }

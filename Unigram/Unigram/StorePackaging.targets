@@ -1,0 +1,9 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ExcludeWindowsSdkMetadataFromPackage"
+          AfterTargets="_AddUnionWinmd;_AddFxWinmd">
+    <ItemGroup>
+      <PackagingOutputs Remove="@(UnionMetadataWinmd)" />
+      <PackagingOutputs Remove="@(WinmdsFromFrameworkSDKs)" />
+    </ItemGroup>
+  </Target>
+</Project>

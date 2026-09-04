@@ -8714,7 +8714,7 @@ Por favor, ative os serviços de localização para ativar este recurso.</value>
     <value>Política de Privacidade e Termos de Serviço</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy</value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>Foto de Perfil</value>

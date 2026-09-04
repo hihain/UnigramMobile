@@ -8497,7 +8497,7 @@ Permeteu l'accés a la ubicació per a activar aquesta opció.</value>
     <value>Política de privadesa i condicions del servei</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy</value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>Foto de perfil</value>

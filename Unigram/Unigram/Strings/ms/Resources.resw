@@ -8656,7 +8656,7 @@ Sila buka akses ke servis lokasi untuk dayakan ciri ini.</value>
     <value>Polisi Privasi dan Terma Servis</value>
   </data>
   <data name="PrivacyPolicyUrl" xml:space="preserve">
-    <value>https://telegram.org/privacy </value>
+    <value>https://zunetracks.github.io/UnigramMobile/privacy</value>
   </data>
   <data name="PrivacyProfilePhoto" xml:space="preserve">
     <value>Foto Profil</value>
