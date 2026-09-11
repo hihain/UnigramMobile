@@ -44,9 +44,9 @@ namespace Unigram.Controls
 
         public event EventHandler StrokeChanged;
 
-        public Color Stroke => ColorForValue(_value.X);
-
-        public float StrokeThickness => 4 + _value.Y * 16;
+        // Live color while dragging: _current tracks the pointer, _value is
+        // only committed on release.
+        public Color Stroke => ColorForValue(_current.X);
 
         public void SetDefault(Vector2 value)
         {
@@ -59,13 +59,9 @@ namespace Unigram.Controls
             }
 
             var w = (float)_layoutRoot.ActualWidth;
-            var h = 180f;
-
-            var weight = 4 + (_current.Y * 16);
 
             _thumbVisual.Offset = new Vector3(_current.X * w, 0, 0);
 
-            _thumbDrop.StrokeThickness = 20 - (weight * 2) / 2;
             _thumbDrop.Fill = new SolidColorBrush(ColorForValue(_current.X));
         }
 
@@ -105,6 +101,7 @@ namespace Unigram.Controls
             _thumbVisual.Scale = new Vector3(0.5f);
 
             _thumbDrop = (Ellipse)GetTemplateChild("ThumbDrop");
+            _thumbDrop.StrokeThickness = 0;
 
             Background = gradient;
             SetDefault(_value);
@@ -119,9 +116,9 @@ namespace Unigram.Controls
             var pointer = e.GetCurrentPoint(_container);
             m_pointerPositions[pointer.PointerId] = pointer.Position;
 
-            _current = new Vector2(_value.X, 0);
+            _current = new Vector2(_value.X, _value.Y);
 
-            UpdateThumb(pointer.Position, true, true);
+            UpdateThumb(pointer.Position);
             e.Handled = true;
         }
 
@@ -135,7 +132,7 @@ namespace Unigram.Controls
             _value = _current;
             StrokeChanged?.Invoke(this, EventArgs.Empty);
 
-            UpdateThumb(pointer.Position, true, false);
+            UpdateThumb(pointer.Position);
             e.Handled = true;
         }
 
@@ -144,16 +141,17 @@ namespace Unigram.Controls
             if (e.Pointer.IsInContact && m_pointerPositions.TryGetValue(e.Pointer.PointerId, out _))
             {
                 UpdateThumb(e.GetCurrentPoint(_container).Position.ToVector2());
+                StrokeChanged?.Invoke(this, EventArgs.Empty);
                 e.Handled = true;
             }
         }
 
-        private void UpdateThumb(Point position, bool animate = false, bool zoom = true)
+        private void UpdateThumb(Point position)
         {
-            UpdateThumb(position.ToVector2(), animate, zoom);
+            UpdateThumb(position.ToVector2());
         }
 
-        private void UpdateThumb(Vector2 position, bool animate = false, bool zoom = true)
+        private void UpdateThumb(Vector2 position)
         {
             if (_layoutRoot == null)
             {
@@ -161,94 +159,15 @@ namespace Unigram.Controls
             }
 
             var w = (float)_layoutRoot.ActualWidth;
-            var h = 180f;
 
             var offsetX = position.X / w;
             var left = Clamp(offsetX, 0, 1);
-            var bottom = _current.Y;
 
             _current.X = left;
 
-            if (position.Y < h)
-            {
-                var offsetY = position.Y / h;
-                bottom = 1 - Clamp(offsetY, 0, 1);
-
-                _current.Y = bottom;
-            }
-            else
-            {
-                bottom = 0;
-            }
-
-            var weight = 4 + (_current.Y * 16);
-
-            _thumbDrop.StrokeThickness = 20 - (weight * 2) / 2;
             _thumbDrop.Fill = new SolidColorBrush(ColorForValue(_current.X));
 
-            if (animate)
-            {
-                _thumbVisual.StopAnimation("Scale");
-                _thumbVisual.StopAnimation("Offset");
-
-                //if (ApiInformation.IsMethodPresent(".Compositor", "CreateSpringVector3Animation"))
-                if (false)
-                {
-                    var scale = Window.Current.Compositor.CreateSpringVector3Animation();
-                    scale.InitialValue = new Vector3(zoom ? 0.5f : 1);
-                    scale.FinalValue = new Vector3(zoom ? 1 : 0.5f);
-
-                    var offset = Window.Current.Compositor.CreateSpringVector3Animation();
-                    //offset.InitialValue = new Vector3(_current.X * w, -60, 0);
-                    offset.InitialValue = _thumbVisual.Offset;
-                    offset.FinalValue = new Vector3(_current.X * w, zoom ? -60 : 0, 0);
-
-                    _thumbVisual.StartAnimation("Scale", scale);
-                    _thumbVisual.StartAnimation("Offset", offset);
-                }
-                else
-                {
-                    _container.Height = 200;
-                    _container.Margin = new Thickness(0, -180, 0, 0);
-
-                    var batch = Window.Current.Compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-                    batch.Completed += (s, args) =>
-                    {
-                        _container.Height = zoom ? 200 : 20;
-                        _container.Margin = new Thickness(0, zoom ? -180 : 0, 0, 0);
-                    };
-
-                    CompositionAnimation scale;
-                    if (Common.ApiInfo.IsUniversalApiContract5Present)
-                    {
-                        var scaleNew = Window.Current.Compositor.CreateSpringVector3Animation();
-                        scaleNew.InitialValue = new Vector3(zoom ? 0.5f : 1);
-                        scaleNew.FinalValue = new Vector3(zoom ? 1 : 0.5f);
-                        scale = scaleNew;
-                    }
-                    else
-                    {
-                        var scaleOld = Window.Current.Compositor.CreateVector3KeyFrameAnimation();
-                        scaleOld.InsertKeyFrame(0, new Vector3(zoom ? 0.5f : 1));
-                        scaleOld.InsertKeyFrame(1, new Vector3(zoom ? 1 : 0.5f));
-                        scale = scaleOld;
-                    }
-
-                    var offset = Window.Current.Compositor.CreateVector3KeyFrameAnimation();
-                    offset.InsertKeyFrame(0, _thumbVisual.Offset);
-                    offset.InsertKeyFrame(1, new Vector3(_current.X * w, zoom ? -60 : 0, 0));
-
-                    _thumbVisual.StartAnimation("Scale", scale);
-                    _thumbVisual.StartAnimation("Offset", offset);
-
-                    batch.End();
-                }
-            }
-            else
-            {
-                //_thumbVisual.StopAnimation("Offset");
-                _thumbVisual.Offset = new Vector3(_current.X * w, -(bottom * h) - 60, 0);
-            }
+            _thumbVisual.Offset = new Vector3(_current.X * w, 0, 0);
         }
 
         private Color ColorForValue(double location)

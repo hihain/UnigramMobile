@@ -910,12 +910,12 @@ namespace Unigram.Services
                 if (_pencil == null)
                 {
                     var offset = GetValueOrDefault(_local, "PencilOffset", 1f);
-                    var thickness = GetValueOrDefault(_local, "PencilThickness", 0.22f);
+                    var thickness = GetValueOrDefault(_local, "PencilThickness", 0.3333f);
 
                     _pencil = new Vector2(offset, thickness);
                 }
 
-                return _pencil ?? new Vector2(1f, 0.22f);
+                return _pencil ?? new Vector2(1f, 0.3333f);
             }
             set
             {

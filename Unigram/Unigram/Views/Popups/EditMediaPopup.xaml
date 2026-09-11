@@ -17,7 +17,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition/>
-            <RowDefinition Height="32"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition x:Name="KeyboardPlaceholder" Height="Auto"/>
         </Grid.RowDefinitions>
@@ -45,13 +45,25 @@
             MaxWidth="400"
             Grid.Row="1"/>
 
-        <controls:ColorSlider
-            x:Name="DrawSlider"
-            x:Load="False"
-            StrokeChanged="DrawSlider_StrokeChanged"
-            Margin="14,0,14,0"
-            MaxWidth="400"
-            Grid.Row="1"/>
+        <Grid x:Name="DrawPanel"
+              x:Load="False"
+              Margin="14,0,14,0"
+              MaxWidth="400"
+              Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel x:Name="ThicknessPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,16"
+                        Grid.Row="0"/>
+            <controls:ColorSlider
+                x:Name="DrawSlider"
+                StrokeChanged="DrawSlider_StrokeChanged"
+                Grid.Row="1"/>
+        </Grid>
 
         <Grid x:Name="Commands"
               Background="{ThemeResource SystemControlChromeMediumLowAcrylicElementMediumBrush}"

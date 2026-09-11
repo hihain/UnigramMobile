@@ -16,7 +16,9 @@ using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
+using Windows.UI.Xaml.Shapes;
 
 namespace Unigram.Views.Popups
 {
@@ -34,6 +36,12 @@ namespace Unigram.Views.Popups
         private BitmapFlip _flip = BitmapFlip.None;
 
         private bool _hasMessageContext = true;
+
+        // Stroke thickness presets (canvas-relative units, normalized by the
+        // canvas width when strokes are rendered onto the output bitmap).
+        private static readonly float[] _thicknessValues = { 2, 3, 4, 6, 9, 13, 20 };
+        private readonly List<(Border Ring, Ellipse Dot)> _thicknessPresets = new List<(Border, Ellipse)>();
+        private int _thicknessIndex = 2;
 
         public EditMediaPopup(StorageMedia media, ImageCropperMask mask = ImageCropperMask.Rectangle, bool ttl = false)
         {
@@ -302,8 +310,8 @@ namespace Unigram.Views.Popups
                 CropToolbar.Visibility = Visibility.Collapsed;
             if (DrawToolbar != null)
                 DrawToolbar.Visibility = Visibility.Collapsed;
-            if (DrawSlider != null)
-                DrawSlider.Visibility = Visibility.Collapsed;
+            if (DrawPanel != null)
+                DrawPanel.Visibility = Visibility.Collapsed;
             if (TrimToolbar != null)
                 TrimToolbar.Visibility = !_hasMessageContext && _media.IsVideo ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -540,16 +548,21 @@ namespace Unigram.Views.Popups
 
             if (DrawToolbar == null)
                 FindName(nameof(DrawToolbar));
-            if (DrawSlider == null)
-                FindName(nameof(DrawSlider));
+            if (DrawPanel == null)
+                FindName(nameof(DrawPanel));
 
             DrawToolbar.Visibility = Visibility.Visible;
-            DrawSlider.Visibility = Visibility.Visible;
-            DrawSlider.SetDefault(SettingsService.Current.Pencil);
+            DrawPanel.Visibility = Visibility.Visible;
 
-            Canvas.Mode = PencilCanvasMode.Stroke;
-            Canvas.Stroke = DrawSlider.Stroke;
-            Canvas.StrokeThickness = DrawSlider.StrokeThickness;
+            var pencil = SettingsService.Current.Pencil;
+            DrawSlider.SetDefault(pencil);
+
+            if (ThicknessPanel.Children.Count == 0)
+            {
+                BuildThicknessPresets();
+            }
+
+            SelectThicknessPreset((int)Math.Round(pencil.Y * (_thicknessValues.Length - 1)));
 
             Brush.IsChecked = true;
             Erase.IsChecked = false;
@@ -700,7 +713,91 @@ namespace Unigram.Views.Popups
         private void DrawSlider_StrokeChanged(object sender, EventArgs e)
         {
             Canvas.Stroke = DrawSlider.Stroke;
-            Canvas.StrokeThickness = DrawSlider.StrokeThickness;
+            Canvas.StrokeThickness = _thicknessValues[_thicknessIndex];
+
+            foreach (var preset in _thicknessPresets)
+            {
+                preset.Dot.Fill = new SolidColorBrush(DrawSlider.Stroke);
+            }
+
+            Brush_Click(null, null);
+        }
+
+        private void BuildThicknessPresets()
+        {
+            var accent = Application.Current.Resources["TelegramBackgroundAccentBrush"] as SolidColorBrush;
+
+            for (int i = 0; i < _thicknessValues.Length; i++)
+            {
+                var dot = new Ellipse
+                {
+                    Width = _thicknessValues[i] * 1.5,
+                    Height = _thicknessValues[i] * 1.5,
+                    Fill = new SolidColorBrush(DrawSlider.Stroke),
+                    Stroke = new SolidColorBrush(Colors.White),
+                    StrokeThickness = 1,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                // The ring is only shown for the selected preset; the dot must
+                // stay visible for every preset, so it cannot be a child of the
+                // (collapsed) ring.
+                var ring = new Border
+                {
+                    Width = 36,
+                    Height = 36,
+                    CornerRadius = new CornerRadius(18),
+                    BorderBrush = accent,
+                    BorderThickness = new Thickness(2),
+                    Visibility = Visibility.Collapsed
+                };
+
+                // Fixed-size content (36x36, the ring size) so showing/hiding
+                // the selection ring never shifts the layout.
+                var content = new Grid { Width = 36, Height = 36 };
+                content.Children.Add(dot);
+                content.Children.Add(ring);
+
+                var button = new Button
+                {
+                    Content = content,
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    BorderThickness = new Thickness(0),
+                    Padding = new Thickness(3),
+                    Margin = new Thickness(2, 0, 2, 0),
+                    MinWidth = 0,
+                    MinHeight = 0,
+                    Tag = i
+                };
+                button.Click += ThicknessPreset_Click;
+
+                ThicknessPanel.Children.Add(button);
+                _thicknessPresets.Add((ring, dot));
+            }
+        }
+
+        private void ThicknessPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is int index)
+            {
+                SelectThicknessPreset(index);
+            }
+        }
+
+        private void SelectThicknessPreset(int index)
+        {
+            _thicknessIndex = index;
+
+            for (int i = 0; i < _thicknessPresets.Count; i++)
+            {
+                _thicknessPresets[i].Ring.Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            DrawSlider.SetDefault(new Vector2(DrawSlider.GetDefault().X, (float)index / (_thicknessValues.Length - 1)));
+
+            Canvas.Stroke = DrawSlider.Stroke;
+            Canvas.StrokeThickness = _thicknessValues[index];
 
             Brush_Click(null, null);
         }

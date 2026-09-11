@@ -140,7 +140,7 @@
 
         <DataTemplate x:Key="MediaItemTemplate" x:DataType="entities:StorageMedia">
             <Grid>
-                <Grid MinHeight="48" MaxHeight="294"
+<Grid MinHeight="48"
                       Tapped="Preview_TappedAsync"
                       Tag="{x:Bind}">
                     <Image
@@ -331,6 +331,7 @@
                     <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                     <Setter Property="MinWidth" Value="0"/>
                     <Setter Property="MinHeight" Value="0"/>
+                    <Setter Property="MaxHeight" Value="294"/>
                     <Setter Property="Padding" Value="12,6"/>
                 </Style>
             </ListView.ItemContainerStyle>
