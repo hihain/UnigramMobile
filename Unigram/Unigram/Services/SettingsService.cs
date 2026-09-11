@@ -610,9 +610,9 @@ namespace Unigram.Services
             get
             {
                 if (_hideArchivedChats == null)
-                    _hideArchivedChats = GetValueOrDefault(_local, "HideArchivedChats", true);
+                    _hideArchivedChats = GetValueOrDefault(_local, "HideArchivedChats", false);
 
-                return _hideArchivedChats ?? true;
+                return _hideArchivedChats ?? false;
             }
             set
             {
