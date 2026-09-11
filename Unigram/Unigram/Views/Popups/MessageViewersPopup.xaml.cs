@@ -17,25 +17,14 @@ namespace Unigram.Views.Popups
         private readonly IProtoService _protoService;
         private readonly IMessageDelegate _delegate;
 
-        public MessageViewersPopup(IProtoService protoService, IMessageDelegate delegato, IList<MessageViewer> viewers, bool played)
+        public MessageViewersPopup(IProtoService protoService, IMessageDelegate delegato, IList<MessageViewerItem> items, string title)
         {
             InitializeComponent();
 
             _protoService = protoService;
             _delegate = delegato;
 
-            var items = new List<MessageViewerItem>();
-
-            foreach (var viewer in viewers)
-            {
-                var user = protoService.GetUser(viewer.UserId);
-                if (user != null)
-                {
-                    items.Add(new MessageViewerItem(user, viewer.ViewDate));
-                }
-            }
-
-            Title = Locale.Declension(played ? "MessagePlayed" : "MessageSeen", items.Count);
+            Title = title;
             PrimaryButtonText = Strings.Resources.Close;
 
             ScrollingHost.ItemsSource = items;
@@ -67,13 +56,19 @@ namespace Unigram.Views.Popups
             }
 
             var photo = content.Children[0] as ProfilePicture;
-            photo.Source = PlaceholderHelper.GetUser(_protoService, item.User, 36);
+            photo.Source = PlaceholderHelper.GetMessageSender(_protoService, item.Sender, 36);
 
             var title = content.Children[1] as TextBlock;
-            title.Text = item.User.GetFullName();
+            title.Text = GetSenderName(item.Sender);
 
             var date = content.Children[2] as TextBlock;
-            date.Text = FormatViewDate(item.ViewDate);
+            date.Text = FormatViewDate(item.Date);
+
+            // Nothing to show for somebody who only read the message, and an empty block is
+            // not the same as a missing one: the column is shared, so it has to keep its
+            // place or the names above and below stop lining up.
+            var reaction = content.Children[3] as TextBlock;
+            reaction.Text = item.Reaction is ReactionTypeEmoji emoji ? emoji.Emoji : string.Empty;
 
             args.Handled = true;
         }
@@ -93,12 +88,36 @@ namespace Unigram.Views.Popups
             return text;
         }
 
+        // Anonymous admins and channels react as a chat rather than as a person, so the
+        // name and the tap have to cope with both.
+        private string GetSenderName(MessageSender sender)
+        {
+            if (_protoService.TryGetUser(sender, out User user))
+            {
+                return user.GetFullName();
+            }
+            else if (_protoService.TryGetChat(sender, out Chat chat))
+            {
+                return _protoService.GetTitle(chat);
+            }
+
+            return string.Empty;
+        }
+
         private void OnItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is MessageViewerItem item)
             {
-                Hide();
-                _delegate.OpenUser(item.User.Id);
+                if (item.Sender is MessageSenderUser senderUser)
+                {
+                    Hide();
+                    _delegate.OpenUser(senderUser.UserId);
+                }
+                else if (item.Sender is MessageSenderChat senderChat)
+                {
+                    Hide();
+                    _delegate.OpenChat(senderChat.ChatId, true);
+                }
             }
         }
 
@@ -107,15 +126,22 @@ namespace Unigram.Views.Popups
         }
     }
 
+    /// <summary>
+    /// One row: somebody who read the message, reacted to it, or both. The reaction is null
+    /// for a reader, and the date is when they read it or when they reacted, whichever this
+    /// row stands for.
+    /// </summary>
     public class MessageViewerItem
     {
-        public MessageViewerItem(User user, int viewDate)
+        public MessageViewerItem(MessageSender sender, int date, ReactionType reaction = null)
         {
-            User = user;
-            ViewDate = viewDate;
+            Sender = sender;
+            Date = date;
+            Reaction = reaction;
         }
 
-        public User User { get; private set; }
-        public int ViewDate { get; private set; }
+        public MessageSender Sender { get; private set; }
+        public int Date { get; private set; }
+        public ReactionType Reaction { get; private set; }
     }
 }

@@ -89,6 +89,7 @@ namespace Unigram.ViewModels
         public bool CanBeForwarded => _message.CanBeForwarded;
         public bool CanBeEdited => _message.CanBeEdited;
         public bool CanBeSaved => _message.CanBeSaved;
+        public bool CanGetAddedReactions => _message.CanGetAddedReactions;
         public bool CanGetMessageThread => _message.CanGetMessageThread;
         public bool CanGetStatistics => _message.CanGetStatistics;
         public bool CanGetViewers => _message.CanGetViewers;
@@ -316,6 +317,7 @@ namespace Unigram.ViewModels
             _message.CanBeEdited = message.CanBeEdited;
             _message.CanBeSaved = message.CanBeSaved;
             _message.CanBeForwarded = message.CanBeForwarded;
+            _message.CanGetAddedReactions = message.CanGetAddedReactions;
             _message.CanGetMessageThread = message.CanGetMessageThread;
             _message.CanGetStatistics = message.CanGetStatistics;
             _message.CanGetViewers = message.CanGetViewers;

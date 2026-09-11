@@ -344,6 +344,13 @@
                                        IsTextSelectionEnabled="False"
                                        VerticalAlignment="Center"
                                        Margin="4,0,0,0" />
+                            <!-- Filled in by ReactionButton, which also decides whether
+                                 this or the count above is the one on show. -->
+                            <StackPanel x:Name="Recent"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Margin="4,0,0,0"
+                                        Visibility="Collapsed" />
                         </StackPanel>
                     </Border>
                 </ControlTemplate>

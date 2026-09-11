@@ -93,12 +93,12 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewersArgs> MessageViewersCommand { get; }
         private async void MessageViewersExecute(MessageViewersArgs args)
         {
-            if (args == null || args.Viewers == null || args.Viewers.Count == 0)
+            if (args == null || args.Items == null || args.Items.Count == 0)
             {
                 return;
             }
 
-            await new MessageViewersPopup(ProtoService, this, args.Viewers, args.Played).ShowQueuedAsync();
+            await new MessageViewersPopup(ProtoService, this, args.Items, args.Title).ShowQueuedAsync();
         }
 
         public RelayCommand<MessageViewModel> MessageQuoteCommand { get; }
@@ -1644,7 +1644,7 @@ namespace Unigram.ViewModels
 
     public class MessageViewersArgs
     {
-        public IList<MessageViewer> Viewers { get; set; }
-        public bool Played { get; set; }
+        public IList<MessageViewerItem> Items { get; set; }
+        public string Title { get; set; }
     }
 }

@@ -28,6 +28,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <controls:ProfilePicture IsHitTestVisible="False"
                                              Width="36"
@@ -47,6 +48,13 @@
                                Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"
                                Grid.Row="1"
                                Grid.Column="1"/>
+                    <TextBlock VerticalAlignment="Center"
+                               FontFamily="{ThemeResource EmojiThemeFontFamily}"
+                               FontSize="20"
+                               IsTextSelectionEnabled="False"
+                               Margin="12,0,0,0"
+                               Grid.Column="2"
+                               Grid.RowSpan="2"/>
                 </Grid>
             </DataTemplate>
         </ListView.ItemTemplate>

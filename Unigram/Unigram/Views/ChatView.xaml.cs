@@ -2133,6 +2133,10 @@ namespace Unigram.Views
                 {
                     LoadMessageViewers(message, flyout);
                 }
+                else if (MessageReactions_Loaded(message))
+                {
+                    LoadMessageReactions(message, flyout);
+                }
 
                 // Generic
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
@@ -2307,6 +2311,107 @@ namespace Unigram.Views
             return message.CanGetViewers;
         }
 
+        /// <summary>
+        /// The people who reacted first, each with what they reacted with, then the people
+        /// who only read it. Somebody who did both appears once, up with the reactions,
+        /// which is how the web client puts it and is the reason the two requests are worth
+        /// merging rather than showing one after the other: the same face twice, once with
+        /// an emoji and once without, reads as two people.
+        /// </summary>
+        private List<MessageViewerItem> BuildViewers(BaseObject viewers, BaseObject reactions)
+        {
+            var items = new List<MessageViewerItem>();
+            var reacted = new HashSet<long>();
+
+            if (reactions is AddedReactions added)
+            {
+                foreach (var reaction in added.Reactions)
+                {
+                    items.Add(new MessageViewerItem(reaction.SenderId, reaction.Date, reaction.Type));
+
+                    if (reaction.SenderId is MessageSenderUser senderUser)
+                    {
+                        reacted.Add(senderUser.UserId);
+                    }
+                }
+            }
+
+            if (viewers is MessageViewers messageViewers)
+            {
+                foreach (var viewer in messageViewers.Viewers)
+                {
+                    if (reacted.Contains(viewer.UserId))
+                    {
+                        continue;
+                    }
+
+                    items.Add(new MessageViewerItem(new MessageSenderUser(viewer.UserId), viewer.ViewDate));
+                }
+            }
+
+            return items;
+        }
+
+        // Only where the readers entry is not, which is what carries the reactions for a
+        // message of one's own. The two say the same thing in different words, and a menu
+        // this long on a phone does not need both.
+        private bool MessageReactions_Loaded(MessageViewModel message)
+        {
+            if (message.SchedulingState != null || !message.CanGetAddedReactions)
+            {
+                return false;
+            }
+
+            var reactions = message.InteractionInfo?.Reactions;
+            return reactions != null && reactions.Reactions.Count > 0;
+        }
+
+        // Same shape as the viewers above, and for the same reason: the answer arrives after
+        // the menu is on screen, so the entry is filled in rather than added.
+        private async void LoadMessageReactions(MessageViewModel message, MenuFlyout flyout)
+        {
+            var placeholder = new MenuFlyoutItem();
+            placeholder.Text = "\u2026";
+            placeholder.IsEnabled = false;
+            placeholder.Icon = new FontIcon { Glyph = Icons.Reactions };
+
+            flyout.Items.Insert(0, placeholder);
+            flyout.Items.Insert(1, new MenuFlyoutSeparator());
+
+            try
+            {
+                // Fifty is where the official clients stop as well. Past that the list stops
+                // being something anybody reads and the count above it is the real answer.
+                var response = await message.ProtoService.SendAsync(
+                    new GetMessageAddedReactions(message.ChatId, message.Id, null, string.Empty, 50));
+
+                if (response is Error error)
+                {
+                    placeholder.Text = error.Message;
+                    return;
+                }
+
+                if (!(response is AddedReactions added) || added.Reactions.Count == 0)
+                {
+                    placeholder.Text = Strings.Resources.NobodyViewed;
+                    return;
+                }
+
+                // TotalCount rather than what came back: the request is capped, and a group
+                // where sixty people reacted should not be told that fifty did.
+                var title = Locale.Declension("ReactionsCount", added.TotalCount);
+
+                placeholder.Text = title;
+                placeholder.CommandParameter = new MessageViewersArgs { Items = BuildViewers(null, added), Title = title };
+                placeholder.Command = ViewModel.MessageViewersCommand;
+                placeholder.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                placeholder.Text = ex.Message;
+            }
+        }
+
         private FontIcon MessageViewersIcon(bool played)
         {
             if (played)
@@ -2333,49 +2438,47 @@ namespace Unigram.Views
 
             try
             {
-                var response = await message.ProtoService.SendAsync(new GetMessageViewers(message.ChatId, message.Id));
+                // Asked for together, because to the reader they are one list. Reacting to a
+                // message means having seen it, so the two answers overlap, and the overlap
+                // is what the merge below is about.
+                var viewersTask = message.ProtoService.SendAsync(new GetMessageViewers(message.ChatId, message.Id));
+                var reactionsTask = message.CanGetAddedReactions
+                    ? message.ProtoService.SendAsync(new GetMessageAddedReactions(message.ChatId, message.Id, null, string.Empty, 100))
+                    : Task.FromResult<BaseObject>(null);
 
-                var profiles = new List<User>();
-                IList<MessageViewer> entries = null;
+                await Task.WhenAll(viewersTask, reactionsTask);
 
-                if (response is MessageViewers viewers)
+                var items = BuildViewers(viewersTask.Result, reactionsTask.Result);
+
+                if (items.Count == 0)
                 {
-                    entries = viewers.Viewers;
+                    placeholder.Text = viewersTask.Result is Error error ? error.Message : Strings.Resources.NobodyViewed;
+                    return;
+                }
 
-                    foreach (var viewer in viewers.Viewers)
+                // One person and nothing beside their name to show: the entry is the answer
+                // rather than the way to one, and a popup holding a single row is a step for
+                // its own sake.
+                if (items.Count == 1 && items[0].Reaction == null && items[0].Sender is MessageSenderUser only)
+                {
+                    var user = message.ProtoService.GetUser(only.UserId);
+                    if (user != null)
                     {
-                        var user = message.ProtoService.GetUser(viewer.UserId);
-                        if (user != null)
-                        {
-                            profiles.Add(user);
-                        }
+                        placeholder.Text = user.GetFullName();
+                        placeholder.CommandParameter = user.Id;
+                        placeholder.Command = ViewModel.OpenUserCommand;
+                        placeholder.IsEnabled = true;
+                        return;
                     }
                 }
-                else if (response is Error error)
-                {
-                    placeholder.Text = error.Message;
-                    return;
-                }
 
-                if (profiles.Count == 0)
-                {
-                    placeholder.Text = Strings.Resources.NobodyViewed;
-                    return;
-                }
+                // Everybody on the list has seen it, the ones who reacted included, so the
+                // count is of the merged list rather than of the viewers alone.
+                var title = Locale.Declension(played ? "MessagePlayed" : "MessageSeen", items.Count);
 
-                if (profiles.Count == 1)
-                {
-                    placeholder.Text = profiles[0].GetFullName();
-                    placeholder.CommandParameter = profiles[0].Id;
-                    placeholder.Command = ViewModel.OpenUserCommand;
-                }
-                else
-                {
-                    placeholder.Text = Locale.Declension(played ? "MessagePlayed" : "MessageSeen", profiles.Count);
-                    placeholder.CommandParameter = new MessageViewersArgs { Viewers = entries, Played = played };
-                    placeholder.Command = ViewModel.MessageViewersCommand;
-                }
-
+                placeholder.Text = title;
+                placeholder.CommandParameter = new MessageViewersArgs { Items = items, Title = title };
+                placeholder.Command = ViewModel.MessageViewersCommand;
                 placeholder.IsEnabled = true;
             }
             catch (Exception ex)

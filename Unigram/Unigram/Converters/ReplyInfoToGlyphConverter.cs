@@ -94,6 +94,8 @@ namespace Unigram.Converters
         public const string Stickers = "\uF4AA";
         public const string Animations = "\uF4A9";
 
+        public const string Reactions = "\uEB51";
+
         public const string Favorite = "\uE734";
         public const string Unfavorite = "\uE8D9";
 
