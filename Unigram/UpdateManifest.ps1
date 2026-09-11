@@ -61,4 +61,13 @@ $h["RELEASE"] = "Unigram Mobile Messenger"
 $visualElements = $document.GetElementsByTagName("uap:VisualElements")[0]
 $visualElements.Attributes["DisplayName"].Value = $h[$config]
 
+# On Windows 10 Mobile the PhoneProductId is the effective app identity; without a
+# distinct GUID per config, Debug and Release refuse to install side by side there.
+$h = @{}
+$h["DEBUG"] = "502422b9-37d8-485f-9fc7-6a5e1211cb72"
+$h["RELEASE"] = "bf16cc61-265a-4c8a-9ead-f4f77e6a0a97"
+
+$phoneIdentity = $document.GetElementsByTagName("mp:PhoneIdentity")[0]
+$phoneIdentity.Attributes["PhoneProductId"].Value = $h[$config]
+
 $document.Save($path_manifest)
