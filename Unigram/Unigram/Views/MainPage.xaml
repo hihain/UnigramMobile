@@ -1,4 +1,4 @@
-<Page
+﻿<Page
     x:Class="Unigram.Views.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -123,18 +123,18 @@
             BorderThickness="0,0,0,0"
             Grid.Row="1">
             <controls:TopNavView
-                x:Name="ChatFiltersSide"
+                x:Name="ChatFoldersSide"
                 ItemsSource="{x:Bind ViewModel.Filters}"
                 SelectedItem="{x:Bind ConvertFilter(ViewModel.SelectedFilter), Mode=TwoWay, BindBack=ConvertFilterBack}"
                 IsItemClickEnabled="True"
-                ItemClick="ChatFilter_ItemClick"
-                ItemContextRequested="ChatFilter_ContextRequested"
+                ItemClick="ChatFolder_ItemClick"
+                ItemContextRequested="ChatFolder_ContextRequested"
                 Orientation="Vertical"
                 AllowDrop="True"
                 CanDragItems="True"
                 CanReorderItems="False"
-                DragItemsStarting="ChatFilters_DragItemsStarting"
-                DragItemsCompleted="ChatFilters_DragItemsCompleted"
+                DragItemsStarting="ChatFolders_DragItemsStarting"
+                DragItemsCompleted="ChatFolders_DragItemsCompleted"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 ScrollViewer.HorizontalScrollMode="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -142,7 +142,7 @@
                 Height="Auto"
                 Width="72">
                 <controls:TopNavView.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:ChatFilterViewModel">
+                    <DataTemplate x:DataType="viewModels:ChatFolderViewModel">
                         <StackPanel Orientation="Vertical">
                             <Grid>
                                 <BitmapIcon
@@ -733,20 +733,20 @@
                                     <Border x:Name="ChatTabs" x:Load="False">
                                         <Grid x:Name="ChatTabsView">
                                             <controls:TopNavView
-                                                x:Name="ChatFilters"
+                                                x:Name="ChatFolders"
                                                 ItemsSource="{x:Bind ViewModel.Filters}"
                                                 SelectedItem="{x:Bind ConvertFilter(ViewModel.SelectedFilter), Mode=TwoWay, BindBack=ConvertFilterBack}"
                                                 IsItemClickEnabled="True"
-                                                ItemClick="ChatFilter_ItemClick"
-                                                ItemContextRequested="ChatFilter_ContextRequested"
+                                                ItemClick="ChatFolder_ItemClick"
+                                                ItemContextRequested="ChatFolder_ContextRequested"
                                                 AllowDrop="True"
                                                 CanDragItems="True"
                                                 CanReorderItems="False"
-                                                DragItemsStarting="ChatFilters_DragItemsStarting"
-                                                DragItemsCompleted="ChatFilters_DragItemsCompleted"
+                                                DragItemsStarting="ChatFolders_DragItemsStarting"
+                                                DragItemsCompleted="ChatFolders_DragItemsCompleted"
                                                 Height="40">
                                                 <controls:TopNavView.ItemTemplate>
-                                                    <DataTemplate x:DataType="viewModels:ChatFilterViewModel">
+                                                    <DataTemplate x:DataType="viewModels:ChatFolderViewModel">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock
                                                                 Text="{x:Bind Title, Mode=OneWay}"

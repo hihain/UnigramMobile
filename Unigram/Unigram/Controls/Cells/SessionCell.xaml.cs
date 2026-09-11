@@ -31,7 +31,7 @@ namespace Unigram.Controls.Cells
                 Title.Text = string.Format("{0}, {1} {2}", session.DeviceModel, session.Platform, session.SystemVersion);
             }
 
-            Subtitle.Text = string.Format("{0} — {1}", session.Ip, session.Country);
+            Subtitle.Text = string.Format("{0} — {1}", session.IpAddress, session.Location);
 
             LastActiveDate.Text = BindConvert.Current.DateExtended(session.LastActiveDate);
         }

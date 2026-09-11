@@ -36,8 +36,8 @@ namespace Unigram.ViewModels.Supergroups
             CanSendPolls = chat.Permissions.CanSendPolls;
             CanAddWebPagePreviews = chat.Permissions.CanAddWebPagePreviews;
             CanSendOtherMessages = chat.Permissions.CanSendOtherMessages;
-            CanSendMediaMessages = chat.Permissions.CanSendMediaMessages;
-            CanSendMessages = chat.Permissions.CanSendMessages;
+            CanSendMediaMessages = chat.Permissions.CanSendMediaMessages();
+            CanSendMessages = chat.Permissions.CanSendBasicMessages;
         }
 
         #region Flags
@@ -215,8 +215,13 @@ namespace Unigram.ViewModels.Supergroups
                 CanAddWebPagePreviews = _canAddWebPagePreviews,
                 CanSendPolls = _canSendPolls,
                 CanSendOtherMessages = _canSendOtherMessages,
-                CanSendMediaMessages = _canSendMediaMessages,
-                CanSendMessages = _canSendMessages
+                CanSendAudios = _canSendMediaMessages,
+                CanSendDocuments = _canSendMediaMessages,
+                CanSendPhotos = _canSendMediaMessages,
+                CanSendVideos = _canSendMediaMessages,
+                CanSendVideoNotes = _canSendMediaMessages,
+                CanSendVoiceNotes = _canSendMediaMessages,
+                CanSendBasicMessages = _canSendMessages
             };
 
             var response = await ProtoService.SendAsync(new SetChatPermissions(chat.Id, permissions));

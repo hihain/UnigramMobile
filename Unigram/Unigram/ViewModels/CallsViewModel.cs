@@ -30,7 +30,7 @@ namespace Unigram.ViewModels
             private readonly IProtoService _protoService;
             private readonly ICacheService _cacheService;
 
-            private long _lastMaxId;
+            private string _nextOffset = string.Empty;
             private bool _hasMoreItems = true;
 
             public ItemsCollection(IProtoService protoService, ICacheService cacheService)
@@ -41,12 +41,12 @@ namespace Unigram.ViewModels
 
             public override async Task<IList<TLCallGroup>> LoadDataAsync()
             {
-                var response = await _protoService.SendAsync(new SearchCallMessages(_lastMaxId, 50, false)); //(new TLInputPeerEmpty(), null, null, new TLInputMessagesFilterPhoneCalls(), 0, 0, 0, _lastMaxId, 50);
-                if (response is Messages messages)
+                var response = await _protoService.SendAsync(new SearchCallMessages(_nextOffset, 50, false)); //(new TLInputPeerEmpty(), null, null, new TLInputMessagesFilterPhoneCalls(), 0, 0, 0, _lastMaxId, 50);
+                if (response is FoundMessages messages)
                 {
-                    if (messages.MessagesValue.Count > 0)
+                    if (messages.Messages.Count > 0 && !string.IsNullOrEmpty(messages.NextOffset))
                     {
-                        _lastMaxId = messages.MessagesValue.Min(x => x.Id);
+                        _nextOffset = messages.NextOffset;
                     }
                     else
                     {
@@ -60,7 +60,7 @@ namespace Unigram.ViewModels
                     bool currentFailed = false;
                     DateTime? currentTime = null;
 
-                    foreach (var message in messages.MessagesValue)
+                    foreach (var message in messages.Messages)
                     {
                         var chat = _protoService.GetChat(message.ChatId);
                         if (chat == null)

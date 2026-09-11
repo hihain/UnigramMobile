@@ -61,7 +61,7 @@ namespace Unigram.Views
         IHandle<UpdateUnreadChatCount>,
         //IHandle<UpdateMessageContent>,
         IHandle<UpdateSecretChat>,
-        IHandle<UpdateChatFilters>,
+        IHandle<UpdateChatFolders>,
         IHandle<UpdateChatNotificationSettings>,
         IHandle<UpdatePasscodeLock>,
         IHandle<UpdateFile>,
@@ -355,12 +355,12 @@ namespace Unigram.Views
             });
         }
 
-        public void Handle(UpdateChatFilters update)
+        public void Handle(UpdateChatFolders update)
         {
             this.BeginOnUIThread(() =>
             {
-                ShowHideLeftTabs(ViewModel.Chats.Settings.IsLeftTabsEnabled && update.ChatFilters.Count > 0);
-                ShowHideTopTabs(!ViewModel.Chats.Settings.IsLeftTabsEnabled && update.ChatFilters.Count > 0);
+                ShowHideLeftTabs(ViewModel.Chats.Settings.IsLeftTabsEnabled && update.ChatFolders.Count > 0);
+                ShowHideTopTabs(!ViewModel.Chats.Settings.IsLeftTabsEnabled && update.ChatFolders.Count > 0);
                 ShowHideArchive(ViewModel.SelectedFilter == null || ViewModel.SelectedFilter.ChatList is ChatListMain);
 
                 UpdateBackButtonVisibility();
@@ -725,12 +725,12 @@ namespace Unigram.Views
 
         private void UpdateLeftTabsScale(bool show)
         {
-            if (ChatFiltersSide?.RenderTransform is ScaleTransform scaleTransform && (scaleTransform.ScaleX != SettingsService.Current.Appearance.TabsLeftLayoutScale || ChatTabsLeft.Width.Equals(double.NaN)))
+            if (ChatFoldersSide?.RenderTransform is ScaleTransform scaleTransform && (scaleTransform.ScaleX != SettingsService.Current.Appearance.TabsLeftLayoutScale || ChatTabsLeft.Width.Equals(double.NaN)))
             {
                 scaleTransform.ScaleX = SettingsService.Current.Appearance.TabsLeftLayoutScale;
                 scaleTransform.ScaleY = scaleTransform.ScaleX;
                 ChatTabsLeft.Width = 72 * scaleTransform.ScaleX;
-                ChatFiltersSide.Margin = new Thickness(0, 0, -72 + 72 * scaleTransform.ScaleX, 0);
+                ChatFoldersSide.Margin = new Thickness(0, 0, -72 + 72 * scaleTransform.ScaleX, 0);
             }
 
             if (Window.Current.Content is RootPage root)
@@ -778,10 +778,10 @@ namespace Unigram.Views
                 SetFolder(new ChatListMain());
                 args.Handled = true;
             }
-            else if (ViewModel.Chats.Items.ChatList is ChatListFilter)
+            else if (ViewModel.Chats.Items.ChatList is ChatListFolder)
             {
-                ViewModel.SelectedFilter = ChatFilterViewModel.Main;
-                ConvertFilter(ChatFilterViewModel.Main);
+                ViewModel.SelectedFilter = ChatFolderViewModel.Main;
+                ConvertFilter(ChatFolderViewModel.Main);
                 args.Handled = true;
             }
         }
@@ -2066,7 +2066,7 @@ namespace Unigram.Views
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
                         if (result.IsPublic)
                         {
-                            subtitle.Text = $"@{user.Username}";
+                            subtitle.Text = $"@{user.ActiveUsername()}";
                         }
                         else
                         {
@@ -2080,11 +2080,11 @@ namespace Unigram.Views
                         {
                             if (supergroup.MemberCount > 0)
                             {
-                                subtitle.Text = string.Format("@{0}, {1}", supergroup.Username, Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
+                                subtitle.Text = string.Format("@{0}, {1}", supergroup.ActiveUsername(), Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
                             }
                             else
                             {
-                                subtitle.Text = $"@{supergroup.Username}";
+                                subtitle.Text = $"@{supergroup.ActiveUsername()}";
                             }
                         }
                         else if (supergroup.MemberCount > 0)
@@ -2259,7 +2259,7 @@ namespace Unigram.Views
                 var subtitle = content.Children[2] as TextBlock;
                 if (result.IsPublic)
                 {
-                    subtitle.Text = $"@{user.Username}";
+                    subtitle.Text = $"@{user.ActiveUsername()}";
                 }
                 else
                 {
@@ -2422,7 +2422,7 @@ namespace Unigram.Views
             SettingsView.EditName_Click(sender, e);
         }
 
-        private ChatFilterViewModel ConvertFilter(ChatFilterViewModel filter)
+        private ChatFolderViewModel ConvertFilter(ChatFolderViewModel filter)
         {
             ShowHideTopTabs(!ViewModel.Chats.Settings.IsLeftTabsEnabled && ViewModel.Filters.Count > 0);
             ShowHideLeftTabs(ViewModel.Chats.Settings.IsLeftTabsEnabled && ViewModel.Filters.Count > 0);
@@ -2436,7 +2436,7 @@ namespace Unigram.Views
 
         private void ConvertFilterBack(object obj)
         {
-            if (obj is ChatFilterViewModel filter)
+            if (obj is ChatFolderViewModel filter)
             {
                 ViewModel.SelectedFilter = filter;
                 ConvertFilter(filter);
@@ -2510,7 +2510,7 @@ namespace Unigram.Views
             SetFolder(new ChatListArchive());
         }
 
-        private void ChatFilter_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+        private void ChatFolder_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
             if (ViewModel == null)
             {
@@ -2520,14 +2520,14 @@ namespace Unigram.Views
             var flyout = new MenuFlyout();
 
             var element = sender as FrameworkElement;
-            var filter = ChatFilters?.ItemFromContainer(sender) as ChatFilterViewModel;
+            var filter = ChatFolders?.ItemFromContainer(sender) as ChatFolderViewModel;
 
             if (filter == null)
             {
-                filter = ChatFiltersSide.ItemFromContainer(sender) as ChatFilterViewModel;
+                filter = ChatFoldersSide.ItemFromContainer(sender) as ChatFolderViewModel;
             }
 
-            if (filter.ChatFilterId == Constants.ChatListMain)
+            if (filter.ChatFolderId == Constants.ChatListMain)
             {
                 flyout.CreateFlyoutItem(ViewModel.FilterEditCommand, filter, Strings.Resources.FilterEditAll, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(ViewModel.FilterMarkAsReadCommand, filter, Strings.Resources.MarkAsRead, new FontIcon { Glyph = Icons.MarkAsRead });
@@ -2921,37 +2921,37 @@ namespace Unigram.Views
             });
         }
 
-        public static string GetFilterIcon(ChatListFilterFlags filter)
+        public static string GetFilterIcon(ChatListFolderFlags filter)
         {
-            if (filter == ChatListFilterFlags.ExcludeMuted)
+            if (filter == ChatListFolderFlags.ExcludeMuted)
             {
                 return Icons.Unmute;
             }
-            else if (filter == ChatListFilterFlags.ExcludeRead)
+            else if (filter == ChatListFolderFlags.ExcludeRead)
             {
                 return Icons.MarkAsUnread; //FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily };
             }
-            else if (filter == ChatListFilterFlags.ExcludeArchived)
+            else if (filter == ChatListFolderFlags.ExcludeArchived)
             {
                 return Icons.Archive;
             }
-            else if (filter == ChatListFilterFlags.IncludeContacts)
+            else if (filter == ChatListFolderFlags.IncludeContacts)
             {
                 return Icons.Contact;
             }
-            else if (filter == ChatListFilterFlags.IncludeNonContacts)
+            else if (filter == ChatListFolderFlags.IncludeNonContacts)
             {
                 return Icons.Help;
             }
-            else if (filter == ChatListFilterFlags.IncludeGroups)
+            else if (filter == ChatListFolderFlags.IncludeGroups)
             {
                 return Icons.Group;
             }
-            else if (filter == ChatListFilterFlags.IncludeChannels)
+            else if (filter == ChatListFolderFlags.IncludeChannels)
             {
                 return Icons.Channel;
             }
-            else if (filter == ChatListFilterFlags.IncludeBots)
+            else if (filter == ChatListFolderFlags.IncludeBots)
             {
                 return Icons.Bot;
             }
@@ -2959,7 +2959,7 @@ namespace Unigram.Views
             return null;
         }
 
-        private void ChatFilters_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+        private void ChatFolders_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
         {
             var list = sender as TopNavView;
             if (list == null)
@@ -2967,7 +2967,7 @@ namespace Unigram.Views
                 return;
             }
 
-            if (e.Items.Count > 1 || e.Items[0] is ChatFilterViewModel filter && filter.ChatList is ChatListMain)
+            if (e.Items.Count > 1 || e.Items[0] is ChatFolderViewModel filter && filter.ChatList is ChatListMain)
             {
                 list.CanReorderItems = false;
                 e.Cancel = true;
@@ -2987,11 +2987,11 @@ namespace Unigram.Views
             }
         }
 
-        private void ChatFilters_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+        private void ChatFolders_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
         {
             sender.CanReorderItems = false;
 
-            if (args.DropResult == DataPackageOperation.Move && args.Items.Count == 1 && args.Items[0] is ChatFilterViewModel filter)
+            if (args.DropResult == DataPackageOperation.Move && args.Items.Count == 1 && args.Items[0] is ChatFolderViewModel filter)
             {
                 var items = ViewModel?.Filters;
                 var index = items.IndexOf(filter);
@@ -3002,18 +3002,18 @@ namespace Unigram.Views
                     compare = items[index + 1];
                 }
 
-                if (compare.ChatList is ChatListFilter)
+                if (compare.ChatList is ChatListFolder)
                 {
-                    ViewModel.ProtoService.Send(new ReorderChatFilters(items.Where(x => x.ChatList is ChatListFilter).Select(x => x.ChatFilterId).ToArray()));
+                    ViewModel.ProtoService.Send(new ReorderChatFolders(items.Where(x => x.ChatList is ChatListFolder).Select(x => x.ChatFolderId).ToArray(), 0));
                 }
                 else
                 {
-                    ViewModel.Handle(new UpdateChatFilters(ViewModel.CacheService.ChatFilters));
+                    ViewModel.Handle(new UpdateChatFolders(ViewModel.CacheService.ChatFolders, 0));
                 }
             }
         }
 
-        private void ChatFilter_ItemClick(object sender, ItemClickEventArgs e)
+        private void ChatFolder_ItemClick(object sender, ItemClickEventArgs e)
         {
             rpMasterTitlebar.SelectedIndex = 0;
 

@@ -85,7 +85,7 @@ namespace Unigram.ViewModels.Settings
 
             await ProtoService.SendAsync(new SetOption("x_phonenumber", new OptionValueString(phoneNumber)));
 
-            var response = await ProtoService.SendAsync(new ChangePhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, new string[0])));
+            var response = await ProtoService.SendAsync(new ChangePhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, null, new string[0])));
             if (response is AuthenticationCodeInfo info)
             {
                 App.Current.SessionState["x_codeinfo"] = info;

@@ -88,7 +88,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypePhoto(),
-                Delegate = (inputFile, caption) => new InputMessagePhoto(generated, thumbnail, new int[0], size.Width, size.Height, caption, ttl)
+                Delegate = (inputFile, caption) => new InputMessagePhoto(generated, thumbnail, new int[0], size.Width, size.Height, caption, ttl > 0 ? new MessageSelfDestructTypeTimer(ttl) : null, false)
             };
         }
 
@@ -149,7 +149,7 @@ namespace Unigram.Services.Factories
                 {
                     InputFile = generated,
                     Type = new FileTypeAnimation(),
-                    Delegate = (inputFile, caption) => new InputMessageAnimation(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, caption)
+                    Delegate = (inputFile, caption) => new InputMessageAnimation(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, caption, false)
                 };
             }
 
@@ -157,7 +157,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypeVideo(),
-                Delegate = (inputFile, caption) => new InputMessageVideo(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, true, caption, ttl)
+                Delegate = (inputFile, caption) => new InputMessageVideo(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, true, caption, ttl > 0 ? new MessageSelfDestructTypeTimer(ttl) : null, false)
             };
         }
 
@@ -203,7 +203,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypeVideoNote(),
-                Delegate = (inputFile, caption) => new InputMessageVideoNote(inputFile, thumbnail, duration, (int) Math.Min(videoWidth, videoHeight))
+                Delegate = (inputFile, caption) => new InputMessageVideoNote(inputFile, thumbnail, duration, (int) Math.Min(videoWidth, videoHeight), null)
             };
         }
 

@@ -31,7 +31,7 @@ namespace Unigram.Controls.Messages.Content
             }
 
             Title.Text = invoice.Title;
-            Description.Text = invoice.Description;
+            Description.Text = invoice.Description.Text;
 
             Photo.Constraint = invoice.Photo;
             Texture.Source = null;

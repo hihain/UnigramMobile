@@ -17,14 +17,14 @@ namespace Unigram.ViewModels.Folders
         public FolderViewModel(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, IEventAggregator aggregator)
             : base(protoService, cacheService, settingsService, aggregator)
         {
-            Include = new MvxObservableCollection<ChatFilterElement>();
-            Exclude = new MvxObservableCollection<ChatFilterElement>();
+            Include = new MvxObservableCollection<ChatFolderElement>();
+            Exclude = new MvxObservableCollection<ChatFolderElement>();
 
             Include.CollectionChanged += OnCollectionChanged;
             Exclude.CollectionChanged += OnCollectionChanged;
 
-            RemoveIncludeCommand = new RelayCommand<ChatFilterElement>(RemoveIncludeExecute);
-            RemoveExcludeCommand = new RelayCommand<ChatFilterElement>(RemoveExcludeExecute);
+            RemoveIncludeCommand = new RelayCommand<ChatFolderElement>(RemoveIncludeExecute);
+            RemoveExcludeCommand = new RelayCommand<ChatFolderElement>(RemoveExcludeExecute);
 
             AddIncludeCommand = new RelayCommand(AddIncludeExecute);
             AddExcludeCommand = new RelayCommand(AddExcludeExecute);
@@ -39,12 +39,12 @@ namespace Unigram.ViewModels.Folders
 
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
-            ChatFilter filter = null;
+            ChatFolder filter = null;
 
             if (parameter is int id)
             {
-                var response = await ProtoService.SendAsync(new GetChatFilter(id));
-                if (response is ChatFilter result)
+                var response = await ProtoService.SendAsync(new GetChatFolder(id));
+                if (response is ChatFolder result)
                 {
                     Id = id;
                     Filter = result;
@@ -59,7 +59,7 @@ namespace Unigram.ViewModels.Folders
             {
                 Id = null;
                 Filter = null;
-                filter = new ChatFilter();
+                filter = new ChatFolder();
                 filter.PinnedChatIds = new List<long>();
                 filter.IncludedChatIds = new List<long>();
                 filter.ExcludedChatIds = new List<long>();
@@ -77,7 +77,7 @@ namespace Unigram.ViewModels.Folders
 
             _pinnedChatIds = filter.PinnedChatIds;
 
-            _iconPicked = !string.IsNullOrEmpty(filter.IconName);
+            _iconPicked = !string.IsNullOrEmpty(filter.Icon?.Name);
 
             Title = filter.Title;
             Icon = Icons.ParseFilter(filter);
@@ -85,15 +85,15 @@ namespace Unigram.ViewModels.Folders
             Include.Clear();
             Exclude.Clear();
 
-            if (filter.IncludeContacts) Include.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeContacts });
-            if (filter.IncludeNonContacts) Include.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeNonContacts });
-            if (filter.IncludeGroups) Include.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeGroups });
-            if (filter.IncludeChannels) Include.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeChannels });
-            if (filter.IncludeBots) Include.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeBots });
+            if (filter.IncludeContacts) Include.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeContacts });
+            if (filter.IncludeNonContacts) Include.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeNonContacts });
+            if (filter.IncludeGroups) Include.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeGroups });
+            if (filter.IncludeChannels) Include.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeChannels });
+            if (filter.IncludeBots) Include.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeBots });
 
-            if (filter.ExcludeMuted) Exclude.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeMuted });
-            if (filter.ExcludeRead) Exclude.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeRead });
-            if (filter.ExcludeArchived) Exclude.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeArchived });
+            if (filter.ExcludeMuted) Exclude.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeMuted });
+            if (filter.ExcludeRead) Exclude.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeRead });
+            if (filter.ExcludeArchived) Exclude.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeArchived });
 
             foreach (var chatId in filter.PinnedChatIds.Union(filter.IncludedChatIds))
             {
@@ -122,8 +122,8 @@ namespace Unigram.ViewModels.Folders
 
         public int? Id { get; set; }
 
-        private ChatFilter _filter;
-        public ChatFilter Filter
+        private ChatFolder _filter;
+        public ChatFolder Filter
         {
             get => _filter;
             set => Set(ref _filter, value);
@@ -142,14 +142,14 @@ namespace Unigram.ViewModels.Folders
 
         private bool _iconPicked;
 
-        private ChatFilterIcon _icon;
-        public ChatFilterIcon Icon
+        private ChatFolderIconKind _icon;
+        public ChatFolderIconKind Icon
         {
             get => _icon;
             private set => Set(ref _icon, value);
         }
 
-        public void SetIcon(ChatFilterIcon icon)
+        public void SetIcon(ChatFolderIconKind icon)
         {
             _iconPicked = true;
             Icon = icon;
@@ -167,8 +167,8 @@ namespace Unigram.ViewModels.Folders
 
         private IList<long> _pinnedChatIds;
 
-        public MvxObservableCollection<ChatFilterElement> Include { get; private set; }
-        public MvxObservableCollection<ChatFilterElement> Exclude { get; private set; }
+        public MvxObservableCollection<ChatFolderElement> Include { get; private set; }
+        public MvxObservableCollection<ChatFolderElement> Exclude { get; private set; }
 
 
 
@@ -193,7 +193,7 @@ namespace Unigram.ViewModels.Folders
                     }
                 }
 
-                var flags = result.OfType<FilterFlag>().Cast<ChatFilterElement>();
+                var flags = result.OfType<FilterFlag>().Cast<ChatFolderElement>();
                 var chats = result.OfType<FilterChat>().OrderBy(x =>
                 {
                     var index = _pinnedChatIds.IndexOf(x.Chat.Id);
@@ -234,15 +234,15 @@ namespace Unigram.ViewModels.Folders
             }
         }
 
-        public RelayCommand<ChatFilterElement> RemoveIncludeCommand { get; }
-        private void RemoveIncludeExecute(ChatFilterElement chat)
+        public RelayCommand<ChatFolderElement> RemoveIncludeCommand { get; }
+        private void RemoveIncludeExecute(ChatFolderElement chat)
         {
             Include.Remove(chat);
             UpdateIcon();
         }
 
-        public RelayCommand<ChatFilterElement> RemoveExcludeCommand { get; }
-        private void RemoveExcludeExecute(ChatFilterElement chat)
+        public RelayCommand<ChatFolderElement> RemoveExcludeCommand { get; }
+        private void RemoveExcludeExecute(ChatFolderElement chat)
         {
             Exclude.Remove(chat);
             UpdateIcon();
@@ -252,7 +252,7 @@ namespace Unigram.ViewModels.Folders
         private async void SendExecute()
         {
             var response = await SendAsync();
-            if (response is ChatFilterInfo)
+            if (response is ChatFolderInfo)
             {
                 NavigationService.GoBack();
             }
@@ -263,11 +263,11 @@ namespace Unigram.ViewModels.Folders
             Function function;
             if (Id is int id)
             {
-                function = new EditChatFilter(id, GetFilter());
+                function = new EditChatFolder(id, GetFilter());
             }
             else
             {
-                function = new CreateChatFilter(GetFilter());
+                function = new CreateChatFolder(GetFilter());
             }
 
             return ProtoService.SendAsync(function);
@@ -278,11 +278,11 @@ namespace Unigram.ViewModels.Folders
             return !string.IsNullOrEmpty(Title) && Include.Count > 0;
         }
 
-        private ChatFilter GetFilter()
+        private ChatFolder GetFilter()
         {
-            var filter = new ChatFilter();
+            var filter = new ChatFolder();
             filter.Title = Title ?? string.Empty;
-            filter.IconName = _iconPicked ? Enum.GetName(typeof(ChatFilterIcon), Icon) : string.Empty;
+            filter.Icon = new ChatFolderIcon(_iconPicked ? Enum.GetName(typeof(ChatFolderIconKind), Icon) : string.Empty);
             filter.PinnedChatIds = new List<long>();
             filter.IncludedChatIds = new List<long>();
             filter.ExcludedChatIds = new List<long>();
@@ -293,19 +293,19 @@ namespace Unigram.ViewModels.Folders
                 {
                     switch (flag.Flag)
                     {
-                        case ChatListFilterFlags.IncludeContacts:
+                        case ChatListFolderFlags.IncludeContacts:
                             filter.IncludeContacts = true;
                             break;
-                        case ChatListFilterFlags.IncludeNonContacts:
+                        case ChatListFolderFlags.IncludeNonContacts:
                             filter.IncludeNonContacts = true;
                             break;
-                        case ChatListFilterFlags.IncludeGroups:
+                        case ChatListFolderFlags.IncludeGroups:
                             filter.IncludeGroups = true;
                             break;
-                        case ChatListFilterFlags.IncludeChannels:
+                        case ChatListFolderFlags.IncludeChannels:
                             filter.IncludeChannels = true;
                             break;
-                        case ChatListFilterFlags.IncludeBots:
+                        case ChatListFolderFlags.IncludeBots:
                             filter.IncludeBots = true;
                             break;
                     }
@@ -329,13 +329,13 @@ namespace Unigram.ViewModels.Folders
                 {
                     switch (flag.Flag)
                     {
-                        case ChatListFilterFlags.ExcludeMuted:
+                        case ChatListFolderFlags.ExcludeMuted:
                             filter.ExcludeMuted = true;
                             break;
-                        case ChatListFilterFlags.ExcludeRead:
+                        case ChatListFolderFlags.ExcludeRead:
                             filter.ExcludeRead = true;
                             break;
-                        case ChatListFilterFlags.ExcludeArchived:
+                        case ChatListFolderFlags.ExcludeArchived:
                             filter.ExcludeArchived = true;
                             break;
                     }
@@ -350,16 +350,16 @@ namespace Unigram.ViewModels.Folders
         }
     }
 
-    public class ChatFilterElement
+    public class ChatFolderElement
     {
     }
 
-    public class FilterFlag : ChatFilterElement
+    public class FilterFlag : ChatFolderElement
     {
-        public ChatListFilterFlags Flag { get; set; }
+        public ChatListFolderFlags Flag { get; set; }
     }
 
-    public class FilterChat : ChatFilterElement
+    public class FilterChat : ChatFolderElement
     {
         public Chat Chat { get; set; }
     }

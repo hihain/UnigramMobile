@@ -38,11 +38,12 @@ namespace Unigram.ViewModels
         public MessageInteractionInfo InteractionInfo { get => _message.InteractionInfo; set => _message.InteractionInfo = value; }
         public string AuthorSignature => _message.AuthorSignature;
         public long ViaBotUserId => _message.ViaBotUserId;
-        public double TtlExpiresIn { get => _message.TtlExpiresIn; set => _message.TtlExpiresIn = value; }
-        public int Ttl => _message.Ttl;
-        public long ReplyToMessageId { get => _message.ReplyToMessageId; set => _message.ReplyToMessageId = value; }
-        public long ReplyInChatId => _message.ReplyInChatId;
+        public double TtlExpiresIn { get => _message.SelfDestructIn; set => _message.SelfDestructIn = value; }
+        public int Ttl => (_message.SelfDestructType as MessageSelfDestructTypeTimer)?.SelfDestructTime ?? 0;
+        public long ReplyToMessageId => (_message.ReplyTo as MessageReplyToMessage)?.MessageId ?? 0;
+        public long ReplyInChatId => (_message.ReplyTo as MessageReplyToMessage)?.ChatId ?? 0;
         public MessageForwardInfo ForwardInfo => _message.ForwardInfo;
+        public MessageImportInfo ImportInfo => _message.ImportInfo;
         public int EditDate { get => _message.EditDate; set => _message.EditDate = value; }
         public int Date => _message.Date;
         public bool ContainsUnreadMention { get => _message.ContainsUnreadMention; set => _message.ContainsUnreadMention = value; }
@@ -223,7 +224,7 @@ namespace Unigram.ViewModels
                     if (chat != null && chat.Type is ChatTypeSupergroup super && !super.IsChannel)
                     {
                         var supergroup = message.ProtoService.GetSupergroup(super.SupergroupId);
-                        return supergroup != null && supergroup.Username.Length > 0 && !(message.Content is MessageContact) && !(message.Content is MessageLocation);
+                        return supergroup != null && supergroup.ActiveUsername().Length > 0 && !(message.Content is MessageContact) && !(message.Content is MessageLocation);
                     }
                 }
             }
@@ -293,12 +294,11 @@ namespace Unigram.ViewModels
             _message.MessageThreadId = message.MessageThreadId;
             _message.MediaAlbumId = message.MediaAlbumId;
             _message.ReplyMarkup = message.ReplyMarkup;
-            _message.ReplyInChatId = message.ReplyInChatId;
-            _message.ReplyToMessageId = message.ReplyToMessageId;
+            _message.ReplyTo = message.ReplyTo;
             _message.SenderId = message.SenderId;
             _message.SendingState = message.SendingState;
-            _message.Ttl = message.Ttl;
-            _message.TtlExpiresIn = message.TtlExpiresIn;
+            _message.SelfDestructType = message.SelfDestructType;
+            _message.SelfDestructIn = message.SelfDestructIn;
             _message.ViaBotUserId = message.ViaBotUserId;
             _message.InteractionInfo = message.InteractionInfo;
 

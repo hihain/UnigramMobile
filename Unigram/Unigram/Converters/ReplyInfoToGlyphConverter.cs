@@ -171,108 +171,108 @@ namespace Unigram.Converters
 
         public const string ChatBubblesQuestion = "\uE783";
 
-        public static readonly ChatFilterIcon[] Filters = new ChatFilterIcon[]
+        public static readonly ChatFolderIconKind[] Filters = new ChatFolderIconKind[]
         {
-            ChatFilterIcon.Cat,
-            ChatFilterIcon.Crown,
-            ChatFilterIcon.Favorite,
-            ChatFilterIcon.Flower,
-            ChatFilterIcon.Game,
-            ChatFilterIcon.Home,
-            ChatFilterIcon.Love,
-            ChatFilterIcon.Mask,
-            ChatFilterIcon.Party,
-            ChatFilterIcon.Sport,
-            ChatFilterIcon.Study,
-            ChatFilterIcon.Trade,
-            ChatFilterIcon.Travel,
-            ChatFilterIcon.Work,
-            ChatFilterIcon.All,
-            ChatFilterIcon.Unread,
-            ChatFilterIcon.Unmuted,
-            ChatFilterIcon.Bots,
-            ChatFilterIcon.Channels,
-            ChatFilterIcon.Groups,
-            ChatFilterIcon.Private,
-            ChatFilterIcon.Custom,
-            ChatFilterIcon.Setup
+            ChatFolderIconKind.Cat,
+            ChatFolderIconKind.Crown,
+            ChatFolderIconKind.Favorite,
+            ChatFolderIconKind.Flower,
+            ChatFolderIconKind.Game,
+            ChatFolderIconKind.Home,
+            ChatFolderIconKind.Love,
+            ChatFolderIconKind.Mask,
+            ChatFolderIconKind.Party,
+            ChatFolderIconKind.Sport,
+            ChatFolderIconKind.Study,
+            ChatFolderIconKind.Trade,
+            ChatFolderIconKind.Travel,
+            ChatFolderIconKind.Work,
+            ChatFolderIconKind.All,
+            ChatFolderIconKind.Unread,
+            ChatFolderIconKind.Unmuted,
+            ChatFolderIconKind.Bots,
+            ChatFolderIconKind.Channels,
+            ChatFolderIconKind.Groups,
+            ChatFolderIconKind.Private,
+            ChatFolderIconKind.Custom,
+            ChatFolderIconKind.Setup
         };
 
-        public static ChatFilterIcon ParseFilter(ChatFilter filter)
+        public static ChatFolderIconKind ParseFilter(ChatFolder filter)
         {
-            var iconName = filter.IconName;
+            var iconName = filter.Icon?.Name;
             if (string.IsNullOrEmpty(iconName))
             {
-                var text = Client.Execute(new GetChatFilterDefaultIconName(filter)) as Text;
-                if (text != null)
+                var icon = Client.Execute(new GetChatFolderDefaultIconName(filter)) as ChatFolderIcon;
+                if (icon != null)
                 {
-                    iconName = text.TextValue;
+                    iconName = icon.Name;
                 }
             }
 
             return ParseFilter(iconName);
         }
 
-        public static ChatFilterIcon ParseFilter(string iconName)
+        public static ChatFolderIconKind ParseFilter(string iconName)
         {
-            if (Enum.TryParse(iconName, out ChatFilterIcon result))
+            if (Enum.TryParse(iconName, out ChatFolderIconKind result))
             {
                 return result;
             }
 
-            return ChatFilterIcon.Custom;
+            return ChatFolderIconKind.Custom;
         }
 
-        public static string FromFilter(ChatFilterIcon icon)
+        public static string FromFilter(ChatFolderIconKind icon)
         {
             switch (icon)
             {
-                case ChatFilterIcon.All:
+                case ChatFolderIconKind.All:
                     return "\uE92D";
-                case ChatFilterIcon.Unread:
+                case ChatFolderIconKind.Unread:
                     return "\uE91C";
-                case ChatFilterIcon.Unmuted:
+                case ChatFolderIconKind.Unmuted:
                     return "\uE93B";
-                case ChatFilterIcon.Bots:
+                case ChatFolderIconKind.Bots:
                     return "\uE92E";
-                case ChatFilterIcon.Channels:
+                case ChatFolderIconKind.Channels:
                     return "\uE930";
-                case ChatFilterIcon.Groups:
+                case ChatFolderIconKind.Groups:
                     return "\uE935";
-                case ChatFilterIcon.Private:
+                case ChatFolderIconKind.Private:
                     return "\uE931";
-                case ChatFilterIcon.Custom:
+                case ChatFolderIconKind.Custom:
                 default:
                     return "\uE932";
-                case ChatFilterIcon.Setup:
+                case ChatFolderIconKind.Setup:
                     return "\uE938";
-                case ChatFilterIcon.Cat:
+                case ChatFolderIconKind.Cat:
                     return "\uE92F";
-                case ChatFilterIcon.Crown:
+                case ChatFolderIconKind.Crown:
                     return "\uE932"; // <-- todo
-                case ChatFilterIcon.Favorite:
+                case ChatFolderIconKind.Favorite:
                     return "\uE933";
-                case ChatFilterIcon.Flower:
+                case ChatFolderIconKind.Flower:
                     return "\uE932"; // <-- todo
-                case ChatFilterIcon.Game:
+                case ChatFolderIconKind.Game:
                     return "\uE934";
-                case ChatFilterIcon.Home:
+                case ChatFolderIconKind.Home:
                     return "\uE936";
-                case ChatFilterIcon.Love:
+                case ChatFolderIconKind.Love:
                     return "\uE937";
-                case ChatFilterIcon.Mask:
+                case ChatFolderIconKind.Mask:
                     return "\uE932"; // <-- todo
-                case ChatFilterIcon.Party:
+                case ChatFolderIconKind.Party:
                     return "\uE932"; // <-- todo
-                case ChatFilterIcon.Sport:
+                case ChatFolderIconKind.Sport:
                     return "\uE923";
-                case ChatFilterIcon.Study:
+                case ChatFolderIconKind.Study:
                     return "\uE939";
-                case ChatFilterIcon.Trade:
+                case ChatFolderIconKind.Trade:
                     return "\uE932"; // <-- todo
-                case ChatFilterIcon.Travel:
+                case ChatFolderIconKind.Travel:
                     return "\uE93A";
-                case ChatFilterIcon.Work:
+                case ChatFolderIconKind.Work:
                     return "\uE93C";
             }
         }

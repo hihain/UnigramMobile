@@ -71,8 +71,8 @@ namespace Unigram.ViewModels.Settings
                 });
             }
 
-            Aggregator.Publish(new UpdateSelectedBackground(true, ProtoService.GetSelectedBackground(true)));
-            Aggregator.Publish(new UpdateSelectedBackground(false, ProtoService.GetSelectedBackground(false)));
+            Aggregator.Publish(new UpdateDefaultBackground(true, ProtoService.GetSelectedBackground(true)));
+            Aggregator.Publish(new UpdateDefaultBackground(false, ProtoService.GetSelectedBackground(false)));
         }
 
         public NightMode Mode

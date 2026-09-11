@@ -116,7 +116,7 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessageAnimation(new InputFileId(animation.AnimationValue.Id), animation.Thumbnail?.ToInput(), new int[0], animation.Duration, animation.Width, animation.Height, null);
+            var input = new InputMessageAnimation(new InputFileId(animation.AnimationValue.Id), animation.Thumbnail?.ToInput(), new int[0], animation.Duration, animation.Width, animation.Height, null, false);
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -413,7 +413,7 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessageVoiceNote(await file.ToGeneratedAsync(), duration, new byte[0], caption);
+            var input = new InputMessageVoiceNote(await file.ToGeneratedAsync(), duration, new byte[0], caption, null);
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -694,27 +694,27 @@ namespace Unigram.ViewModels
 
                 if (dialog.IsUntilOnline)
                 {
-                    return new MessageSendOptions(false, false, false, new MessageSchedulingStateSendWhenOnline());
+                    return new MessageSendOptions(false, false, false, false, new MessageSchedulingStateSendWhenOnline(), 0, false);
                 }
                 else
                 {
-                    return new MessageSendOptions(false, false, false, new MessageSchedulingStateSendAtDate(dialog.Value.ToTimestamp()));
+                    return new MessageSendOptions(false, false, false, false, new MessageSchedulingStateSendAtDate(dialog.Value.ToTimestamp()), 0, false);
                 }
             }
             else
             {
-                return new MessageSendOptions(silent ?? false, false, false, null);
+                return new MessageSendOptions(silent ?? false, false, false, false, null, 0, false);
             }
         }
 
-        private async Task<BaseObject> SendMessageAsync(Chat chat, long replyToMessageId, InputMessageContent inputMessageContent, MessageSendOptions options)
+        private async Task<BaseObject> SendMessageAsync(Chat chat, InputMessageReplyTo replyTo, InputMessageContent inputMessageContent, MessageSendOptions options)
         {
             if (options == null)
             {
-                options = new MessageSendOptions(false, false, false, null);
+                options = new MessageSendOptions(false, false, false, false, null, 0, false);
             }
 
-            var response = await ProtoService.SendAsync(new SendMessage(chat.Id, _threadId, replyToMessageId, options, null, inputMessageContent));
+            var response = await ProtoService.SendAsync(new SendMessage(chat.Id, _threadId, replyTo, options, null, inputMessageContent));
             if (response is Error error)
             {
                 if (error.TypeEquals(ErrorType.PEER_FLOOD))
@@ -736,7 +736,7 @@ namespace Unigram.ViewModels
 
         private async Task<BaseObject> EditMessageAsync(MessageViewModel message, InputFile inputFile, FileType type, Func<InputFile, InputMessageContent> inputMessageContent)
         {
-            var response = await ProtoService.SendAsync(new UploadFile(inputFile, type, 32));
+            var response = await ProtoService.SendAsync(new PreliminaryUploadFile(inputFile, type, 32));
             if (response is Telegram.Td.Api.File file)
             {
                 ComposerHeader = new MessageComposerHeader { EditingMessage = message, EditingMessageMedia = null, EditingMessageFileId = file.Id };

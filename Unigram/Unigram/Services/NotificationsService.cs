@@ -127,7 +127,7 @@ namespace Unigram.Services
                         return;
                     }
 
-                    _protoService.Send(new DeleteAccount("Decline ToS update"));
+                    _protoService.Send(new DeleteAccount("Decline ToS update", string.Empty));
                 }
 
                 await Task.Delay(2000);
@@ -799,7 +799,6 @@ namespace Unigram.Services
             switch (update.AuthorizationState)
             {
                 case AuthorizationStateWaitTdlibParameters waitTdlibParameters:
-                case AuthorizationStateWaitEncryptionKey waitEncryptionKey:
                     break;
                 default:
                     _authorizationStateTask.TrySetResult(update.AuthorizationState);
@@ -847,11 +846,11 @@ namespace Unigram.Services
                     var formatted = Client.Execute(new ParseMarkdown(new FormattedText(messageText, new TextEntity[0]))) as FormattedText;
 
                     var replyToMsgId = data.ContainsKey("msg_id") ? long.Parse(data["msg_id"]) << 20 : 0;
-                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId, new MessageSendOptions(false, true, false, null), null, new InputMessageText(formatted, false, false)));
+                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId == 0 ? null : new InputMessageReplyToMessage(0, replyToMsgId, null), new MessageSendOptions(false, true, false, false, null, 0, false), null, new InputMessageText(formatted, null, false)));
 
                     if (chat.Type is ChatTypePrivate && chat.LastMessage != null)
                     {
-                        await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                        await _protoService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, null, true));
                     }
                 }
                 else if (string.Equals(action, "markasread", StringComparison.OrdinalIgnoreCase))
@@ -861,7 +860,7 @@ namespace Unigram.Services
                         return;
                     }
 
-                    await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                    await _protoService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, null, true));
                 }
             }
         }
@@ -988,9 +987,9 @@ namespace Unigram.Services
                 {
                     result = $"{from.LastName.Trim()}: ";
                 }
-                else if (!string.IsNullOrEmpty(from.Username))
+                else if (!string.IsNullOrEmpty(from.ActiveUsername()))
                 {
-                    result = $"{from.Username.Trim()}: ";
+                    result = $"{from.ActiveUsername().Trim()}: ";
                 }
                 else if (from.Type is UserTypeDeleted)
                 {
@@ -1125,9 +1124,9 @@ namespace Unigram.Services
                     {
                         result = $"{senderUser.LastName.Trim()}: ";
                     }
-                    else if (!string.IsNullOrEmpty(senderUser.Username))
+                    else if (!string.IsNullOrEmpty(senderUser.ActiveUsername()))
                     {
-                        result = $"{senderUser.Username.Trim()}: ";
+                        result = $"{senderUser.ActiveUsername().Trim()}: ";
                     }
                     else if (senderUser.Type is UserTypeDeleted)
                     {
@@ -1446,8 +1445,11 @@ namespace Unigram.Services
             _protoService.Send(new SetChatNotificationSettings(chat.Id,
                 new ChatNotificationSettings(
                     useDefault, muteFor,
-                    settings.UseDefaultSound, settings.Sound,
+                    settings.UseDefaultSound, settings.SoundId,
                     settings.UseDefaultShowPreview, settings.ShowPreview,
+                    settings.UseDefaultMuteStories, settings.MuteStories,
+                    settings.UseDefaultStorySound, settings.StorySoundId,
+                    settings.UseDefaultShowStorySender, settings.ShowStorySender,
                     settings.UseDefaultDisablePinnedMessageNotifications, settings.DisablePinnedMessageNotifications,
                     settings.UseDefaultDisableMentionNotifications, settings.DisableMentionNotifications)));
         }

@@ -22,7 +22,7 @@ namespace Unigram.Views.Folders
         private void Items_ElementPrepared(Microsoft.UI.Xaml.Controls.ItemsRepeater sender, Microsoft.UI.Xaml.Controls.ItemsRepeaterElementPreparedEventArgs args)
         {
             var button = args.Element as Button;
-            var filter = button.DataContext as ChatFilterInfo;
+            var filter = button.DataContext as ChatFolderInfo;
 
             button.Content = filter.Title;
             button.Command = ViewModel.EditCommand;
@@ -32,12 +32,12 @@ namespace Unigram.Views.Folders
         private void Recommended_ElementPrepared(Microsoft.UI.Xaml.Controls.ItemsRepeater sender, Microsoft.UI.Xaml.Controls.ItemsRepeaterElementPreparedEventArgs args)
         {
             var content = args.Element as Grid;
-            var filter = content.DataContext as RecommendedChatFilter;
+            var filter = content.DataContext as RecommendedChatFolder;
 
             var button = content.Children[0] as BadgeButton;
             var add = content.Children[1] as Button;
 
-            button.Content = filter.Filter.Title;
+            button.Content = filter.Folder.Title;
             button.Badge = filter.Description;
 
             add.Command = ViewModel.RecommendCommand;
@@ -49,7 +49,7 @@ namespace Unigram.Views.Folders
             var flyout = new MenuFlyout();
 
             var element = sender as FrameworkElement;
-            var chat = element.DataContext as ChatFilterInfo;
+            var chat = element.DataContext as ChatFolderInfo;
 
             flyout.CreateFlyoutItem(ViewModel.DeleteCommand, chat, Strings.Resources.FilterDeleteItem, new FontIcon { Glyph = Icons.Delete });
 

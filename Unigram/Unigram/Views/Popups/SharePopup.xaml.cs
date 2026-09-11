@@ -177,9 +177,9 @@ namespace Unigram.Views.Popups
             ViewModel.IsWithMyScore = withMyScore;
 
             var chat = ViewModel.ProtoService.GetChat(message.ChatId);
-            if (chat != null && chat.Type is ChatTypeSupergroup super && super.IsChannel && ViewModel.ProtoService.GetSupergroup(super.SupergroupId) is Supergroup supergroup && supergroup.Username.Length > 0)
+            if (chat != null && chat.Type is ChatTypeSupergroup super && super.IsChannel && ViewModel.ProtoService.GetSupergroup(super.SupergroupId) is Supergroup supergroup && supergroup.ActiveUsername().Length > 0)
             {
-                var link = $"{supergroup.Username}/{message.Id}";
+                var link = $"{supergroup.ActiveUsername()}/{message.Id}";
 
                 if (message.Content is MessageVideoNote)
                 {
@@ -202,9 +202,9 @@ namespace Unigram.Views.Popups
             else if (message.Content is MessageGame game)
             {
                 var viaBot = ViewModel.ProtoService.GetUser(message.ViaBotUserId);
-                if (viaBot != null && viaBot.Username.Length > 0)
+                if (viaBot != null && viaBot.ActiveUsername().Length > 0)
                 {
-                    ViewModel.ShareLink = new Uri(MeUrlPrefixConverter.Convert(ViewModel.ProtoService, $"{viaBot.Username}?game={game.Game.ShortName}"));
+                    ViewModel.ShareLink = new Uri(MeUrlPrefixConverter.Convert(ViewModel.ProtoService, $"{viaBot.ActiveUsername()}?game={game.Game.ShortName}"));
                     ViewModel.ShareTitle = game.Game.Title;
                 }
             }
@@ -309,24 +309,24 @@ namespace Unigram.Views.Popups
 
         #region PickFiltersAsync
 
-        public static async Task<IList<ChatFilterElement>> AddExecute(bool include, IList<ChatFilterElement> target)
+        public static async Task<IList<ChatFolderElement>> AddExecute(bool include, IList<ChatFolderElement> target)
         {
-            //var target = new List<ChatFilterElement>();
+            //var target = new List<ChatFolderElement>();
 
             var flags = new List<FilterFlag>();
             if (include)
             {
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeContacts });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeNonContacts });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeGroups });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeChannels });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.IncludeBots });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeContacts });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeNonContacts });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeGroups });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeChannels });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.IncludeBots });
             }
             else
             {
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeMuted });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeRead });
-                flags.Add(new FilterFlag { Flag = ChatListFilterFlags.ExcludeArchived });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeMuted });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeRead });
+                flags.Add(new FilterFlag { Flag = ChatListFolderFlags.ExcludeArchived });
             }
 
             var header = new ListView();
@@ -412,33 +412,33 @@ namespace Unigram.Views.Popups
             var content = args.ItemContainer.ContentTemplateRoot as Grid;
 
             var title = content.Children[1] as TextBlock;
-            //title.Text = Enum.GetName(typeof(ChatListFilterFlags), filter.Flag);
+            //title.Text = Enum.GetName(typeof(ChatListFolderFlags), filter.Flag);
 
             switch (filter.Flag)
             {
-                case ChatListFilterFlags.IncludeContacts:
+                case ChatListFolderFlags.IncludeContacts:
                     title.Text = Strings.Resources.FilterContacts;
                     break;
-                case ChatListFilterFlags.IncludeNonContacts:
+                case ChatListFolderFlags.IncludeNonContacts:
                     title.Text = Strings.Resources.FilterNonContacts;
                     break;
-                case ChatListFilterFlags.IncludeGroups:
+                case ChatListFolderFlags.IncludeGroups:
                     title.Text = Strings.Resources.FilterGroups;
                     break;
-                case ChatListFilterFlags.IncludeChannels:
+                case ChatListFolderFlags.IncludeChannels:
                     title.Text = Strings.Resources.FilterChannels;
                     break;
-                case ChatListFilterFlags.IncludeBots:
+                case ChatListFolderFlags.IncludeBots:
                     title.Text = Strings.Resources.FilterBots;
                     break;
 
-                case ChatListFilterFlags.ExcludeMuted:
+                case ChatListFolderFlags.ExcludeMuted:
                     title.Text = Strings.Resources.FilterMuted;
                     break;
-                case ChatListFilterFlags.ExcludeRead:
+                case ChatListFolderFlags.ExcludeRead:
                     title.Text = Strings.Resources.FilterRead;
                     break;
-                case ChatListFilterFlags.ExcludeArchived:
+                case ChatListFolderFlags.ExcludeArchived:
                     title.Text = Strings.Resources.FilterArchived;
                     break;
             }
@@ -529,7 +529,7 @@ namespace Unigram.Views.Popups
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
                         if (result.IsPublic)
                         {
-                            subtitle.Text = $"@{user.Username}";
+                            subtitle.Text = $"@{user.ActiveUsername()}";
                         }
                         else
                         {
@@ -543,11 +543,11 @@ namespace Unigram.Views.Popups
                         {
                             if (supergroup.MemberCount > 0)
                             {
-                                subtitle.Text = string.Format("@{0}, {1}", supergroup.Username, Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
+                                subtitle.Text = string.Format("@{0}, {1}", supergroup.ActiveUsername(), Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
                             }
                             else
                             {
-                                subtitle.Text = $"@{supergroup.Username}";
+                                subtitle.Text = $"@{supergroup.ActiveUsername()}";
                             }
                         }
                         else if (supergroup.MemberCount > 0)

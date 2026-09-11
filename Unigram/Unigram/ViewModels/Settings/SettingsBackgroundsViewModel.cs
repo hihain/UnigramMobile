@@ -35,7 +35,7 @@ namespace Unigram.ViewModels.Settings
 
         private void RefreshItems()
         {
-            ProtoService.Send(new GetBackgrounds(Settings.Appearance.IsDarkTheme()), result =>
+            ProtoService.Send(new GetInstalledBackgrounds(Settings.Appearance.IsDarkTheme()), result =>
             {
                 if (result is Backgrounds wallpapers)
                 {
@@ -119,7 +119,8 @@ namespace Unigram.ViewModels.Settings
                 return;
             }
 
-            var response = await ProtoService.SendAsync(new ResetBackgrounds());
+            ProtoService.Send(new DeleteDefaultBackground(true));
+            var response = await ProtoService.SendAsync(new DeleteDefaultBackground(false));
             if (response is Ok)
             {
                 RefreshItems();

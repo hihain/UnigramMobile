@@ -178,20 +178,20 @@ namespace Unigram.Views.Popups
                 var insert = string.Empty;
                 var adjust = 0;
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     insert = string.IsNullOrEmpty(user.FirstName) ? user.LastName : user.FirstName;
                     adjust = 1;
                 }
                 else
                 {
-                    insert = user.Username;
+                    insert = user.ActiveUsername();
                 }
 
                 var range = CaptionInput.Document.GetRange(CaptionInput.Document.Selection.StartPosition - username.Length - adjust, CaptionInput.Document.Selection.StartPosition);
                 range.SetText(TextSetOptions.None, insert);
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     range.Link = $"\"tg-user://{user.Id}\"";
                 }
@@ -232,7 +232,7 @@ namespace Unigram.Views.Popups
                 var username = title.Inlines[1] as Run;
 
                 name.Text = user.GetFullName();
-                username.Text = string.IsNullOrEmpty(user.Username) ? string.Empty : $" @{user.Username}";
+                username.Text = string.IsNullOrEmpty(user.ActiveUsername()) ? string.Empty : $" @{user.ActiveUsername()}";
 
                 photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 36);
             }

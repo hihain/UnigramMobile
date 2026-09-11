@@ -26,7 +26,7 @@ namespace Unigram.ViewModels.Payments
             if (response is PaymentReceipt receipt)
             {
                 Receipt = receipt;
-                Bot = ProtoService.GetUser(receipt.PaymentsProviderUserId);
+                Bot = ProtoService.GetUser(receipt.PaymentProviderUserId);
 
                 var second = await ProtoService.SendAsync(new GetMessage(navigation.ChatId, navigation.ReceiptMessageId));
                 if (second is Message message1 && message1.Content is MessagePaymentSuccessful payment)

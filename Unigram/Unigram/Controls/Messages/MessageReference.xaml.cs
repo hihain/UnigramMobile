@@ -222,7 +222,7 @@ namespace Unigram.Controls.Messages
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
-                case MessageChatSetTtl chatSetTtl:
+                case MessageChatSetMessageAutoDeleteTime chatSetTtl:
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:

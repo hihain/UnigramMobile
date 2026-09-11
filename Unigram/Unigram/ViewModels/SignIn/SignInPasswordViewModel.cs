@@ -134,7 +134,7 @@ namespace Unigram.ViewModels.SignIn
             {
                 IsLoading = true;
 
-                var response = await ProtoService.SendAsync(new DeleteAccount("Forgot password"));
+                var response = await ProtoService.SendAsync(new DeleteAccount("Forgot password", string.Empty));
                 if (response is Ok)
                 {
                     //var logout = await LegacyService.LogOutAsync();

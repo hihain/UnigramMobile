@@ -35,7 +35,7 @@ namespace Unigram.Converters
             //{
             //    builder.append(Strings.Resources.UserRestrictionsNoRead);
             //}
-            if (rights.CanSendMessages && defaultBannedRights.CanSendMessages != rights.CanSendMessages)
+            if (rights.CanSendBasicMessages && defaultBannedRights.CanSendBasicMessages != rights.CanSendBasicMessages)
             {
                 if (builder.Length > 0)
                 {
@@ -43,7 +43,7 @@ namespace Unigram.Converters
                 }
                 builder.Append(Strings.Resources.UserRestrictionsNoSend);
             }
-            if (rights.CanSendMediaMessages && defaultBannedRights.CanSendMediaMessages != rights.CanSendMediaMessages)
+            if (rights.CanSendMediaMessages() && defaultBannedRights.CanSendMediaMessages() != rights.CanSendMediaMessages())
             {
                 if (builder.Length > 0)
                 {

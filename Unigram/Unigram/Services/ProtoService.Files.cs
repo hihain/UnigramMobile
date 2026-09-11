@@ -877,7 +877,7 @@ namespace Unigram.Services
                     MapFiles(updateTrendingStickerSets.StickerSets);
                 }
             }
-            else if (target is UpdateSelectedBackground updateSelectedBackground)
+            else if (target is UpdateDefaultBackground updateSelectedBackground)
             {
                 if (updateSelectedBackground.Background != null)
                 {

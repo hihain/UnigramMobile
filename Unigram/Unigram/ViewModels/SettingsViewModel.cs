@@ -165,12 +165,12 @@ namespace Unigram.ViewModels
                 conversion.CropRectangle = rectangle;
 
                 var generated = await media.File.ToGeneratedAsync(ConversionType.Transcode, JsonConvert.SerializeObject(conversion));
-                var response = await ProtoService.SendAsync(new SetProfilePhoto(new InputChatPhotoAnimation(generated, 0)));
+                var response = await ProtoService.SendAsync(new SetProfilePhoto(new InputChatPhotoAnimation(generated, 0), false));
             }
             else
             {
                 var generated = await media.File.ToGeneratedAsync(ConversionType.Compress, JsonConvert.SerializeObject(media.EditState));
-                var response = await ProtoService.SendAsync(new SetProfilePhoto(new InputChatPhotoStatic(generated)));
+                var response = await ProtoService.SendAsync(new SetProfilePhoto(new InputChatPhotoStatic(generated), false));
             }
         }
 

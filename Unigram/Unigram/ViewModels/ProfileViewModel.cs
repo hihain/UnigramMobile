@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -452,11 +452,11 @@ namespace Unigram.ViewModels
         {
             if (chat.Type is ChatTypePrivate privata)
             {
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(privata.UserId), blocked));
+                ProtoService.Send(new SetMessageSenderBlockList(new MessageSenderUser(privata.UserId), blocked ? new BlockListMain() : null));
             }
             else if (chat.Type is ChatTypeSecret secret)
             {
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(secret.UserId), blocked));
+                ProtoService.Send(new SetMessageSenderBlockList(new MessageSenderUser(secret.UserId), blocked ? new BlockListMain() : null));
             }
         }
 
@@ -597,7 +597,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(user.Bio);
+                dataPackage.SetText(user.Bio?.Text ?? string.Empty);
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -620,7 +620,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText($"@{supergroup.Username}");
+                dataPackage.SetText($"@{supergroup.ActiveUsername()}");
                 ClipboardEx.TrySetContent(dataPackage);
             }
             else
@@ -632,7 +632,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText($"@{user.Username}");
+                dataPackage.SetText($"@{user.ActiveUsername()}");
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -655,7 +655,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, supergroup.Username));
+                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, supergroup.ActiveUsername()));
                 ClipboardEx.TrySetContent(dataPackage);
             }
             else
@@ -667,7 +667,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, user.Username));
+                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, user.ActiveUsername()));
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -1034,7 +1034,7 @@ namespace Unigram.ViewModels
             }
 
             var dialog = new ChatTtlPopup(chat.Type is ChatTypeSecret);
-            dialog.Value = chat.MessageTtl;
+            dialog.Value = chat.MessageAutoDeleteTime;
 
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm != ContentDialogResult.Primary)
@@ -1042,7 +1042,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            ProtoService.Send(new SetChatMessageTtl(chat.Id, dialog.Value));
+            ProtoService.Send(new SetChatMessageAutoDeleteTime(chat.Id, dialog.Value));
         }
 
         #endregion

@@ -184,7 +184,7 @@ namespace Unigram.ViewModels.SignIn
 
             await _notificationsService.CloseAsync();
 
-            var function = new SetAuthenticationPhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, new string[0]));
+            var function = new SetAuthenticationPhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, null, new string[0]));
             var request = default(Task<BaseObject>);
 
             if (ProtoService.AuthorizationState is AuthorizationStateWaitOtherDeviceConfirmation)

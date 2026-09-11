@@ -157,8 +157,8 @@ namespace Unigram.Views
             UserPhone.Badge = PhoneNumber.Format(user.PhoneNumber);
             UserPhone.Visibility = string.IsNullOrEmpty(user.PhoneNumber) ? Visibility.Collapsed : Visibility.Visible;
 
-            Username.Badge = $"{user.Username}";
-            Username.Visibility = string.IsNullOrEmpty(user.Username) ? Visibility.Collapsed : Visibility.Visible;
+            Username.Badge = $"{user.ActiveUsername()}";
+            Username.Visibility = string.IsNullOrEmpty(user.ActiveUsername()) ? Visibility.Collapsed : Visibility.Visible;
 
             DescriptionTitle.Text = user.Type is UserTypeBot ? Strings.Resources.DescriptionPlaceholder : Strings.Resources.UserBio;
 
@@ -214,13 +214,13 @@ namespace Unigram.Views
         {
             if (user.Type is UserTypeBot)
             {
-                GetEntities(fullInfo.ShareText);
-                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.ShareText) ? Visibility.Collapsed : Visibility.Visible;
+                GetEntities(fullInfo.BotInfo?.Description ?? string.Empty);
+                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.BotInfo?.Description) ? Visibility.Collapsed : Visibility.Visible;
             }
             else
             {
-                GetEntities(fullInfo.Bio);
-                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.Bio) ? Visibility.Collapsed : Visibility.Visible;
+                GetEntities(fullInfo.Bio?.Text ?? string.Empty);
+                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.Bio?.Text) ? Visibility.Collapsed : Visibility.Visible;
             }
 
             //UserCommonChats.Badge = fullInfo.GroupInCommonCount;
@@ -250,7 +250,7 @@ namespace Unigram.Views
         {
             if (secretChat.State is SecretChatStateReady ready)
             {
-                SecretLifetime.Badge = chat.MessageTtl > 0 ? Locale.FormatTtl(chat.MessageTtl) : Strings.Resources.ShortMessageLifetimeForever;
+                SecretLifetime.Badge = chat.MessageAutoDeleteTime > 0 ? Locale.FormatTtl(chat.MessageAutoDeleteTime) : Strings.Resources.ShortMessageLifetimeForever;
                 //SecretIdenticon.Source = PlaceholderHelper.GetIdenticon(secretChat.KeyHash, 24);
 
                 MiscPanel.Visibility = Visibility.Visible;
@@ -273,7 +273,7 @@ namespace Unigram.Views
 
             DescriptionTitle.Text = Strings.Resources.DescriptionPlaceholder;
 
-            GroupInvite.Visibility = group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers) || chat.Permissions.CanInviteUsers ? Visibility.Visible : Visibility.Collapsed;
+            GroupInvite.Visibility = group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanInviteUsers) || chat.Permissions.CanInviteUsers ? Visibility.Visible : Visibility.Collapsed;
 
             Edit.Visibility = chat.Permissions.CanChangeInfo || group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator ? Visibility.Visible : Visibility.Collapsed;
             Edit.Glyph = Icons.Edit;
@@ -334,8 +334,8 @@ namespace Unigram.Views
 
             Verified.Visibility = group.IsVerified ? Visibility.Visible : Visibility.Collapsed;
 
-            Username.Badge = $"{group.Username}";
-            Username.Visibility = string.IsNullOrEmpty(group.Username) ? Visibility.Collapsed : Visibility.Visible;
+            Username.Badge = $"{group.ActiveUsername()}";
+            Username.Visibility = string.IsNullOrEmpty(group.ActiveUsername()) ? Visibility.Collapsed : Visibility.Visible;
 
             Location.Visibility = group.HasLocation ? Visibility.Visible : Visibility.Collapsed;
 
@@ -350,7 +350,7 @@ namespace Unigram.Views
                 GroupLeave.Visibility = Visibility.Collapsed;
             }
 
-            GroupInvite.Visibility = !group.IsChannel && (group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers) || chat.Permissions.CanInviteUsers) ? Visibility.Visible : Visibility.Collapsed;
+            GroupInvite.Visibility = !group.IsChannel && (group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanInviteUsers) || chat.Permissions.CanInviteUsers) ? Visibility.Visible : Visibility.Collapsed;
 
             ChannelMembersPanel.Visibility = group.IsChannel && (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator) ? Visibility.Visible : Visibility.Collapsed;
             MembersPanel.Visibility = group.IsChannel ? Visibility.Collapsed : Visibility.Collapsed;
@@ -509,7 +509,7 @@ namespace Unigram.Views
                     if (user.IsContact)
                     {
                         flyout.CreateFlyoutItem(ViewModel.ShareCommand, Strings.Resources.ShareContact, new FontIcon { Glyph = Icons.Share });
-                        flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                        flyout.CreateFlyoutItem(chat.IsBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked() ? Icons.Banned : Icons.Banned });
                         flyout.CreateFlyoutItem(ViewModel.EditCommand, Strings.Resources.EditContact, new FontIcon { Glyph = Icons.Edit });
                         flyout.CreateFlyoutItem(ViewModel.DeleteCommand, Strings.Resources.DeleteContact, new FontIcon { Glyph = Icons.Delete });
                     }
@@ -532,17 +532,17 @@ namespace Unigram.Views
                         if (user.PhoneNumber.Length > 0)
                         {
                             flyout.CreateFlyoutItem(ViewModel.ShareCommand, Strings.Resources.ShareContact, new FontIcon { Glyph = Icons.Share });
-                            flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                            flyout.CreateFlyoutItem(chat.IsBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked() ? Icons.Banned : Icons.Banned });
                         }
                         else
                         {
                             if (user.Type is UserTypeBot)
                             {
-                                flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.BotRestart : Strings.Resources.BotStop, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                                flyout.CreateFlyoutItem(chat.IsBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked() ? Strings.Resources.BotRestart : Strings.Resources.BotStop, new FontIcon { Glyph = chat.IsBlocked() ? Icons.Banned : Icons.Banned });
                             }
                             else
                             {
-                                flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                                flyout.CreateFlyoutItem(chat.IsBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked() ? Icons.Banned : Icons.Banned });
                             }
                         }
                     }

@@ -1433,7 +1433,7 @@ namespace Unigram.Views
                         return;
                     }
 
-                    protoService.Send(new GetWebPagePreview(new FormattedText(urls, new TextEntity[0])), result);
+                    protoService.Send(new GetWebPagePreview(new FormattedText(urls, new TextEntity[0]), null), result);
                 }
                 else
                 {
@@ -1442,7 +1442,7 @@ namespace Unigram.Views
             }
             else
             {
-                protoService.Send(new GetWebPagePreview(new FormattedText(text.Format(), new TextEntity[0])), result);
+                protoService.Send(new GetWebPagePreview(new FormattedText(text.Format(), new TextEntity[0]), null), result);
             }
         }
 
@@ -1786,20 +1786,20 @@ namespace Unigram.Views
 
             if (message.IsSaved())
             {
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                 {
                     ViewModel.OpenUser(fromUser.SenderUserId);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                 {
                     ViewModel.OpenChat(fromChat.SenderChatId, true);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     // TODO: verify if this is sufficient
                     ViewModel.OpenChat(fromChannel.ChatId);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser)
+                else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser)
                 {
                     Window.Current.ShowTeachingTip(sender as FrameworkElement, Strings.Resources.HidAccount);
                     //await MessagePopup.ShowAsync(Strings.Resources.HidAccount, Strings.Resources.AppName, Strings.Resources.OK);
@@ -1834,11 +1834,11 @@ namespace Unigram.Views
 
             if (message.IsSaved())
             {
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser || message.ForwardInfo?.Origin is MessageForwardOriginChat)
+                if (message.ForwardInfo?.Origin is MessageOriginUser || message.ForwardInfo?.Origin is MessageOriginChat)
                 {
-                    ViewModel.NavigationService.NavigateToChat(message.ForwardInfo.FromChatId, message.ForwardInfo.FromMessageId);
+                    ViewModel.NavigationService.NavigateToChat(message.ForwardInfo.Source?.ChatId ?? 0, message.ForwardInfo.Source?.MessageId ?? 0);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     ViewModel.NavigationService.NavigateToChat(fromChannel.ChatId, fromChannel.MessageId);
                 }
@@ -1894,7 +1894,7 @@ namespace Unigram.Views
 
             flyout.CreateFlyoutItem(ViewModel.SearchCommand, Strings.Resources.Search, new FontIcon { Glyph = Icons.Search }, Windows.System.VirtualKey.F);
 
-            if (supergroup != null && !(supergroup.Status is ChatMemberStatusCreator) && (supergroup.IsChannel || !string.IsNullOrEmpty(supergroup.Username)))
+            if (supergroup != null && !(supergroup.Status is ChatMemberStatusCreator) && (supergroup.IsChannel || !string.IsNullOrEmpty(supergroup.ActiveUsername())))
             {
                 flyout.CreateFlyoutItem(ViewModel.ReportCommand, Strings.Resources.ReportChat, new FontIcon { Glyph = Icons.Report });
             }
@@ -1916,7 +1916,7 @@ namespace Unigram.Views
             {
                 flyout.CreateFlyoutItem(ViewModel.SetTimerCommand, Strings.Resources.SetTimer, new FontIcon { Glyph = Icons.Timer });
             }
-            if (user != null || basicGroup != null || (supergroup != null && !supergroup.IsChannel && string.IsNullOrEmpty(supergroup.Username)))
+            if (user != null || basicGroup != null || (supergroup != null && !supergroup.IsChannel && string.IsNullOrEmpty(supergroup.ActiveUsername())))
             {
                 flyout.CreateFlyoutItem(ViewModel.ChatClearCommand, Strings.Resources.ClearHistory, new FontIcon { Glyph = Icons.Clear });
             }
@@ -1950,12 +1950,12 @@ namespace Unigram.Views
                 var fullInfo = ViewModel.ProtoService.GetUserFull(user.Id);
                 if (fullInfo != null)
                 {
-                    if (fullInfo.Commands.Any(x => x.Command.Equals("Settings")))
+                    if (fullInfo.BotInfo?.Commands.Any(x => x.Command.Equals("Settings")) == true)
                     {
                         flyout.CreateFlyoutItem(null, Strings.Resources.BotSettings);
                     }
 
-                    if (fullInfo.Commands.Any(x => x.Command.Equals("help")))
+                    if (fullInfo.BotInfo?.Commands.Any(x => x.Command.Equals("help")) == true)
                     {
                         flyout.CreateFlyoutItem(null, Strings.Resources.BotHelp);
                     }
@@ -2215,7 +2215,7 @@ namespace Unigram.Views
                 }
                 else if (supergroup.Status is ChatMemberStatusRestricted restricted)
                 {
-                    return restricted.Permissions.CanSendMessages;
+                    return restricted.Permissions.CanSendBasicMessages;
                 }
             }
             else if (chat != null && chat.Id == ViewModel.CacheService.Options.RepliesBotChatId)
@@ -2247,7 +2247,7 @@ namespace Unigram.Views
                     return false;
                 }
 
-                if (supergroup.Status is ChatMemberStatusCreator || (supergroup.Status is ChatMemberStatusAdministrator admin && (admin.CanPinMessages || supergroup.IsChannel && admin.CanEditMessages)))
+                if (supergroup.Status is ChatMemberStatusCreator || (supergroup.Status is ChatMemberStatusAdministrator admin && (admin.Rights.CanPinMessages || supergroup.IsChannel && admin.Rights.CanEditMessages)))
                 {
                     return true;
                 }
@@ -2264,7 +2264,7 @@ namespace Unigram.Views
                     return false;
                 }
 
-                if (basicGroup.Status is ChatMemberStatusCreator || (basicGroup.Status is ChatMemberStatusAdministrator admin && admin.CanPinMessages))
+                if (basicGroup.Status is ChatMemberStatusCreator || (basicGroup.Status is ChatMemberStatusAdministrator admin && admin.Rights.CanPinMessages))
                 {
                     return true;
                 }
@@ -2850,20 +2850,20 @@ namespace Unigram.Views
                 var adjust = 0;
 
                 string insert;
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     insert = string.IsNullOrEmpty(user.FirstName) ? user.LastName : user.FirstName;
                     adjust = 1;
                 }
                 else
                 {
-                    insert = user.Username;
+                    insert = user.ActiveUsername();
                 }
 
                 var range = TextField.Document.GetRange(TextField.Document.Selection.StartPosition - username.Length - adjust, TextField.Document.Selection.StartPosition);
                 range.SetText(TextSetOptions.None, insert);
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     range.Link = $"\"tg-user://{user.Id}\"";
                 }
@@ -2873,7 +2873,7 @@ namespace Unigram.Views
 
                 if (index == 0 && user.Type is UserTypeBot bot && bot.IsInline)
                 {
-                    ViewModel.ResolveInlineBot(user.Username);
+                    ViewModel.ResolveInlineBot(user.ActiveUsername());
                 }
             }
             else if (e.ClickedItem is UserCommand command)
@@ -2890,9 +2890,9 @@ namespace Unigram.Views
                     if (chat.Type is ChatTypeSupergroup || chat.Type is ChatTypeBasicGroup)
                     {
                         var bot = ViewModel.ProtoService.GetUser(command.UserId);
-                        if (bot != null && bot.Username.Length > 0)
+                        if (bot != null && bot.ActiveUsername().Length > 0)
                         {
-                            insert += $"@{bot.Username}";
+                            insert += $"@{bot.ActiveUsername()}";
                         }
                     }
 
@@ -3212,7 +3212,7 @@ namespace Unigram.Views
                 var username = title.Inlines[1] as Run;
 
                 name.Text = user.GetFullName();
-                username.Text = string.IsNullOrEmpty(user.Username) ? string.Empty : $" @{user.Username}";
+                username.Text = string.IsNullOrEmpty(user.ActiveUsername()) ? string.Empty : $" @{user.ActiveUsername()}";
 
                 photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 36);
             }
@@ -3435,12 +3435,12 @@ namespace Unigram.Views
                 }
                 else
                 {
-                    ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamAndLeave, ViewModel.ReportSpamCommand, new ChatReportReasonSpam()));
+                    ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamAndLeave, ViewModel.ReportSpamCommand, new ReportReasonSpam()));
                 }
             }
             else if (chat.ActionBar is ChatActionBarReportUnrelatedLocation)
             {
-                ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamLocation, ViewModel.ReportSpamCommand, new ChatReportReasonUnrelatedLocation()));
+                ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamLocation, ViewModel.ReportSpamCommand, new ReportReasonUnrelatedLocation()));
             }
             else if (chat.ActionBar is ChatActionBarSharePhoneNumber)
             {
@@ -3503,7 +3503,7 @@ namespace Unigram.Views
                     return;
                 }
 
-                if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages)
+                if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPostMessages)
                 {
                 }
                 else if (group.Status is ChatMemberStatusLeft)
@@ -3555,7 +3555,7 @@ namespace Unigram.Views
                                 ? Strings.Resources.ChannelSilentBroadcast
                                 : Strings.Resources.ChannelBroadcast;
                         }
-                        else if (supergroup.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.IsAnonymous)
+                        else if (supergroup.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.IsAnonymous)
                         {
                             return Strings.Resources.SendAnonymously;
                         }
@@ -3621,7 +3621,7 @@ namespace Unigram.Views
                 //AttachMedia.Command = ViewModel.SendMediaCommand;
                 //AttachDocument.Command = ViewModel.SendDocumentCommand;
 
-                var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
+                var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages(), Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
                 var pollsRights = ViewModel.VerifyRights(chat, x => x.CanSendPolls, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string pollsLabel);
 
                 var pollsAllowed = chat.Type is ChatTypeSupergroup || chat.Type is ChatTypeBasicGroup;
@@ -3705,7 +3705,7 @@ namespace Unigram.Views
                     //AttachMedia.Command = ViewModel.SendMediaCommand;
                     //AttachDocument.Command = ViewModel.SendDocumentCommand;
 
-                    var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
+                    var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages(), Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
                     var pollsRights = ViewModel.VerifyRights(chat, x => x.CanSendPolls, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string pollsLabel);
 
                     AttachRestriction.Text = label ?? string.Empty;
@@ -4187,7 +4187,7 @@ namespace Unigram.Views
             {
                 ShowAction(ViewModel.CacheService.GetNotificationSettingsMuteFor(chat) > 0 ? Strings.Resources.ChannelUnmute : Strings.Resources.ChannelMute, true);
             }
-            else if (chat.IsBlocked)
+            else if (chat.IsBlocked())
             {
                 ShowAction(user.Type is UserTypeBot ? Strings.Resources.BotUnblock : Strings.Resources.Unblock, true);
             }
@@ -4200,9 +4200,9 @@ namespace Unigram.Views
                 ShowArea();
             }
 
-            if (fullInfo.Commands.Count > 0)
+            if (fullInfo.BotInfo?.Commands.Count > 0)
             {
-                ViewModel.BotCommands = fullInfo.Commands.Select(x => new UserCommand(user.Id, x)).ToList();
+                ViewModel.BotCommands = fullInfo.BotInfo.Commands.Select(x => new UserCommand(user.Id, x)).ToList();
                 ViewModel.HasBotCommands = false;
                 ShowHideBotCommands(true);
             }
@@ -4334,11 +4334,11 @@ namespace Unigram.Views
             }
             else if (group.IsChannel || group.IsBroadcastGroup)
             {
-                if ((group.Status is ChatMemberStatusLeft && (group.Username.Length > 0 || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
+                if ((group.Status is ChatMemberStatusLeft && (group.ActiveUsername().Length > 0 || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
                 {
                     ShowAction(Strings.Resources.ChannelJoin, true);
                 }
-                else if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages)
+                else if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPostMessages)
                 {
                     ShowArea();
                 }
@@ -4353,7 +4353,7 @@ namespace Unigram.Views
             }
             else
             {
-                if ((group.Status is ChatMemberStatusLeft && (group.Username.Length > 0 || group.HasLocation || group.HasLinkedChat || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
+                if ((group.Status is ChatMemberStatusLeft && (group.ActiveUsername().Length > 0 || group.HasLocation || group.HasLinkedChat || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
                 {
                     if (ViewModel.Type == DialogType.Thread)
                     {
@@ -4370,11 +4370,11 @@ namespace Unigram.Views
                 }
                 else if (group.Status is ChatMemberStatusRestricted restrictedSend)
                 {
-                    if (!restrictedSend.IsMember && group.Username.Length > 0)
+                    if (!restrictedSend.IsMember && group.ActiveUsername().Length > 0)
                     {
                         ShowAction(Strings.Resources.ChannelJoin, true);
                     }
-                    else if (!restrictedSend.Permissions.CanSendMessages)
+                    else if (!restrictedSend.Permissions.CanSendBasicMessages)
                     {
                         if (restrictedSend.IsForever())
                         {
@@ -4394,7 +4394,7 @@ namespace Unigram.Views
                 {
                     ShowAction(Strings.Resources.DeleteChat, true);
                 }
-                else if (!chat.Permissions.CanSendMessages)
+                else if (!chat.Permissions.CanSendBasicMessages)
                 {
                     ShowAction(Strings.Resources.GlobalSendMessageRestricted, false);
                 }
@@ -4410,7 +4410,7 @@ namespace Unigram.Views
                     ? Strings.Resources.ChannelSilentBroadcast
                     : Strings.Resources.ChannelBroadcast;
             }
-            else if (group.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || group.Status is ChatMemberStatusAdministrator administrator && administrator.IsAnonymous)
+            else if (group.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.IsAnonymous)
             {
                 TextField.PlaceholderText = Strings.Resources.SendAnonymously;
             }
@@ -4518,7 +4518,7 @@ namespace Unigram.Views
                     {
                         ViewVisibleMessages(false);
                     }
-                    else if (content is MessageSticker sticker && (sticker.Sticker.Type is StickerTypeAnimated || sticker.Sticker.Type is StickerTypeVideo) && sticker.Sticker.StickerValue.Id == file.Id && file.Local.IsDownloadingCompleted)
+                    else if (content is MessageSticker sticker && (sticker.Sticker.Format is StickerFormatTgs || sticker.Sticker.Format is StickerFormatWebm) && sticker.Sticker.StickerValue.Id == file.Id && file.Local.IsDownloadingCompleted)
                     {
                         ViewVisibleMessages(false);
                     }
@@ -4532,7 +4532,7 @@ namespace Unigram.Views
                         {
                             ViewVisibleMessages(false);
                         }
-                        else if (text.WebPage.Sticker?.StickerValue.Id == file.Id && (text.WebPage.Sticker.Type is StickerTypeAnimated || text.WebPage.Sticker.Type is StickerTypeVideo))
+                        else if (text.WebPage.Sticker?.StickerValue.Id == file.Id && (text.WebPage.Sticker.Format is StickerFormatTgs || text.WebPage.Sticker.Format is StickerFormatWebm))
                         {
                             ViewVisibleMessages(false);
                         }
@@ -4563,7 +4563,7 @@ namespace Unigram.Views
                         {
                             if (message.IsSaved())
                             {
-                                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                                 {
                                     var user = message.ProtoService.GetUser(fromUser.SenderUserId);
                                     if (user != null)
@@ -4571,7 +4571,7 @@ namespace Unigram.Views
                                         photo.Source = PlaceholderHelper.GetUser(null, user, 32);
                                     }
                                 }
-                                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                                 {
                                     var originChat = message.ProtoService.GetChat(fromChat.SenderChatId);
                                     if (originChat != null)
@@ -4579,7 +4579,7 @@ namespace Unigram.Views
                                         photo.Source = PlaceholderHelper.GetChat(null, originChat, 32);
                                     }
                                 }
-                                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                                 {
                                     var originChannel = message.ProtoService.GetChat(fromChannel.ChatId);
                                     if (originChannel != null)

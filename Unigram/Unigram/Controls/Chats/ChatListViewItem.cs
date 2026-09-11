@@ -229,12 +229,12 @@ namespace Unigram.Controls.Chats
                     }
                     else if (supergroup.Status is ChatMemberStatusRestricted restricted)
                     {
-                        return restricted.Permissions.CanSendMessages;
+                        return restricted.Permissions.CanSendBasicMessages;
                     }
                 }
                 else
                 {
-                    return chat.Permissions.CanSendMessages;
+                    return chat.Permissions.CanSendBasicMessages;
                 }
 
                 return true;

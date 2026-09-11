@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -300,30 +300,30 @@ namespace Unigram.ViewModels
                     var date = BindConvert.Current.DateTime(message.Date);
                     builder.AppendLine(string.Format("{0}, [{1} {2}]", title, BindConvert.Current.ShortDate.Format(date), BindConvert.Current.ShortTime.Format(date)));
 
-                    if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                    if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                     {
                         var from = ProtoService.GetChat(fromChat.SenderChatId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {ProtoService.GetTitle(from)}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel forwardedPost)
+                    else if (message.ForwardInfo?.Origin is MessageOriginChannel forwardedPost)
                     {
                         var from = ProtoService.GetChat(forwardedPost.ChatId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {ProtoService.GetTitle(from)}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginUser forwardedFromUser)
+                    else if (message.ForwardInfo?.Origin is MessageOriginUser forwardedFromUser)
                     {
                         var from = ProtoService.GetUser(forwardedFromUser.SenderUserId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {from.GetFullName()}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport forwardedFromImport)
+                    else if (message.ImportInfo != null)
                     {
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
-                        builder.AppendLine($"[{Strings.Resources.From} {forwardedFromImport.SenderName}]");
+                        builder.AppendLine($"[{Strings.Resources.From} {message.ImportInfo.SenderName}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser forwardedFromHiddenUser)
+                    else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser forwardedFromHiddenUser)
                     {
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {forwardedFromHiddenUser.SenderName}]");
@@ -479,11 +479,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -497,7 +497,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -565,7 +565,7 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageRetryCommand { get; }
         private void MessageRetryExecute(MessageViewModel message)
         {
-            ProtoService.Send(new ResendMessages(message.ChatId, new[] { message.Id }));
+            ProtoService.Send(new ResendMessages(message.ChatId, new[] { message.Id }, null));
         }
 
         #endregion
@@ -889,11 +889,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -907,7 +907,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -1005,7 +1005,7 @@ namespace Unigram.ViewModels
                     var response = await ProtoService.SendAsync(new GetLoginUrlInfo(chat.Id, message.Id, loginUrl.Id));
                     if (response is LoginUrlInfoOpen infoOpen)
                     {
-                        OpenUrl(infoOpen.Url, !infoOpen.SkipConfirm);
+                        OpenUrl(infoOpen.Url, !infoOpen.SkipConfirmation);
                     }
                     else if (response is LoginUrlInfoRequestConfirmation requestConfirmation)
                     {
@@ -1041,10 +1041,10 @@ namespace Unigram.ViewModels
                         return;
                     }
 
-                    if (switchInline.InCurrentChat)
+                    if (switchInline.TargetChat is TargetChatCurrent)
                     {
-                        SetText(string.Format("@{0} {1}", bot.Username, switchInline.Query), focus: true);
-                        ResolveInlineBot(bot.Username, switchInline.Query);
+                        SetText(string.Format("@{0} {1}", bot.ActiveUsername(), switchInline.Query), focus: true);
+                        ResolveInlineBot(bot.ActiveUsername(), switchInline.Query);
                     }
                     else
                     {
@@ -1076,7 +1076,7 @@ namespace Unigram.ViewModels
                     var bot = message.GetViaBotUser();
                     if (bot != null)
                     {
-                        InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null), null));
+                        InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null, null), null));
                     }
 
                     var response = await ProtoService.SendAsync(new GetCallbackQueryAnswer(chat.Id, message.Id, new CallbackQueryPayloadData(callback.Data)));
@@ -1097,7 +1097,7 @@ namespace Unigram.ViewModels
                                     return;
                                 }
 
-                                InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(answer.Text, new TextEntity[0]), null), null));
+                                InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(answer.Text, new TextEntity[0]), null, null), null));
                             }
                         }
                         else if (!string.IsNullOrEmpty(answer.Url))
@@ -1146,7 +1146,7 @@ namespace Unigram.ViewModels
                         var viaBot = message.GetViaBotUser();
                         if (viaBot != null)
                         {
-                            bundle.Add("username", viaBot.Username);
+                            bundle.Add("username", viaBot.ActiveUsername());
                         }
 
                         ChatActionManager.SetTyping(new ChatActionStartPlayingGame());
@@ -1198,7 +1198,7 @@ namespace Unigram.ViewModels
                                 return;
                             }
 
-                            await SendMessageAsync(chat, 0, new InputMessageLocation(location, 0, 0, 0), null);
+                            await SendMessageAsync(chat, null, new InputMessageLocation(location, 0, 0, 0), null);
                         }
                     }
                 }

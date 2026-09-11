@@ -222,7 +222,7 @@ namespace Unigram.Controls.Messages
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
-                case MessageChatSetTtl chatSetTtl:
+                case MessageChatSetMessageAutoDeleteTime chatSetTtl:
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:
@@ -238,7 +238,7 @@ namespace Unigram.Controls.Messages
                 //case MessageVoiceChatEnded newTodo3:
                 //case MessageVoiceChatScheduled newTodo4:
                 //case MessageVoiceChatStarted newTodo5:
-                case MessageWebsiteConnected newTodo6:
+                case MessageBotWriteAccessAllowed newTodo6:
                     return SetServiceTextTemplate(message, title);
                 case MessageExpiredPhoto expiredPhoto:
                 case MessageExpiredVideo expiredVideo:

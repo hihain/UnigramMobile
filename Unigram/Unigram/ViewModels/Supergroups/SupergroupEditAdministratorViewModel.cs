@@ -88,15 +88,15 @@ namespace Unigram.ViewModels.Supergroups
 
                 if (member.Status is ChatMemberStatusAdministrator administrator)
                 {
-                    CanChangeInfo = administrator.CanChangeInfo;
-                    CanDeleteMessages = administrator.CanDeleteMessages;
-                    CanEditMessages = administrator.CanEditMessages;
-                    CanInviteUsers = administrator.CanInviteUsers;
-                    CanPinMessages = administrator.CanPinMessages;
-                    CanPostMessages = administrator.CanPostMessages;
-                    CanPromoteMembers = administrator.CanPromoteMembers;
-                    CanRestrictMembers = administrator.CanRestrictMembers;
-                    IsAnonymous = administrator.IsAnonymous;
+                    CanChangeInfo = administrator.Rights.CanChangeInfo;
+                    CanDeleteMessages = administrator.Rights.CanDeleteMessages;
+                    CanEditMessages = administrator.Rights.CanEditMessages;
+                    CanInviteUsers = administrator.Rights.CanInviteUsers;
+                    CanPinMessages = administrator.Rights.CanPinMessages;
+                    CanPostMessages = administrator.Rights.CanPostMessages;
+                    CanPromoteMembers = administrator.Rights.CanPromoteMembers;
+                    CanRestrictMembers = administrator.Rights.CanRestrictMembers;
+                    IsAnonymous = administrator.Rights.IsAnonymous;
 
                     CustomTitle = administrator.CustomTitle;
                 }
@@ -342,15 +342,19 @@ namespace Unigram.ViewModels.Supergroups
             {
                 status = new ChatMemberStatusAdministrator
                 {
-                    IsAnonymous = channel ? false : _isAnonymous,
-                    CanChangeInfo = _canChangeInfo,
-                    CanDeleteMessages = _canDeleteMessages,
-                    CanEditMessages = channel ? _canEditMessages : false,
-                    CanInviteUsers = _canInviteUsers,
-                    CanPinMessages = channel ? false : _canPinMessages,
-                    CanPostMessages = channel ? _canPostMessages : false,
-                    CanPromoteMembers = _canPromoteMembers,
-                    CanRestrictMembers = channel ? false : _canRestrictMembers,
+                    Rights = new ChatAdministratorRights
+                    {
+                        CanManageChat = true,
+                        IsAnonymous = channel ? false : _isAnonymous,
+                        CanChangeInfo = _canChangeInfo,
+                        CanDeleteMessages = _canDeleteMessages,
+                        CanEditMessages = channel ? _canEditMessages : false,
+                        CanInviteUsers = _canInviteUsers,
+                        CanPinMessages = channel ? false : _canPinMessages,
+                        CanPostMessages = channel ? _canPostMessages : false,
+                        CanPromoteMembers = _canPromoteMembers,
+                        CanRestrictMembers = channel ? false : _canRestrictMembers
+                    },
                     CustomTitle = _customTitle ?? string.Empty
                 };
             }
@@ -403,8 +407,8 @@ namespace Unigram.ViewModels.Supergroups
                 var builder = new StringBuilder();
                 builder.AppendFormat(supergroup.IsChannel ? Strings.Resources.EditChannelAdminTransferAlertText : Strings.Resources.EditAdminTransferAlertText, user.FirstName);
                 builder.AppendLine();
-                builder.AppendLine($"• {Strings.Resources.EditAdminTransferAlertText1}");
-                builder.AppendLine($"• {Strings.Resources.EditAdminTransferAlertText2}");
+                builder.AppendLine($"ï¿½ {Strings.Resources.EditAdminTransferAlertText1}");
+                builder.AppendLine($"ï¿½ {Strings.Resources.EditAdminTransferAlertText2}");
 
                 if (canTransfer is CanTransferOwnershipResultPasswordNeeded)
                 {

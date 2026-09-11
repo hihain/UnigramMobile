@@ -326,24 +326,24 @@ namespace Unigram.Controls.Messages
                     var title = string.Empty;
                     var foreground = default(SolidColorBrush);
 
-                    if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                    if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                     {
                         title = message.ProtoService.GetUser(fromUser.SenderUserId)?.GetFullName();
                         foreground = PlaceholderHelper.GetBrush(fromUser.SenderUserId);
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                    else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                     {
                         title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChat.SenderChatId));
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                    else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                     {
                         title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChannel.ChatId));
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
+                    else if (message.ImportInfo != null)
                     {
-                        title = fromImport.SenderName;
+                        title = message.ImportInfo.SenderName;
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+                    else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
                     {
                         title = fromHiddenUser.SenderName;
                     }
@@ -400,24 +400,20 @@ namespace Unigram.Controls.Messages
                 var title = string.Empty;
                 var foreground = default(SolidColorBrush);
 
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                 {
                     title = message.ProtoService.GetUser(fromUser.SenderUserId)?.GetFullName();
                     foreground = PlaceholderHelper.GetBrush(fromUser.SenderUserId);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                 {
                     title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChat.SenderChatId));
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChannel.ChatId));
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
-                {
-                    title = fromImport.SenderName;
-                }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+                else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
                 {
                     title = fromHiddenUser.SenderName;
                 }
@@ -492,23 +488,19 @@ namespace Unigram.Controls.Messages
                 var title = string.Empty;
                 var bold = true;
 
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                 {
                     title = message.ProtoService.GetUser(fromUser.SenderUserId)?.GetFullName();
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                 {
                     title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChat.SenderChatId));
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     title = message.ProtoService.GetTitle(message.ProtoService.GetChat(fromChannel.ChatId));
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
-                {
-                    title = fromImport.SenderName;
-                }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+                else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
                 {
                     title = fromHiddenUser.SenderName;
                     bold = false;
@@ -530,11 +522,11 @@ namespace Unigram.Controls.Messages
 
             //if (message.HasViaBotId && message.ViaBot != null && !message.ViaBot.IsDeleted && message.ViaBot.HasUsername)
             var viaBot = message.ProtoService.GetUser(message.ViaBotUserId);
-            if (viaBot != null && viaBot.Type is UserTypeBot && !string.IsNullOrEmpty(viaBot.Username))
+            if (viaBot != null && viaBot.Type is UserTypeBot && !string.IsNullOrEmpty(viaBot.ActiveUsername()))
             {
                 var hyperlink = new Hyperlink();
                 hyperlink.Inlines.Add(new Run { Text = paragraph.Inlines.Count > 0 ? " via @" : "via @", FontWeight = FontWeights.Normal });
-                hyperlink.Inlines.Add(new Run { Text = viaBot.Username });
+                hyperlink.Inlines.Add(new Run { Text = viaBot.ActiveUsername() });
                 hyperlink.UnderlineStyle = UnderlineStyle.None;
                 hyperlink.Foreground = light ? new SolidColorBrush(Colors.White) : GetBrush("MessageHeaderForegroundBrush");
                 hyperlink.Click += (s, args) => ViaBot_Click(message);
@@ -590,20 +582,20 @@ namespace Unigram.Controls.Messages
 
         private void FwdFrom_Click(MessageViewModel message)
         {
-            if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+            if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
             {
                 message.Delegate.OpenUser(fromUser.SenderUserId);
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+            else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
             {
                 message.Delegate.OpenChat(fromChat.SenderChatId, true);
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+            else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
             {
                 // TODO: verify if this is sufficient
                 message.Delegate.OpenChat(fromChannel.ChatId, fromChannel.MessageId);
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+            else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
             {
                 Window.Current.ShowTeachingTip(HeaderLabel, Strings.Resources.HidAccount);
                 //await MessagePopup.ShowAsync(Strings.Resources.HidAccount, Strings.Resources.AppName, Strings.Resources.OK);
@@ -944,7 +936,7 @@ namespace Unigram.Controls.Messages
                 }
                 else if (content is MessageSticker sticker)
                 {
-                    if ((sticker.Sticker.Type is StickerTypeAnimated || sticker.Sticker.Type is StickerTypeVideo))
+                    if ((sticker.Sticker.Format is StickerFormatTgs || sticker.Sticker.Format is StickerFormatWebm))
                     {
                         Media.Child = new AnimatedStickerContent(message);
                     }
@@ -1907,7 +1899,7 @@ namespace Unigram.Controls.Messages
             }
             else if (constraint is Message message)
             {
-                ttl = message.Ttl > 0;
+                ttl = message.SelfDestructType != null;
                 constraint = message.Content;
             }
 

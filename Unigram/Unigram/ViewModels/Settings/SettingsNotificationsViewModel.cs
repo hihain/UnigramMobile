@@ -337,7 +337,7 @@ namespace Unigram.ViewModels.Settings
         public RelayCommand SendCommand { get; }
         public async void SendExecute()
         {
-            await ProtoService.SendAsync(new SetScopeNotificationSettings(GetScope(), new ScopeNotificationSettings(_alert ? 0 : int.MaxValue, string.Empty, _preview, _disablePinnedMessage, _disableMention)));
+            await ProtoService.SendAsync(new SetScopeNotificationSettings(GetScope(), new ScopeNotificationSettings(_alert ? 0 : int.MaxValue, 0, _preview, true, false, 0, false, _disablePinnedMessage, _disableMention)));
         }
 
         public RelayCommand ExceptionsCommand { get; }

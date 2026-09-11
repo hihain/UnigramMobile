@@ -434,7 +434,7 @@ namespace Unigram.Controls.Cells
 
             var position = chat.GetPosition(chatList);
 
-            //UpdateViewState(chat, ChatFilterMode.None, false, false);
+            //UpdateViewState(chat, ChatFolderMode.None, false, false);
 
             UpdateChatTitle(chat);
             UpdateChatPhoto(chat);
@@ -683,9 +683,9 @@ namespace Unigram.Controls.Cells
                     {
                         result = string.Format(format, fromUser.LastName.Trim());
                     }
-                    else if (!string.IsNullOrEmpty(fromUser.Username))
+                    else if (!string.IsNullOrEmpty(fromUser.ActiveUsername()))
                     {
-                        result = string.Format(format, fromUser.Username.Trim());
+                        result = string.Format(format, fromUser.ActiveUsername().Trim());
                     }
                     else if (fromUser.Type is UserTypeDeleted)
                     {

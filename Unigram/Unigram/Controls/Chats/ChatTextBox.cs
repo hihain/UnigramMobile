@@ -556,7 +556,7 @@ namespace Unigram.Controls.Chats
                             foreach (var id in chats.ChatIds)
                             {
                                 var user = _protoService.GetUser(_protoService.GetChat(id));
-                                if (user != null && user.Username.StartsWith(_query, StringComparison.OrdinalIgnoreCase))
+                                if (user != null && user.ActiveUsername().StartsWith(_query, StringComparison.OrdinalIgnoreCase))
                                 {
                                     Add(user);
                                     count++;
@@ -626,10 +626,10 @@ namespace Unigram.Controls.Chats
                     }
                     else
                     {
-                        var response = await _protoService.SendAsync(new SearchEmojis(_query, false, new[] { _inputLanguage }));
-                        if (response is Emojis emojis)
+                        var response = await _protoService.SendAsync(new SearchEmojis(_query, new[] { _inputLanguage }));
+                        if (response is EmojiKeywords emojis)
                         {
-                            var results = emojis.EmojisValue.Reverse();
+                            var results = emojis.EmojiKeywordsValue.Select(x => x.Emoji).Distinct().Reverse();
                             results = results.OrderBy(x =>
                             {
                                 var index = SettingsService.Current.Emoji.RecentEmoji.IndexOf(x);
@@ -713,7 +713,7 @@ namespace Unigram.Controls.Chats
 
             Sending?.Invoke(this, EventArgs.Empty);
 
-            var options = new MessageSendOptions(disableNotification, false, false, null);
+            var options = new MessageSendOptions(disableNotification, false, false, false, null, 0, false);
 
             var text = GetFormattedText(true);
             await ViewModel.SendMessageAsync(text, options);
@@ -1015,7 +1015,7 @@ namespace Unigram.Controls.Chats
 
             if (ViewModel.CurrentInlineBot != null)
             {
-                var username = ViewModel.CurrentInlineBot.Username;
+                var username = ViewModel.CurrentInlineBot.ActiveUsername();
                 if (text != null && text.TrimStart().StartsWith("@" + username, StringComparison.OrdinalIgnoreCase))
                 {
                     searchText = ReplaceFirst(text.TrimStart(), "@" + username, string.Empty);

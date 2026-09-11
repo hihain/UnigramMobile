@@ -146,8 +146,8 @@ namespace Unigram.Services.Settings
                 var aggregator = TLContainer.Current.Resolve<IEventAggregator>();
                 var protoService = TLContainer.Current.Resolve<IProtoService>();
 
-                aggregator.Publish(new UpdateSelectedBackground(true, protoService.GetSelectedBackground(true)));
-                aggregator.Publish(new UpdateSelectedBackground(false, protoService.GetSelectedBackground(false)));
+                aggregator.Publish(new UpdateDefaultBackground(true, protoService.GetSelectedBackground(true)));
+                aggregator.Publish(new UpdateDefaultBackground(false, protoService.GetSelectedBackground(false)));
             }
         }
 

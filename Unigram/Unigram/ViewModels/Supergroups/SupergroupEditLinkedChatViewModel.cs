@@ -201,13 +201,13 @@ namespace Unigram.ViewModels.Supergroups
                         return;
                     }
 
-                    if (string.IsNullOrEmpty(linkedSupergroup.Username))
+                    if (string.IsNullOrEmpty(linkedSupergroup.ActiveUsername()))
                     {
                         message = string.Format(Strings.Resources.DiscussionLinkGroupPublicPrivateAlert, linkedChat.Title, chat.Title);
                     }
                     else
                     {
-                        if (string.IsNullOrEmpty(supergroup.Username))
+                        if (string.IsNullOrEmpty(supergroup.ActiveUsername()))
                         {
                             message = string.Format(Strings.Resources.DiscussionLinkGroupPrivateAlert, linkedChat.Title, chat.Title);
                         }

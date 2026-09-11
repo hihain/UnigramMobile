@@ -12,7 +12,7 @@ using Windows.UI.Xaml.Navigation;
 
 namespace Unigram.ViewModels.Folders
 {
-    public class FoldersViewModel : TLViewModelBase, IHandle<UpdateChatFilters>
+    public class FoldersViewModel : TLViewModelBase, IHandle<UpdateChatFolders>
     {
         public FoldersViewModel(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, IEventAggregator aggregator)
             : base(protoService, cacheService, settingsService, aggregator)
@@ -20,29 +20,29 @@ namespace Unigram.ViewModels.Folders
             UseLeftLayout = settingsService.IsLeftTabsEnabled;
             UseTopLayout = !settingsService.IsLeftTabsEnabled;
 
-            Items = new MvxObservableCollection<ChatFilterInfo>();
-            Recommended = new MvxObservableCollection<RecommendedChatFilter>();
+            Items = new MvxObservableCollection<ChatFolderInfo>();
+            Recommended = new MvxObservableCollection<RecommendedChatFolder>();
 
-            RecommendCommand = new RelayCommand<RecommendedChatFilter>(RecommendExecute);
-            EditCommand = new RelayCommand<ChatFilterInfo>(EditExecute);
-            DeleteCommand = new RelayCommand<ChatFilterInfo>(DeleteExecute);
+            RecommendCommand = new RelayCommand<RecommendedChatFolder>(RecommendExecute);
+            EditCommand = new RelayCommand<ChatFolderInfo>(EditExecute);
+            DeleteCommand = new RelayCommand<ChatFolderInfo>(DeleteExecute);
 
             CreateCommand = new RelayCommand(CreateExecute);
         }
 
-        public MvxObservableCollection<ChatFilterInfo> Items { get; private set; }
-        public MvxObservableCollection<RecommendedChatFilter> Recommended { get; private set; }
+        public MvxObservableCollection<ChatFolderInfo> Items { get; private set; }
+        public MvxObservableCollection<RecommendedChatFolder> Recommended { get; private set; }
 
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
-            Items.ReplaceWith(CacheService.ChatFilters);
+            Items.ReplaceWith(CacheService.ChatFolders);
 
             if (Items.Count < 10)
             {
-                var response = await ProtoService.SendAsync(new GetRecommendedChatFilters());
-                if (response is RecommendedChatFilters filters)
+                var response = await ProtoService.SendAsync(new GetRecommendedChatFolders());
+                if (response is RecommendedChatFolders filters)
                 {
-                    Recommended.ReplaceWith(filters.ChatFilters);
+                    Recommended.ReplaceWith(filters.ChatFolders);
                 }
             }
             else
@@ -104,18 +104,18 @@ namespace Unigram.ViewModels.Folders
             set => Set(ref _useTopLayout, value);
         }
 
-        public void Handle(UpdateChatFilters update)
+        public void Handle(UpdateChatFolders update)
         {
             BeginOnUIThread(async () =>
             {
-                Items.ReplaceWith(update.ChatFilters);
+                Items.ReplaceWith(update.ChatFolders);
 
                 if (Items.Count < 10)
                 {
-                    var response = await ProtoService.SendAsync(new GetRecommendedChatFilters());
-                    if (response is RecommendedChatFilters recommended)
+                    var response = await ProtoService.SendAsync(new GetRecommendedChatFolders());
+                    if (response is RecommendedChatFolders recommended)
                     {
-                        Recommended.ReplaceWith(recommended.ChatFilters);
+                        Recommended.ReplaceWith(recommended.ChatFolders);
                     }
                 }
                 else
@@ -125,21 +125,21 @@ namespace Unigram.ViewModels.Folders
             });
         }
 
-        public RelayCommand<RecommendedChatFilter> RecommendCommand { get; }
-        private void RecommendExecute(RecommendedChatFilter filter)
+        public RelayCommand<RecommendedChatFolder> RecommendCommand { get; }
+        private void RecommendExecute(RecommendedChatFolder filter)
         {
             Recommended.Remove(filter);
-            ProtoService.Send(new CreateChatFilter(filter.Filter));
+            ProtoService.Send(new CreateChatFolder(filter.Folder));
         }
 
-        public RelayCommand<ChatFilterInfo> EditCommand { get; }
-        private void EditExecute(ChatFilterInfo filter)
+        public RelayCommand<ChatFolderInfo> EditCommand { get; }
+        private void EditExecute(ChatFolderInfo filter)
         {
             NavigationService.Navigate(typeof(FolderPage), filter.Id);
         }
 
-        public RelayCommand<ChatFilterInfo> DeleteCommand { get; }
-        private async void DeleteExecute(ChatFilterInfo filter)
+        public RelayCommand<ChatFolderInfo> DeleteCommand { get; }
+        private async void DeleteExecute(ChatFolderInfo filter)
         {
             var confirm = await MessagePopup.ShowAsync(Strings.Resources.FilterDeleteAlert, Strings.Resources.FilterDelete, Strings.Resources.Delete, Strings.Resources.Cancel);
             if (confirm != ContentDialogResult.Primary)
@@ -147,7 +147,7 @@ namespace Unigram.ViewModels.Folders
                 return;
             }
 
-            ProtoService.Send(new DeleteChatFilter(filter.Id));
+            ProtoService.Send(new DeleteChatFolder(filter.Id, new long[0]));
         }
 
         public RelayCommand CreateCommand { get; }

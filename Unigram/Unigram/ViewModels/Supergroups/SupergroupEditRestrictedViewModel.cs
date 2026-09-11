@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
@@ -92,8 +92,8 @@ namespace Unigram.ViewModels.Supergroups
                     CanSendPolls = restricted.Permissions.CanSendPolls;
                     CanAddWebPagePreviews = restricted.Permissions.CanAddWebPagePreviews;
                     CanSendOtherMessages = restricted.Permissions.CanSendOtherMessages;
-                    CanSendMediaMessages = restricted.Permissions.CanSendMediaMessages;
-                    CanSendMessages = restricted.Permissions.CanSendMessages;
+                    CanSendMediaMessages = restricted.Permissions.CanSendMediaMessages();
+                    CanSendMessages = restricted.Permissions.CanSendBasicMessages;
                     UntilDate = restricted.RestrictedUntilDate;
                 }
                 else if (member.Status is ChatMemberStatusBanned banned)
@@ -116,8 +116,8 @@ namespace Unigram.ViewModels.Supergroups
                     CanSendPolls = chat.Permissions.CanSendPolls;
                     CanAddWebPagePreviews = chat.Permissions.CanAddWebPagePreviews;
                     CanSendOtherMessages = chat.Permissions.CanSendOtherMessages;
-                    CanSendMediaMessages = chat.Permissions.CanSendMediaMessages;
-                    CanSendMessages = chat.Permissions.CanSendMessages;
+                    CanSendMediaMessages = chat.Permissions.CanSendMediaMessages();
+                    CanSendMessages = chat.Permissions.CanSendBasicMessages;
                     UntilDate = 0;
                 }
             }
@@ -331,8 +331,13 @@ namespace Unigram.ViewModels.Supergroups
                     CanAddWebPagePreviews = _canAddWebPagePreviews,
                     CanSendPolls = _canSendPolls,
                     CanSendOtherMessages = _canSendOtherMessages,
-                    CanSendMediaMessages = _canSendMediaMessages,
-                    CanSendMessages = _canSendMessages,
+                    CanSendAudios = _canSendMediaMessages,
+                    CanSendDocuments = _canSendMediaMessages,
+                    CanSendPhotos = _canSendMediaMessages,
+                    CanSendVideos = _canSendMediaMessages,
+                    CanSendVideoNotes = _canSendMediaMessages,
+                    CanSendVoiceNotes = _canSendMediaMessages,
+                    CanSendBasicMessages = _canSendMessages,
                 }
             };
 

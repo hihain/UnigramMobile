@@ -50,13 +50,13 @@ namespace Unigram.Collections
                     offset = 0;
                 }
 
-                var response = await _protoService.SendAsync(new SearchChatMessages(_chatId, _query, _sender, fromMessageId, offset, (int)count, _filter, _threadId));
-                if (response is Messages messages)
+                var response = await _protoService.SendAsync(new SearchChatMessages(_chatId, _query, _sender, fromMessageId, offset, (int)count, _filter, _threadId, null));
+                if (response is FoundChatMessages messages)
                 {
                     TotalCount = messages.TotalCount;
-                    AddRange(messages.MessagesValue);
+                    AddRange(messages.Messages);
 
-                    return new LoadMoreItemsResult { Count = (uint)messages.MessagesValue.Count };
+                    return new LoadMoreItemsResult { Count = (uint)messages.Messages.Count };
                 }
 
                 return new LoadMoreItemsResult { Count = 0 };

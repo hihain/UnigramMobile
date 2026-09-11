@@ -127,7 +127,7 @@ namespace Unigram.Views
                     return;
                 }
 
-                var dialog = new EditYourAboutPopup(user.Bio);
+                var dialog = new EditYourAboutPopup(user.Bio?.Text ?? string.Empty);
 
                 var confirm = await dialog.ShowQueuedAsync();
                 if (confirm == ContentDialogResult.Primary)
@@ -293,12 +293,12 @@ namespace Unigram.Views
             }
 #endif
 
-            Username.Badge = string.IsNullOrEmpty(user.Username) ? Strings.Resources.UsernameEmpty : $"{user.Username}";
+            Username.Badge = string.IsNullOrEmpty(user.ActiveUsername()) ? Strings.Resources.UsernameEmpty : $"{user.ActiveUsername()}";
         }
 
         public void UpdateUserFullInfo(Chat chat, User user, UserFullInfo fullInfo, bool secret, bool accessToken)
         {
-            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio) ? Strings.Resources.UserBioDetail : fullInfo.Bio;
+            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio?.Text) ? Strings.Resources.UserBioDetail : fullInfo.Bio.Text;
         }
 
         public void UpdateUserStatus(Chat chat, User user)

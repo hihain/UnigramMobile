@@ -154,7 +154,7 @@ namespace Unigram.Views.Supergroups
                 return false;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanPromoteMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPromoteMembers;
         }
 
         private bool MemberRestrict_Loaded(ChatType chatType, ChatMemberStatus status, ChatMember member)
@@ -174,7 +174,7 @@ namespace Unigram.Views.Supergroups
                 return false;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanRestrictMembers;
         }
 
         private bool MemberRemove_Loaded(ChatType chatType, ChatMemberStatus status, ChatMember member)
@@ -194,7 +194,7 @@ namespace Unigram.Views.Supergroups
                 return member.InviterUserId == ViewModel.CacheService.Options.MyId;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanRestrictMembers;
         }
 
         #endregion

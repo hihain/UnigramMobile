@@ -1,5 +1,19 @@
 # Dependencies
 
+## Telegram.Td.UWP-1.8.24.vsix (Git LFS) — CURRENT
+
+TDLib 1.8.24 built from source as UWP Extension SDK, same identity `Telegram.Td.UWP,
+Version=1.0` and same layout as the 1.8.1 package below, so it installs to the same
+per-user location. The app code requires this version since the 1.8.1→1.8.24 port.
+
+- Source: tdlib/td commit `c5c55092d` (= v1.8.24, 2024-01-27; still C++14/VS2017-buildable)
+- Same toolchain/vcpkg deps and the same **mandatory `/Od` for ARM Release** as described
+  below — the VS2017 ARM optimizer bug reproduces with 1.8.24 as well.
+- x86/x64 configs are built with stock optimization (`/O2`); the bug is ARM-specific.
+- The `Redist\Debug\ARM` slot intentionally contains the same `/Od` *Release* DLL as
+  `Redist\Retail\ARM` (a genuine ARM Debug build was never needed; the release CRT
+  dependencies keep Debug app builds deployable without debug-CRT sideloading).
+
 ## Telegram.Td.UWP-1.8.1.vsix (Git LFS)
 
 TDLib 1.8.1 built from source as UWP Extension SDK, identity `Telegram.Td.UWP, Version=1.0`

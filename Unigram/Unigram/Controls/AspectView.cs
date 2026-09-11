@@ -57,7 +57,7 @@ namespace Unigram.Controls
             }
             else if (constraint is Message message)
             {
-                ttl = message.Ttl > 0;
+                ttl = message.SelfDestructType != null;
                 constraint = message.Content;
 
                 if (message.MediaAlbumId != 0 && Tag is true)

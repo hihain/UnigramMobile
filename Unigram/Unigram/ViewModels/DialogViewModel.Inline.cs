@@ -256,8 +256,8 @@ namespace Unigram.ViewModels
         public long InlineQueryId => _results.InlineQueryId;
         public string NextOffset => _results.NextOffset;
 
-        public string SwitchPmParameter => _results.SwitchPmParameter;
-        public string SwitchPmText => _results.SwitchPmText;
+        public string SwitchPmParameter => (_results.Button?.Type as InlineQueryResultsButtonTypeStartBot)?.Parameter ?? string.Empty;
+        public string SwitchPmText => _results.Button?.Text;
 
         public override async Task<IList<InlineQueryResult>> LoadDataAsync()
         {
