@@ -257,7 +257,7 @@ namespace Unigram.Controls.Messages
 
             SetTitle(GetFromLabel(message, title));
             SetService(string.Empty);
-            SetMessage(text.Text.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+            SetMessage(text.Text.ReplaceSpoilers());
 
             return true;
         }
@@ -303,7 +303,7 @@ namespace Unigram.Controls.Messages
             if (photo.Caption != null && !string.IsNullOrWhiteSpace(photo.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(photo.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+                AppendMessage(photo.Caption.ReplaceSpoilers());
             }
 
             return true;
@@ -422,7 +422,7 @@ namespace Unigram.Controls.Messages
             if (audio.Caption != null && !string.IsNullOrWhiteSpace(audio.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(audio.Caption.Text.Replace('\n', ' '));
+                AppendMessage(audio.Caption.ReplaceSpoilers());
             }
 
             return true;
@@ -454,7 +454,7 @@ namespace Unigram.Controls.Messages
             if (voiceNote.Caption != null && !string.IsNullOrWhiteSpace(voiceNote.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(voiceNote.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+                AppendMessage(voiceNote.Caption.ReplaceSpoilers());
             }
 
             return true;
@@ -515,7 +515,7 @@ namespace Unigram.Controls.Messages
             if (video.Caption != null && !string.IsNullOrWhiteSpace(video.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(video.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+                AppendMessage(video.Caption.ReplaceSpoilers());
             }
 
             return true;
@@ -552,7 +552,7 @@ namespace Unigram.Controls.Messages
             if (animation.Caption != null && !string.IsNullOrWhiteSpace(animation.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(animation.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+                AppendMessage(animation.Caption.ReplaceSpoilers());
             }
 
             if (animation.Animation.Thumbnail != null)
@@ -589,7 +589,7 @@ namespace Unigram.Controls.Messages
             if (document.Caption != null && !string.IsNullOrWhiteSpace(document.Caption.Text))
             {
                 AppendService(", ");
-                AppendMessage(document.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' '));
+                AppendMessage(document.Caption.ReplaceSpoilers());
             }
 
             return true;

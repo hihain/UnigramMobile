@@ -53,6 +53,38 @@ namespace Unigram.Common
             return new Version(version.Major, version.Minor, version.Build, version.Revision);
         }
 
+        // Colors the "@query" prefix of a search result subtitle. Uses TextHighlighters
+        // where the runtime supports them and falls back to inline Runs on W10M 15254
+        // (which reports UniversalApiContract 5 but does not implement ITextBlock/IRichTextBlock5).
+        public static void HighlightSearchQuery(this TextBlock subtitle, string query)
+        {
+            if (!string.IsNullOrEmpty(query) && subtitle.Text.StartsWith($"@{query}", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ApiInfo.CanUseTextHighlighters)
+                {
+                    var highligher = new TextHighlighter();
+                    highligher.Foreground = new SolidColorBrush(Colors.Red);
+                    highligher.Background = new SolidColorBrush(Colors.Transparent);
+                    highligher.Ranges.Add(new Windows.UI.Xaml.Documents.TextRange { StartIndex = 1, Length = query.Length });
+
+                    subtitle.TextHighlighters.Add(highligher);
+                }
+                else
+                {
+                    var text = subtitle.Text;
+
+                    subtitle.Inlines.Clear();
+                    subtitle.Inlines.Add(new Run { Text = "@" });
+                    subtitle.Inlines.Add(new Run { Text = text.Substring(1, query.Length), Foreground = new SolidColorBrush(Colors.Red) });
+                    subtitle.Inlines.Add(new Run { Text = text.Substring(1 + query.Length) });
+                }
+            }
+            else if (ApiInfo.CanUseTextHighlighters)
+            {
+                subtitle.TextHighlighters.Clear();
+            }
+        }
+
         public static string ToQuery(this Dictionary<string, string> dictionary)
         {
             var result = string.Empty;

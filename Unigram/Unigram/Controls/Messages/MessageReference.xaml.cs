@@ -335,7 +335,7 @@ namespace Unigram.Controls.Messages
 
             TitleLabel.Text = GetFromLabel(message, title);
             ServiceLabel.Text = string.Empty;
-            MessageLabel.Text = text.Text.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+            MessageLabel.Text = text.Text.ReplaceSpoilers();
 
             return true;
         }
@@ -388,7 +388,7 @@ namespace Unigram.Controls.Messages
             if (photo.Caption != null && !string.IsNullOrWhiteSpace(photo.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += photo.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+                MessageLabel.Text += photo.Caption.ReplaceSpoilers();
             }
 
             return true;
@@ -517,7 +517,7 @@ namespace Unigram.Controls.Messages
             if (audio.Caption != null && !string.IsNullOrWhiteSpace(audio.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += audio.Caption.Text.Replace('\n', ' ');
+                MessageLabel.Text += audio.Caption.ReplaceSpoilers();
             }
 
             return true;
@@ -551,7 +551,7 @@ namespace Unigram.Controls.Messages
             if (voiceNote.Caption != null && !string.IsNullOrWhiteSpace(voiceNote.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += voiceNote.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+                MessageLabel.Text += voiceNote.Caption.ReplaceSpoilers();
             }
 
             return true;
@@ -617,7 +617,7 @@ namespace Unigram.Controls.Messages
             if (video.Caption != null && !string.IsNullOrWhiteSpace(video.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += video.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+                MessageLabel.Text += video.Caption.ReplaceSpoilers();
             }
 
             return true;
@@ -660,7 +660,7 @@ namespace Unigram.Controls.Messages
             if (animation.Caption != null && !string.IsNullOrWhiteSpace(animation.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += animation.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+                MessageLabel.Text += animation.Caption.ReplaceSpoilers();
             }
 
             ThumbRoot.CornerRadius = ThumbEllipse.CornerRadius = default(CornerRadius);
@@ -701,7 +701,7 @@ namespace Unigram.Controls.Messages
             if (document.Caption != null && !string.IsNullOrWhiteSpace(document.Caption.Text))
             {
                 ServiceLabel.Text += ", ";
-                MessageLabel.Text += document.Caption.Text.Replace("\r\n", "\n").Replace('\n', ' ');
+                MessageLabel.Text += document.Caption.ReplaceSpoilers();
             }
 
             return true;
@@ -926,20 +926,20 @@ namespace Unigram.Controls.Messages
             switch (value.Content)
             {
                 case MessageAnimation animation:
-                    return animation.Caption.Text.Replace('\n', ' ');
+                    return animation.Caption.ReplaceSpoilers();
                 case MessageAudio audio:
-                    return audio.Caption.Text.Replace('\n', ' ');
+                    return audio.Caption.ReplaceSpoilers();
                 case MessageDocument document:
-                    return document.Caption.Text.Replace('\n', ' ');
+                    return document.Caption.ReplaceSpoilers();
                 case MessagePhoto photo:
-                    return photo.Caption.Text.Replace('\n', ' ');
+                    return photo.Caption.ReplaceSpoilers();
                 case MessageVideo video:
-                    return video.Caption.Text.Replace('\n', ' ');
+                    return video.Caption.ReplaceSpoilers();
                 case MessageVoiceNote voiceNote:
-                    return voiceNote.Caption.Text.Replace('\n', ' ');
+                    return voiceNote.Caption.ReplaceSpoilers();
 
                 case MessageText text:
-                    return text.Text.Text.Replace('\n', ' ');
+                    return text.Text.ReplaceSpoilers();
 
                 case MessageDice dice:
                     return dice.Emoji;

@@ -1100,6 +1100,15 @@ namespace Unigram.Controls.Messages
                 return false;
             }
 
+            // W10M 15254 reports UniversalApiContract 5 but does not implement
+            // IRichTextBlock5 — touching TextHighlighters there throws InvalidCastException
+            if (ApiInfo.CanUseTextHighlighters)
+            {
+                Message.TextHighlighters.Clear();
+            }
+
+            TextHighlighter spoiler = null;
+
             var runs = TextStyleRun.GetRuns(text, entities);
             var previous = 0;
 
@@ -1184,8 +1193,40 @@ namespace Unigram.Controls.Messages
                             local = hyperlink;
                         }
                     }
+                    else if (entity.HasFlag(TextStyle.Spoiler))
+                    {
+                        var hyperlink = new Hyperlink();
+                        hyperlink.Foreground = GetBrush("MessageForegroundBrush");
+                        hyperlink.UnderlineStyle = UnderlineStyle.None;
+                        //hyperlink.Foreground = foreground;
+
+                        if (ApiInfo.CanUseTextHighlighters)
+                        {
+                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, null);
+
+                            if (spoiler == null)
+                            {
+                                spoiler = new TextHighlighter();
+                            }
+
+                            spoiler.Ranges.Add(new TextRange { StartIndex = entity.Offset, Length = entity.Length });
+                        }
+
+                        span.Inlines.Add(hyperlink);
+                        local = hyperlink;
+                    }
 
                     var run = new Run { Text = text.Substring(entity.Offset, entity.Length) };
+
+                    if (entity.HasFlag(TextStyle.Spoiler) && !entity.HasFlag(TextStyle.Mention) && !entity.HasFlag(TextStyle.Url) && !ApiInfo.CanUseTextHighlighters && local is Hyperlink spoilerLink)
+                    {
+                        // No TextHighlighters on this OS: obscure with braille, tap to reveal
+                        var revealed = run.Text;
+                        var obscured = new FormattedText(revealed, new[] { new TextEntity(0, revealed.Length, new TextEntityTypeSpoiler()) });
+
+                        run.Text = obscured.ReplaceSpoilers(false);
+                        spoilerLink.Click += (s, args) => run.Text = revealed;
+                    }
 
                     if (entity.HasFlag(TextStyle.Bold))
                     {
@@ -1272,6 +1313,14 @@ namespace Unigram.Controls.Messages
             //        Message.TextHighlighters.Clear();
             //    }
             //}
+
+            if (spoiler?.Ranges.Count > 0)
+            {
+                spoiler.Foreground = new SolidColorBrush(Colors.Black);
+                spoiler.Background = new SolidColorBrush(Colors.Black);
+
+                Message.TextHighlighters.Add(spoiler);
+            }
 
             if (AdjustEmojis(span, text))
             {
@@ -1378,6 +1427,13 @@ namespace Unigram.Controls.Messages
             else if (type is TextEntityTypeCode || type is TextEntityTypePre || type is TextEntityTypePreCode)
             {
                 MessageHelper.CopyText(data);
+            }
+            else if (type is TextEntityTypeSpoiler)
+            {
+                if (ApiInfo.CanUseTextHighlighters && Message.TextHighlighters.Count > 0)
+                {
+                    Message.TextHighlighters.RemoveAt(Message.TextHighlighters.Count - 1);
+                }
             }
         }
 

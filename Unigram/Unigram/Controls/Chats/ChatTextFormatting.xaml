@@ -69,6 +69,18 @@
             IsOneWay="False"
             FontSize="16"/>
 
+        <controls:GlyphToggleButton
+            x:Name="Spoiler"
+            Click="Spoiler_Click"
+            AutomationProperties.Name="{CustomResource Spoiler}"
+            ToolTipService.ToolTip="{CustomResource Spoiler}"
+            AllowFocusOnInteraction="False"
+            Glyph="&#xE7B3;"
+            CheckedGlyph="&#xE7B3;"
+            CheckedForeground="{ThemeResource TelegramBackgroundAccentBrush}"
+            IsOneWay="False"
+            FontSize="16"/>
+
         <Rectangle
             Fill="{ThemeResource SystemControlForegroundBaseMediumLowBrush}"
             Margin="4,12,4,12"

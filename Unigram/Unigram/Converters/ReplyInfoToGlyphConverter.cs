@@ -50,6 +50,7 @@ namespace Unigram.Converters
         public const string Strikethrough = "\uE8DE";
         public const string Monospace = "\uE943";
         public const string Link = "\uE71B";
+        public const string Spoiler = "\uE7B3";
 
         public const string BasicGroup = "\uE125";
         public const string Group = "\uE902";

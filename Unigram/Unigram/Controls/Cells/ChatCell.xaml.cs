@@ -590,20 +590,20 @@ namespace Unigram.Controls.Cells
             switch (value.Content)
             {
                 case MessageAnimation animation:
-                    return animation.Caption.Text.Replace('\n', ' ');
+                    return animation.Caption.ReplaceSpoilers();
                 case MessageAudio audio:
-                    return audio.Caption.Text.Replace('\n', ' ');
+                    return audio.Caption.ReplaceSpoilers();
                 case MessageDocument document:
-                    return document.Caption.Text.Replace('\n', ' ');
+                    return document.Caption.ReplaceSpoilers();
                 case MessagePhoto photo:
-                    return photo.Caption.Text.Replace('\n', ' ');
+                    return photo.Caption.ReplaceSpoilers();
                 case MessageVideo video:
-                    return video.Caption.Text.Replace('\n', ' ');
+                    return video.Caption.ReplaceSpoilers();
                 case MessageVoiceNote voiceNote:
-                    return voiceNote.Caption.Text.Replace('\n', ' ');
+                    return voiceNote.Caption.ReplaceSpoilers();
 
                 case MessageText text:
-                    return text.Text.Text.Replace('\n', ' ');
+                    return text.Text.ReplaceSpoilers();
 
                 case MessageDice dice:
                     return dice.Emoji;

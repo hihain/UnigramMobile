@@ -1,4 +1,5 @@
 ﻿using System;
+using Windows.UI;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -50,6 +51,7 @@ namespace Unigram.Controls.Chats
             Strikethrough.IsChecked = format.Strikethrough == FormatEffect.On;
             Underline.IsChecked = format.Underline == UnderlineType.Single;
             Monospace.IsChecked = string.Equals(format.Name, "Consolas", StringComparison.OrdinalIgnoreCase);
+            Spoiler.IsChecked = format.BackgroundColor == Colors.Gray;
         }
 
         private void Bold_Click(object sender, RoutedEventArgs e)
@@ -75,6 +77,11 @@ namespace Unigram.Controls.Chats
         private void Monospace_Click(object sender, RoutedEventArgs e)
         {
             _textBox?.ToggleMonospace();
+        }
+
+        private void Spoiler_Click(object sender, RoutedEventArgs e)
+        {
+            _textBox?.ToggleSpoiler();
         }
 
         private void Link_Click(object sender, RoutedEventArgs e)

@@ -564,22 +564,7 @@ namespace Unigram.Views.Popups
                         subtitle.Text = string.Empty;
                     }
 
-                    if (ApiInfo.CanUseTextHighlighters)
-                    {
-                        if (subtitle.Text.StartsWith($"@{result.Query}", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var highligher = new TextHighlighter();
-                            highligher.Foreground = new SolidColorBrush(Colors.Red);
-                            highligher.Background = new SolidColorBrush(Colors.Transparent);
-                            highligher.Ranges.Add(new TextRange { StartIndex = 1, Length = result.Query.Length });
-
-                            subtitle.TextHighlighters.Add(highligher);
-                        }
-                        else
-                        {
-                            subtitle.TextHighlighters.Clear();
-                        }
-                    }
+                    subtitle.HighlightSearchQuery(result.Query);
                 }
                 else if (args.Phase == 2)
                 {
