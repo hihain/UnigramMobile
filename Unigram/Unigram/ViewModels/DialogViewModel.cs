@@ -739,8 +739,6 @@ namespace Unigram.ViewModels
                         {
                             await AddHeaderAsync();
                         }
-
-                        await TryJoinMigratedAsync();
                     }
 
                     LoadPinnedMessagesSliceAsync(maxId.Value, VerticalAlignment.Top);
@@ -750,6 +748,15 @@ namespace Unigram.ViewModels
                     _isLoadingNextSlice = false;
                     IsLoading = false;
                 }
+            }
+
+            // Outside the lock and after the flags are down, the same as the other caller.
+            // It used to be inside, which put up to three requests into the stretch where
+            // this chat counts as loading -- and a chat that counts as loading takes no new
+            // messages, because the insert waits on the lock being let go of here.
+            using (await _loadMoreLock.WaitAsync())
+            {
+                await TryJoinMigratedAsync();
             }
         }
 
@@ -983,11 +990,11 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            IList<MessageViewModel> migrated = null;
+            var older = default((Chat Chat, IList<MessageViewModel> Messages));
 
             try
             {
-                migrated = await PrepareMigratedAsync(chatUpgradeFrom.BasicGroupId);
+                older = await PrepareMigratedAsync(chatUpgradeFrom.BasicGroupId);
             }
             catch (Exception ex)
             {
@@ -995,7 +1002,8 @@ namespace Unigram.ViewModels
                 Logs.Logger.Error(Logs.Target.Chat, "Migrated history: " + ex);
             }
 
-            if (migrated == null || migrated.Count == 0 || _chat?.Id != chat.Id)
+            if (older.Chat == null || older.Messages == null || older.Messages.Count == 0
+                || _chat?.Id != chat.Id)
             {
                 // Nothing above it, so the notice stays, and it is then the only thing
                 // saying the group did not begin here. Tapping it opens the older group.
@@ -1022,26 +1030,36 @@ namespace Unigram.ViewModels
 
             // Newest first, and each one goes in at the same place, so the oldest ends up
             // on top.
-            foreach (var older in migrated)
+            foreach (var message in older.Messages)
             {
-                Items.Insert(index, older);
+                Items.Insert(index, message);
             }
+
+            // Only now, with those messages actually in the list. Claimed any earlier, every
+            // return above leaves it claimed with nothing joined -- and LoadNextSliceAsync
+            // then asks the older group for history either side of a message id belonging to
+            // this one.
+            MigratedChat = older.Chat;
+            IsLastSliceLoaded = false;
         }
 
         /// <summary>
-        /// The end of the history the group had before it was upgraded, newest first. Null
-        /// or empty when there is no such group or it cannot be read.
+        /// The group this supergroup was upgraded from, and the end of the history it had,
+        /// newest first. A null Chat when there is no such group or it cannot be read.
+        ///
+        /// It only reads. What to do with the answer, MigratedChat included, is the
+        /// caller's, so that nothing is claimed before it has been put on screen.
         ///
         /// Everything here talks to the network, and none of it is worth making the messages
         /// somebody is waiting for arrive any later than they otherwise would.
         /// </summary>
-        private async Task<IList<MessageViewModel>> PrepareMigratedAsync(long basicGroupId)
+        private async Task<(Chat Chat, IList<MessageViewModel> Messages)> PrepareMigratedAsync(long basicGroupId)
         {
             var chat = _chat;
             var supergroup = CacheService.GetSupergroup(chat);
             if (chat == null || supergroup == null)
             {
-                return null;
+                return default;
             }
 
             // Where the old group ends is in the supergroup full info. It is asked for when
@@ -1061,13 +1079,13 @@ namespace Unigram.ViewModels
                 || fullInfo.UpgradedFromBasicGroupId != basicGroupId
                 || fullInfo.UpgradedFromMaxMessageId == 0)
             {
-                return null;
+                return default;
             }
 
             var response = await ProtoService.SendAsync(new CreateBasicGroupChat(basicGroupId, false));
             if (!(response is Chat migrated))
             {
-                return null;
+                return default;
             }
 
             // Anchored at the last message the old group ever had, and asking for a slice
@@ -1082,7 +1100,7 @@ namespace Unigram.ViewModels
 
             if (messages == null || messages.MessagesValue.Count == 0)
             {
-                return null;
+                return default;
             }
 
             // The whole slice, not just the message on the boundary. Handing back one
@@ -1095,10 +1113,7 @@ namespace Unigram.ViewModels
 
             await ProcessMessagesAsync(migrated, older);
 
-            MigratedChat = migrated;
-            IsLastSliceLoaded = false;
-
-            return older;
+            return (migrated, older);
         }
 
         private List<long> _mentions = new List<long>();
