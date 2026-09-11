@@ -90,9 +90,22 @@ function Wdp([string]$m, [string]$p, [Net.Http.HttpContent]$c) {
 
 function Txt($r) { return $r.Content.ReadAsStringAsync().Result }
 
+# The identity the manifest carries, which UpdateManifest.ps1 rewrites per configuration,
+# so this finds whichever of them is on the phone rather than a name written down twice.
+$identity = ([regex]::Match(
+    [IO.File]::ReadAllText((Join-Path $Root 'Unigram\Unigram\Package.appxmanifest')),
+    '<Identity[^>]*\sName="([^"]+)"')).Groups[1].Value
+
+if (-not $identity) {
+    throw 'Could not read the package identity out of Package.appxmanifest.'
+}
+
+# Anchored on the whole name and the underscore that follows it in a PackageFullName.
+# A substring would not do: one identity here is the other with Fork on the end, so the
+# shorter name matches the longer package and the script would act on the wrong app.
 function Installed() {
     return ((Txt (Wdp GET '/api/app/packagemanager/packages' $null)) | ConvertFrom-Json).InstalledPackages |
-        Where-Object { $_.PackageFullName -like '*UnigramMobileFork*' }
+        Where-Object { $_.PackageFullName -like "${identity}_*" }
 }
 
 Sync-Csrf ($cli.GetAsync("$base/api/os/info").GetAwaiter().GetResult())
