@@ -319,4 +319,8 @@
     <value>Die Auswahl ist zu lang zum Zitieren.</value>
     <comment>QuotePopup</comment>
   </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Neue Zeile einfügen</value>
+    <comment>Send button context menu</comment>
+  </data>
 </root>

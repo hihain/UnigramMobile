@@ -28,6 +28,16 @@ namespace Unigram.Strings
     public sealed partial class Additional
     {
         
+        /// <summary>
+        /// Localized resource similar to "Insert New Line"
+        /// </summary>
+        public static string InsertNewLine
+        {
+            get
+            {
+                return Resource.GetString("InsertNewLine");
+            }
+        }
         private static ResourceLoader resourceLoader;
         
         /// <summary>

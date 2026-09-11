@@ -1453,6 +1453,13 @@ namespace Unigram.Views
 
         private async void btnSendMessage_Click(object sender, RoutedEventArgs e)
         {
+            // Releasing a long press fires Click after the context menu has
+            // already opened; that release must not send the message.
+            if (_sendFlyoutOpen)
+            {
+                return;
+            }
+
             await TextField.SendAsync();
         }
 
@@ -1979,6 +1986,8 @@ namespace Unigram.Views
             }
         }
 
+        private bool _sendFlyoutOpen;
+
         private void Send_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
             var chat = ViewModel.Chat;
@@ -1997,6 +2006,21 @@ namespace Unigram.Views
             var flyout = new MenuFlyout();
             flyout.CreateFlyoutItem(new RelayCommand(async () => await TextField.SendAsync(true)), Strings.Resources.SendWithoutSound, new FontIcon { Glyph = Icons.Mute });
             flyout.CreateFlyoutItem(new RelayCommand(async () => await TextField.ScheduleAsync()), self ? Strings.Resources.SetReminder : Strings.Resources.ScheduleMessage, new FontIcon { Glyph = Icons.Schedule });
+
+            if (ViewModel.Settings.IsSendByEnterEnabled)
+            {
+                // With send-by-enter there is no way to type a line break on the
+                // touch keyboard (it reports no key repeat and no modifiers), so
+                // offer one here.
+                flyout.CreateFlyoutItem(new RelayCommand(() =>
+                {
+                    TextField.Document.Selection.TypeText("\r");
+                    TextField.Focus(FocusState.Programmatic);
+                }), Strings.Additional.InsertNewLine, new FontIcon { Glyph = "\uE751" });
+            }
+
+            _sendFlyoutOpen = true;
+            flyout.Closed += (s, e) => _sendFlyoutOpen = false;
 
             if (ApiInfo.CanUseNewFlyoutPlacementMode)
             {

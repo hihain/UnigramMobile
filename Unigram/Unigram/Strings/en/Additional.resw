@@ -323,4 +323,8 @@
     <value>The selection is too long to be quoted.</value>
     <comment>QuotePopup</comment>
   </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Insert New Line</value>
+    <comment>Send button context menu</comment>
+  </data>
 </root>
