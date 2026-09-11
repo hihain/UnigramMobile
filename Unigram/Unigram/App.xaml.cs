@@ -46,21 +46,6 @@ namespace Unigram
 
         public ViewModelLocator Locator { get; } = new ViewModelLocator();
 
-        // Diagnostic crash log for devices without a debugger: written to
-        // LocalState\crash.txt, readable via Device Portal file explorer.
-        public static void LogCrash(object exception)
-        {
-            try
-            {
-                System.IO.File.AppendAllText(
-                    System.IO.Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path, "crash.txt"),
-                    "[" + System.DateTime.Now.ToString("O") + "]\r\n" + exception + "\r\n\r\n");
-            }
-            catch
-            {
-            }
-        }
-
         /// <summary>
         /// Initializes a new instance of the <see cref="App"/> class.
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -68,24 +53,6 @@ namespace Unigram
         /// </summary>
         public App()
         {
-            UnhandledException += (s, args) => LogCrash(args.Exception);
-            TaskScheduler.UnobservedTaskException += (s, args) => LogCrash(args.Exception);
-
-            // Stowed exceptions (XAML-internal failures) never reach UnhandledException;
-            // propagating them here surfaces the real error before the process fail-fasts.
-            Windows.ApplicationModel.Core.CoreApplication.UnhandledErrorDetected += (s, args) =>
-            {
-                try
-                {
-                    args.UnhandledError.Propagate();
-                }
-                catch (System.Exception ex)
-                {
-                    LogCrash(ex);
-                    throw;
-                }
-            };
-
             Locator.Configure(/*session*/);
 
             if (SettingsService.Current.Appearance.RequestedTheme != ElementTheme.Default)
