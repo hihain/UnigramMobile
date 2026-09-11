@@ -1500,6 +1500,9 @@
     <Compile Include="Controls\InputDialog.xaml.cs">
       <DependentUpon>InputDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\QuotePopup.xaml.cs">
+      <DependentUpon>QuotePopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\MasterDetailView.cs" />
     <Compile Include="Controls\PivotRadioButton.cs" />
     <Compile Include="Controls\Messages\MessageReference.xaml.cs">
@@ -2052,6 +2055,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Controls\InputDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\QuotePopup.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

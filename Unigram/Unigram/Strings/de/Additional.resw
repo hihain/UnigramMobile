@@ -303,4 +303,20 @@
     <value>Im Ordner anzeigen</value>
     <comment>DiagnosticsPage</comment>
   </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Mit Zitat antworten</value>
+    <comment>Message context menu</comment>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Zitat auswählen</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Markiere den Teil der Nachricht, den du zitieren möchtest.</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Die Auswahl ist zu lang zum Zitieren.</value>
+    <comment>QuotePopup</comment>
+  </data>
 </root>

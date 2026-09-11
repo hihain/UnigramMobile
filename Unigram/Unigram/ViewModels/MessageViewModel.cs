@@ -42,6 +42,7 @@ namespace Unigram.ViewModels
         public int Ttl => (_message.SelfDestructType as MessageSelfDestructTypeTimer)?.SelfDestructTime ?? 0;
         public long ReplyToMessageId => (_message.ReplyTo as MessageReplyToMessage)?.MessageId ?? 0;
         public long ReplyInChatId => (_message.ReplyTo as MessageReplyToMessage)?.ChatId ?? 0;
+        public TextQuote ReplyToQuote => (_message.ReplyTo as MessageReplyToMessage)?.Quote;
         public MessageForwardInfo ForwardInfo => _message.ForwardInfo;
         public MessageImportInfo ImportInfo => _message.ImportInfo;
         public int EditDate { get => _message.EditDate; set => _message.EditDate = value; }

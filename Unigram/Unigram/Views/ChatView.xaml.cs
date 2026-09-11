@@ -1381,7 +1381,7 @@ namespace Unigram.Views
                         }
                         else
                         {
-                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, WebPagePreview = webPage, WebPageUrl = webPage.Url };
+                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, ReplyToQuote = embedded.ReplyToQuote, WebPagePreview = webPage, WebPageUrl = webPage.Url };
                         }
                     }
                     else if (embedded != null)
@@ -1392,7 +1392,7 @@ namespace Unigram.Views
                         }
                         else if (embedded.WebPagePreview != null)
                         {
-                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, WebPagePreview = null };
+                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, ReplyToQuote = embedded.ReplyToQuote, WebPagePreview = null };
                         }
                     }
                 });
@@ -2103,6 +2103,7 @@ namespace Unigram.Views
 
                 // Generic
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
+                flyout.CreateFlyoutItem(MessageQuote_Loaded, ViewModel.MessageQuoteCommand, message, Strings.Additional.QuoteReply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageEdit_Loaded, ViewModel.MessageEditCommand, message, Strings.Resources.Edit, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(MessageThread_Loaded, ViewModel.MessageThreadCommand, message, message.InteractionInfo?.ReplyInfo?.ReplyCount > 0 ? Locale.Declension("ViewReplies", message.InteractionInfo.ReplyInfo.ReplyCount) : Strings.Resources.ViewThread, new FontIcon { Glyph = Icons.Thread, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
 
@@ -2293,6 +2294,29 @@ namespace Unigram.Views
             }
 
             return true;
+        }
+
+        private bool MessageQuote_Loaded(MessageViewModel message)
+        {
+            if (!MessageReply_Loaded(message) || !message.CanBeSaved)
+            {
+                return false;
+            }
+
+            var chat = message.GetChat();
+            if (chat == null || chat.Type is ChatTypeSecret)
+            {
+                return false;
+            }
+
+            var content = message.GeneratedContent ?? message.Content;
+            if (content is MessageVenue || content is MessageUnsupported)
+            {
+                return false;
+            }
+
+            var caption = content.GetCaption();
+            return caption != null && caption.Text.Length > 0;
         }
 
         private bool MessagePin_Loaded(MessageViewModel message)

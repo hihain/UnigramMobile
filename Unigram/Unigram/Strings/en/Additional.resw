@@ -307,4 +307,20 @@
     <value>Show in Folder</value>
     <comment>DiagnosticsPage</comment>
   </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Reply with Quote</value>
+    <comment>Message context menu</comment>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Select Quote</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Select the part of the message you want to quote.</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>The selection is too long to be quoted.</value>
+    <comment>QuotePopup</comment>
+  </data>
 </root>

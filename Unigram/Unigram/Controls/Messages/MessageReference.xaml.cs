@@ -17,6 +17,31 @@ namespace Unigram.Controls.Messages
 
         public long MessageId { get; private set; }
 
+        private FormattedText _quote;
+
+        private void SetQuote(FormattedText quote)
+        {
+            _quote = quote;
+
+            Label.MaxLines = quote != null ? 5 : 2;
+            MessageLabel.FontStyle = quote != null ? Windows.UI.Text.FontStyle.Italic : Windows.UI.Text.FontStyle.Normal;
+        }
+
+        private void ApplyQuote()
+        {
+            if (_quote == null)
+            {
+                return;
+            }
+
+            if (ServiceLabel.Text.Length > 0 && MessageLabel.Text.Length == 0)
+            {
+                ServiceLabel.Text += ", ";
+            }
+
+            MessageLabel.Text = "“" + _quote.ReplaceSpoilers() + "”";
+        }
+
         #region Message
 
         public object Message
@@ -39,6 +64,8 @@ namespace Unigram.Controls.Messages
             {
                 return;
             }
+
+            SetQuote(null);
 
             if (embedded.WebPagePreview != null)
             {
@@ -72,7 +99,10 @@ namespace Unigram.Controls.Messages
             else if (embedded.ReplyToMessage != null)
             {
                 MessageId = embedded.ReplyToMessage.Id;
+
+                SetQuote(embedded.ReplyToQuote?.Text);
                 GetMessageTemplate(embedded.ReplyToMessage, null);
+                ApplyQuote();
             }
         }
 
@@ -80,6 +110,8 @@ namespace Unigram.Controls.Messages
 
         public void Mockup(string sender, string message)
         {
+            SetQuote(null);
+
             TitleLabel.Text = sender;
             ServiceLabel.Text = string.Empty;
             MessageLabel.Text = message;
@@ -87,6 +119,8 @@ namespace Unigram.Controls.Messages
 
         public void UpdateMessageReply(MessageViewModel message)
         {
+            SetQuote(message.ReplyToQuote?.Text);
+
             if (message.ReplyToMessageState == ReplyToMessageState.Hidden || message.ReplyToMessageId == 0)
             {
                 Visibility = Visibility.Collapsed;
@@ -94,19 +128,24 @@ namespace Unigram.Controls.Messages
             else if (message.ReplyToMessage != null)
             {
                 GetMessageTemplate(message.ReplyToMessage, null);
+                ApplyQuote();
             }
             else if (message.ReplyToMessageState == ReplyToMessageState.Loading)
             {
                 SetLoadingTemplate(null, null);
+                ApplyQuote();
             }
             else if (message.ReplyToMessageState == ReplyToMessageState.Deleted)
             {
                 SetEmptyTemplate(null, null);
+                ApplyQuote();
             }
         }
 
         public void UpdateMessage(MessageViewModel message, bool loading, string title)
         {
+            SetQuote(null);
+
             if (loading)
             {
                 SetLoadingTemplate(null, title);

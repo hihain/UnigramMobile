@@ -148,6 +148,7 @@ namespace Unigram.ViewModels
             MessageReplyPreviousCommand = new RelayCommand(MessageReplyPreviousExecute);
             MessageReplyNextCommand = new RelayCommand(MessageReplyNextExecute);
             MessageReplyCommand = new RelayCommand<MessageViewModel>(MessageReplyExecute);
+            MessageQuoteCommand = new RelayCommand<MessageViewModel>(MessageQuoteExecute);
             MessageRetryCommand = new RelayCommand<MessageViewModel>(MessageRetryExecute);
             MessageDeleteCommand = new RelayCommand<MessageViewModel>(MessageDeleteExecute);
             MessageForwardCommand = new RelayCommand<MessageViewModel>(MessageForwardExecute);
@@ -2499,13 +2500,14 @@ namespace Unigram.ViewModels
                     SetText(text.Text);
                 }
 
-                var draftReplyToMessageId = (draft.ReplyTo as InputMessageReplyToMessage)?.MessageId ?? 0;
+                var draftReplyTo = draft.ReplyTo as InputMessageReplyToMessage;
+                var draftReplyToMessageId = draftReplyTo?.MessageId ?? 0;
                 if (draftReplyToMessageId != 0)
                 {
                     var response = await ProtoService.SendAsync(new GetMessage(chat.Id, draftReplyToMessageId));
                     if (response is Message message)
                     {
-                        ComposerHeader = new MessageComposerHeader { ReplyToMessage = _messageFactory.Create(this, message) };
+                        ComposerHeader = new MessageComposerHeader { ReplyToMessage = _messageFactory.Create(this, message), ReplyToQuote = draftReplyTo.Quote };
                     }
                     else
                     {
@@ -2604,10 +2606,12 @@ namespace Unigram.ViewModels
             }
 
             var reply = 0L;
+            InputTextQuote quote = null;
 
             if (embedded != null && embedded.ReplyToMessage != null)
             {
                 reply = embedded.ReplyToMessage.Id;
+                quote = embedded.ReplyToQuote;
             }
 
             DraftMessage draft = null;
@@ -2618,7 +2622,7 @@ namespace Unigram.ViewModels
                     formattedText = formattedText.Substring(0, CacheService.Options.MessageTextLengthMax * 4);
                 }
 
-                draft = new DraftMessage(reply == 0 ? null : new InputMessageReplyToMessage(0, reply, null), 0, new InputMessageText(formattedText, null, false));
+                draft = new DraftMessage(reply == 0 ? null : new InputMessageReplyToMessage(0, reply, quote), 0, new InputMessageText(formattedText, null, false));
             }
 
             ProtoService.Send(new SetChatDraftMessage(_chat.Id, _threadId, draft));
@@ -2682,7 +2686,7 @@ namespace Unigram.ViewModels
                 }
                 else
                 {
-                    ComposerHeader = new MessageComposerHeader { EditingMessage = container.EditingMessage, ReplyToMessage = container.ReplyToMessage, WebPagePreview = null };
+                    ComposerHeader = new MessageComposerHeader { EditingMessage = container.EditingMessage, ReplyToMessage = container.ReplyToMessage, ReplyToQuote = container.ReplyToQuote, WebPagePreview = null };
                 }
 
                 DisableWebPagePreview = true;
@@ -2726,7 +2730,7 @@ namespace Unigram.ViewModels
                 ComposerHeader = null;
             }
 
-            return new InputMessageReplyToMessage(0, embedded.ReplyToMessage.Id, null);
+            return new InputMessageReplyToMessage(0, embedded.ReplyToMessage.Id, embedded.ReplyToQuote);
         }
 
         #endregion
@@ -4040,6 +4044,7 @@ namespace Unigram.ViewModels
     public class MessageComposerHeader
     {
         public MessageViewModel ReplyToMessage { get; set; }
+        public InputTextQuote ReplyToQuote { get; set; }
         public MessageViewModel EditingMessage { get; set; }
 
         public int? EditingMessageFileId { get; set; }

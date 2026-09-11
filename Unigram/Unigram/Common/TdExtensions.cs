@@ -452,45 +452,92 @@ namespace Unigram.Common
 
         public static FormattedText Substring(this FormattedText text, long startIndex, long length)
         {
-            if (text.Text.Length < length)
+            if (startIndex >= text.Text.Length)
             {
-                return text;
+                return new FormattedText(string.Empty, new List<TextEntity>());
             }
 
-            var message = text.Text.Substring((int)startIndex, Math.Min(text.Text.Length - (int)startIndex, (int)length));
+            var offset = (int)startIndex;
+            var message = text.Text.Substring(offset, Math.Min(text.Text.Length - offset, (int)length));
             var sub = new List<TextEntity>();
 
-            foreach (var entity in text.Entities)
+            if (text.Entities != null)
             {
-                // Included, Included
-                if (entity.Offset >= startIndex && entity.Offset + entity.Length <= startIndex + length)
+                foreach (var entity in text.Entities)
                 {
-                    var replace = new TextEntity { Offset = entity.Offset - (int)startIndex, Length = entity.Length };
-                    sub.Add(replace);
-                }
-                // Before, Included
-                else if (entity.Offset < startIndex && entity.Offset + entity.Length > startIndex && entity.Offset + entity.Length <= startIndex + length)
-                {
-                    var replace = new TextEntity { Offset = 0, Length = entity.Length - ((int)startIndex - entity.Offset) };
-                    sub.Add(replace);
-                }
-                // Included, After
-                else if (entity.Offset >= startIndex && entity.Offset < startIndex + length && entity.Offset + entity.Length > startIndex + length)
-                {
-                    var difference = entity.Offset + entity.Length - startIndex + length;
+                    var start = Math.Max(entity.Offset, offset);
+                    var end = Math.Min(entity.Offset + entity.Length, offset + message.Length);
 
-                    var replace = new TextEntity { Offset = entity.Offset - (int)startIndex, Length = entity.Length - (int)difference };
-                    sub.Add(replace);
-                }
-                // Before, After
-                else if (entity.Offset < startIndex && entity.Offset + entity.Length > startIndex + length)
-                {
-                    var replace = new TextEntity { Offset = 0, Length = message.Length };
-                    sub.Add(replace);
+                    if (end > start)
+                    {
+                        sub.Add(new TextEntity(start - offset, end - start, entity.Type));
+                    }
                 }
             }
 
             return new FormattedText(message, sub);
+        }
+
+        private static bool IsQuotable(TextEntityType type)
+        {
+            return type is TextEntityTypeBold
+                || type is TextEntityTypeItalic
+                || type is TextEntityTypeUnderline
+                || type is TextEntityTypeStrikethrough
+                || type is TextEntityTypeSpoiler
+                || type is TextEntityTypeCustomEmoji;
+        }
+
+        public static FormattedText ToQuote(this FormattedText text, ref int offset, ref int length)
+        {
+            if (offset < 0)
+            {
+                offset = 0;
+            }
+
+            if (offset > text.Text.Length)
+            {
+                offset = text.Text.Length;
+            }
+
+            if (length > text.Text.Length - offset)
+            {
+                length = text.Text.Length - offset;
+            }
+
+            if (offset > 0 && offset < text.Text.Length && char.IsLowSurrogate(text.Text[offset]))
+            {
+                offset--;
+                length++;
+            }
+
+            if (length > 0 && offset + length < text.Text.Length && char.IsHighSurrogate(text.Text[offset + length - 1]))
+            {
+                length++;
+            }
+
+            var sub = new List<TextEntity>();
+
+            if (text.Entities != null)
+            {
+                foreach (var entity in text.Entities)
+                {
+                    if (!IsQuotable(entity.Type))
+                    {
+                        continue;
+                    }
+
+                    var start = Math.Max(entity.Offset, offset);
+                    var end = Math.Min(entity.Offset + entity.Length, offset + length);
+
+                    if (end > start)
+                    {
+                        sub.Add(new TextEntity(start - offset, end - start, entity.Type));
+                    }
+                }
+            }
+
+            return new FormattedText(text.Text.Substring(offset, length), sub);
         }
 
         public static string ToPlainText(this PageBlockCaption caption)

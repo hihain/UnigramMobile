@@ -90,6 +90,89 @@ namespace Unigram.ViewModels
             TextField?.Focus(FocusState.Keyboard);
         }
 
+        public RelayCommand<MessageViewModel> MessageQuoteCommand { get; }
+        private async void MessageQuoteExecute(MessageViewModel message)
+        {
+            DisposeSearch();
+
+            if (message == null)
+            {
+                return;
+            }
+
+            if (message.Content is MessageAlbum album)
+            {
+                message = album.Messages.FirstOrDefault();
+            }
+
+            if (message == null)
+            {
+                return;
+            }
+
+            var caption = (message.GeneratedContent ?? message.Content).GetCaption();
+            if (caption == null || caption.Text.Length == 0)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            long maxLength;
+            if (!CacheService.Options.TryGetValue("message_reply_quote_length_max", out maxLength) || maxLength <= 0)
+            {
+                maxLength = 1024;
+            }
+
+            var popup = new QuotePopup(caption.Text, (int)maxLength);
+
+            var confirm = await popup.OpenAsync();
+            if (confirm != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            var position = popup.Position;
+            var length = popup.Length;
+
+            var quote = caption.ToQuote(ref position, ref length);
+            if (quote.Text.Length == 0)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            quote = ValidateQuote(caption, quote, ref position);
+            if (quote == null)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            ComposerHeader = new MessageComposerHeader { ReplyToMessage = message, ReplyToQuote = new InputTextQuote(quote, position) };
+            TextField?.Focus(FocusState.Keyboard);
+        }
+
+        private FormattedText ValidateQuote(FormattedText caption, FormattedText quote, ref int position)
+        {
+            var response = ProtoService.Execute(new SearchQuote(caption, quote, position));
+            if (response is FoundPosition found)
+            {
+                position = found.Position;
+                return quote;
+            }
+
+            var plain = new FormattedText(quote.Text, new TextEntity[0]);
+
+            response = ProtoService.Execute(new SearchQuote(caption, plain, position));
+            if (response is FoundPosition foundPlain)
+            {
+                position = foundPlain.Position;
+                return plain;
+            }
+
+            return null;
+        }
+
         #endregion
 
         #region Delete
