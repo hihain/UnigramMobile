@@ -128,10 +128,7 @@ namespace Unigram.Views
             var header = ElementCompositionPreview.GetElementVisual(PageHeader);
             header.Clip = header.Compositor.CreateInsetClip();
 
-            var show = !((TLViewModelBase)ViewModel).Settings.CollapseArchivedChats;
-
-            ArchivedChatsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            ArchivedChatsCompactPanel.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+            UpdateArchivedChatsVisibility();
         }
 
         public void Dispose()
@@ -1684,6 +1681,7 @@ namespace Unigram.Views
             switch (rpMasterTitlebar.SelectedIndex)
             {
                 case 0:
+                    UpdateArchivedChatsVisibility();
                     Root?.SetSelectedIndex(RootDestination.Chats);
                     break;
                 case 1:
@@ -2663,8 +2661,38 @@ namespace Unigram.Views
 
         private bool _archiveCollapsed;
 
+        /// <summary>
+        /// Puts the archive row in the chat list or takes it out, from the setting. Called
+        /// again whenever the chat list comes back into view, because the switch for it lives
+        /// on a settings page inside this same window: nothing navigates away and back, so
+        /// there is no other moment at which to notice the change.
+        /// </summary>
+        private void UpdateArchivedChatsVisibility()
+        {
+            var hide = ((TLViewModelBase)ViewModel).Settings.HideArchivedChats;
+
+            ArchivedChatsPresenter.Visibility = hide ? Visibility.Collapsed : Visibility.Visible;
+
+            if (hide)
+            {
+                return;
+            }
+
+            var expanded = !((TLViewModelBase)ViewModel).Settings.CollapseArchivedChats;
+
+            ArchivedChatsPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+            ArchivedChatsCompactPanel.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
+        }
+
         private async void ShowHideArchive(bool show)
         {
+            // Nothing to slide in or out while the row is switched off. The rest of the
+            // method is what puts it back on screen, so the guard has to come before it.
+            if (((TLViewModelBase)ViewModel).Settings.HideArchivedChats)
+            {
+                return;
+            }
+
             if ((show && ArchivedChatsPresenter.Visibility == Visibility.Visible) || (!show && (ArchivedChatsPresenter.Visibility == Visibility.Collapsed || _archiveCollapsed)))
             {
                 return;

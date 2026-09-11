@@ -800,7 +800,12 @@
                                                      AllowSelection="True"
                                                      Grid.Row="1">
                                         <ListView.Header>
-                                            <Grid x:Name="ArchivedChatsPresenter">
+                                            <!--
+                                                Whether this row is here at all is a setting now. Collapsed
+                                                to start with, and never deleted: the cell inside is what the
+                                                archive updates are handed to, so it has to exist either way.
+                                            -->
+                                            <Grid x:Name="ArchivedChatsPresenter" Visibility="Collapsed">
                                                 <Border x:Name="ArchivedChatsPanel">
                                                     <cells:ChatCell
                                                         x:Name="ArchivedChats"

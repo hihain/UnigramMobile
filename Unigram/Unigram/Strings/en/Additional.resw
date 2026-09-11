@@ -335,4 +335,7 @@
     <value>Go to next reaction</value>
     <comment>ChatView</comment>
   </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Hide archived chats</value>
+  </data>
 </root>

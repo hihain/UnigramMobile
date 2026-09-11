@@ -36,6 +36,7 @@ namespace Unigram.Services
 
         bool UseThreeLinesLayout { get; set; }
         bool CollapseArchivedChats { get; set; }
+        bool HideArchivedChats { get; set; }
         bool IsAdaptiveWideEnabled { get; set; }
         bool ShowRecentFiles { get; set; }
         bool IsTrayVisible { get; set; }
@@ -593,6 +594,30 @@ namespace Unigram.Services
             {
                 _collapseArchivedChats = value;
                 AddOrUpdateValue(_local, "CollapseArchivedChats", value);
+            }
+        }
+
+        /// <summary>
+        /// Whether the archive keeps its row above the chat list at all. Different from
+        /// CollapseArchivedChats, which only decides which of the two shapes that row takes.
+        ///
+        /// On by default: this fork is for a phone screen, where a list you have explicitly
+        /// put away should not be the first thing on it.
+        /// </summary>
+        private static bool? _hideArchivedChats;
+        public bool HideArchivedChats
+        {
+            get
+            {
+                if (_hideArchivedChats == null)
+                    _hideArchivedChats = GetValueOrDefault(_local, "HideArchivedChats", true);
+
+                return _hideArchivedChats ?? true;
+            }
+            set
+            {
+                _hideArchivedChats = value;
+                AddOrUpdateValue(_local, "HideArchivedChats", value);
             }
         }
 

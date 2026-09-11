@@ -180,6 +180,19 @@ namespace Unigram.ViewModels.Settings
             }
         }
 
+        public bool HideArchivedChats
+        {
+            get
+            {
+                return Settings.HideArchivedChats;
+            }
+            set
+            {
+                Settings.HideArchivedChats = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public bool IsLargeEmojiEnabled
         {
             get
