@@ -289,4 +289,28 @@
     <value>Удалить выбранное</value>
     <comment>Context menu if multiple messages are selected</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Цитата</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Ответить с цитатой</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Выбрать цитату</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Выделите часть сообщения, которую хотите процитировать.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Выделение слишком длинное для цитаты.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Перейти к следующей реакции</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Вставить новую строку</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Скрыть архивные чаты</value>
+  </data>
 </root>

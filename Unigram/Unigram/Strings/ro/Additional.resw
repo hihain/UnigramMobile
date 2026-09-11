@@ -277,4 +277,28 @@
     <value>Descărcarea automată a mesajelor vocale</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Citat</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Răspunde cu citat</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Selectează citatul</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Selectează partea din mesaj pe care vrei să o citezi.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Selecția este prea lungă pentru a fi citată.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Mergi la reacția următoare</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Inserează un rând nou</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Ascunde conversațiile arhivate</value>
+  </data>
 </root>

@@ -278,4 +278,28 @@
     <value>بارگیری خودکار پیام های آوایی</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>نقل‌قول</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>پاسخ با نقل‌قول</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>انتخاب نقل‌قول</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>بخشی از پیام را که می‌خواهید نقل‌قول کنید انتخاب کنید.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>انتخاب برای نقل‌قول شدن بیش از حد طولانی است.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>رفتن به واکنش بعدی</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>درج خط جدید</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>پنهان کردن گفتگوهای بایگانی‌شده</value>
+  </data>
 </root>

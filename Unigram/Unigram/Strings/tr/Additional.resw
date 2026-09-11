@@ -277,4 +277,28 @@
     <value>Sesli mesajları otomatik indir</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Alıntı</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Alıntıyla yanıtla</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Alıntı seç</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Mesajın alıntılamak istediğiniz bölümünü seçin.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Seçim alıntılanamayacak kadar uzun.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Sonraki tepkiye git</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Yeni satır ekle</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Arşivlenmiş sohbetleri gizle</value>
+  </data>
 </root>

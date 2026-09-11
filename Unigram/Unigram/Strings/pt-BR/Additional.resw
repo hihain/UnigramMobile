@@ -249,4 +249,28 @@
     <value>Corrigir as palavras mal-escritas automaticamente</value>
     <comment>SettingsAppearancePage</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Citação</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Responder com citação</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Selecionar citação</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Selecione a parte da mensagem que você quer citar.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>A seleção é longa demais para ser citada.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Ir para a próxima reação</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Inserir nova linha</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Ocultar conversas arquivadas</value>
+  </data>
 </root>
