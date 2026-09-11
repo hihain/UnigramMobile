@@ -85,6 +85,18 @@
             <Color x:Key="MessageCallMissedForegroundColor">Red</Color>
             <Color x:Key="MessageCallMissedForegroundOutColor">Red</Color>
 
+            <Color x:Key="MessageReactionBackgroundColor">#3A4754</Color>
+            <Color x:Key="MessageReactionBackgroundOutColor">#2B4153</Color>
+
+            <Color x:Key="MessageReactionForegroundColor">#67BBF3</Color>
+            <Color x:Key="MessageReactionForegroundOutColor">#7AC3F4</Color>
+
+            <Color x:Key="MessageReactionChosenBackgroundColor">#6EB2EE</Color>
+            <Color x:Key="MessageReactionChosenBackgroundOutColor">#318EE4</Color>
+
+            <Color x:Key="MessageReactionChosenForegroundColor">#33393F</Color>
+            <Color x:Key="MessageReactionChosenForegroundOutColor">#33393F</Color>
+
             <Color x:Key="SubtleFillColorTransparent">#00FFFFFF</Color>
             <SolidColorBrush x:Key="SubtleFillColorTransparentBrush" Color="{StaticResource SubtleFillColorTransparent}" />
 
@@ -101,6 +113,10 @@
             <SolidColorBrush x:Key="MessageOverlayBackgroundBrush" Color="{ThemeResource MessageOverlayBackgroundColor}" />
             <SolidColorBrush x:Key="MessageCallForegroundBrush" Color="{ThemeResource MessageCallForegroundColor}" />
             <SolidColorBrush x:Key="MessageCallMissedForegroundBrush" Color="{ThemeResource MessageCallMissedForegroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionBackgroundBrush" Color="{ThemeResource MessageReactionBackgroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionForegroundBrush" Color="{ThemeResource MessageReactionForegroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionChosenBackgroundBrush" Color="{ThemeResource MessageReactionChosenBackgroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionChosenForegroundBrush" Color="{ThemeResource MessageReactionChosenForegroundColor}" />
 
 
 
@@ -1321,6 +1337,18 @@
             <Color x:Key="MessageCallMissedForegroundColor">Red</Color>
             <Color x:Key="MessageCallMissedForegroundOutColor">Red</Color>
 
+            <Color x:Key="MessageReactionBackgroundColor">#E8F5FC</Color>
+            <Color x:Key="MessageReactionBackgroundOutColor">#C1E4F8</Color>
+
+            <Color x:Key="MessageReactionForegroundColor">#168DCD</Color>
+            <Color x:Key="MessageReactionForegroundOutColor">#168DCD</Color>
+
+            <Color x:Key="MessageReactionChosenBackgroundColor">#40A7E3</Color>
+            <Color x:Key="MessageReactionChosenBackgroundOutColor">#40A7E3</Color>
+
+            <Color x:Key="MessageReactionChosenForegroundColor">#FFFFFF</Color>
+            <Color x:Key="MessageReactionChosenForegroundOutColor">#FFFFFF</Color>
+
             <Color x:Key="SubtleFillColorTransparent">#00FFFFFF</Color>
             <SolidColorBrush x:Key="SubtleFillColorTransparentBrush" Color="{StaticResource SubtleFillColorTransparent}" />
 
@@ -1337,6 +1365,10 @@
             <SolidColorBrush x:Key="MessageOverlayBackgroundBrush" Color="{ThemeResource MessageOverlayBackgroundColor}" />
             <SolidColorBrush x:Key="MessageCallForegroundBrush" Color="{ThemeResource MessageCallForegroundColor}" />
             <SolidColorBrush x:Key="MessageCallMissedForegroundBrush" Color="{ThemeResource MessageCallMissedForegroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionBackgroundBrush" Color="{ThemeResource MessageReactionBackgroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionForegroundBrush" Color="{ThemeResource MessageReactionForegroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionChosenBackgroundBrush" Color="{ThemeResource MessageReactionChosenBackgroundColor}" />
+            <SolidColorBrush x:Key="MessageReactionChosenForegroundBrush" Color="{ThemeResource MessageReactionChosenForegroundColor}" />
 
 
 

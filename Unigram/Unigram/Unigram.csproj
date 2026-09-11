@@ -339,6 +339,7 @@
     <Compile Include="Controls\MenuButton.cs" />
     <Compile Include="Controls\MenuFlyoutLabel.cs" />
     <Compile Include="Controls\MenuFlyoutProfile.cs" />
+    <Compile Include="Controls\MenuFlyoutReactionsBar.cs" />
     <Compile Include="Controls\MessagePopup.xaml.cs">
       <DependentUpon>MessagePopup.xaml</DependentUpon>
     </Compile>
@@ -374,6 +375,8 @@
     </Compile>
     <Compile Include="Controls\Messages\MessageReferenceBase.cs" />
     <Compile Include="Controls\Messages\MessageService.cs" />
+    <Compile Include="Controls\Messages\ReactionButton.cs" />
+    <Compile Include="Controls\Messages\ReactionsPanel.cs" />
     <Compile Include="Controls\MediaPlayerView.cs" />
     <Compile Include="Controls\Messages\Content\AnimationContent.xaml.cs">
       <DependentUpon>AnimationContent.xaml</DependentUpon>

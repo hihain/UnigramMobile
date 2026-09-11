@@ -237,6 +237,16 @@ namespace Unigram.Common
             return chat.BlockList is BlockListMain;
         }
 
+        public static string ToKey(this ReactionType type)
+        {
+            if (type is ReactionTypeEmoji emoji)
+            {
+                return emoji.Emoji;
+            }
+
+            return string.Empty;
+        }
+
         #endregion
 
         public static File InvalidFile()

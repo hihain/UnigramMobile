@@ -84,6 +84,9 @@ namespace Unigram.Controls.Messages
             {
                 Span.Inlines.Clear();
                 Media.Child = null;
+
+                Reactions.UpdateMessageReactions(null);
+                MediaReactions.UpdateMessageReactions(null);
             }
 
             if (_highlight != null)
@@ -693,6 +696,17 @@ namespace Unigram.Controls.Messages
             }
 
             Footer.UpdateMessageInteractionInfo(message);
+
+            if (Grid.GetRow(Media) == Grid.GetRow(Footer))
+            {
+                Reactions.UpdateMessageReactions(null);
+                MediaReactions.UpdateMessageReactions(message);
+            }
+            else
+            {
+                Reactions.UpdateMessageReactions(message);
+                MediaReactions.UpdateMessageReactions(null);
+            }
         }
 
         public void UpdateMessageContentOpened(MessageViewModel message)

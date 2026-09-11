@@ -1345,6 +1345,13 @@ namespace Unigram.Services
                     value.ActionBar = updateChatActionBar.ActionBar;
                 }
             }
+            else if (update is UpdateChatAvailableReactions updateChatAvailableReactions)
+            {
+                if (_chats.TryGetValue(updateChatAvailableReactions.ChatId, out Chat value))
+                {
+                    value.AvailableReactions = updateChatAvailableReactions.AvailableReactions;
+                }
+            }
             else if (update is UpdateChatHasProtectedContent updateChatHasProtectedContent)
             {
                 if (_chats.TryGetValue(updateChatHasProtectedContent.ChatId, out Chat value))

@@ -2185,7 +2185,76 @@ namespace Unigram.Views
                 flyout.Items.RemoveAt(flyout.Items.Count - 1);
             }
 
+            if (ViewModel.SelectedItems.Count < 2)
+            {
+                var reactions = await GetAvailableReactionsAsync(message);
+                if (reactions != null && reactions.Count > 0)
+                {
+                    var target = message;
+                    var bar = new MenuFlyoutReactionsBar();
+                    bar.SetReactions(reactions);
+                    bar.ReactionSelected += (s, reaction) =>
+                    {
+                        flyout.Hide();
+                        ViewModel.ProtoService.Send(new AddMessageReaction(target.ChatId, target.Id, reaction, false, true));
+                    };
+
+                    flyout.Items.Insert(0, bar);
+                }
+            }
+
             args.ShowAt(flyout, sender as FrameworkElement);
+        }
+
+        private async Task<IList<ReactionType>> GetAvailableReactionsAsync(MessageViewModel message)
+        {
+            var chat = ViewModel.CacheService.GetChat(message.ChatId);
+            if (chat == null || ViewModel.CacheService.IsSavedMessages(chat))
+            {
+                // Reactions in the chat with yourself are saved-messages tags,
+                // which the server rejects for non-premium accounts.
+                return null;
+            }
+
+            var response = await ViewModel.ProtoService.SendAsync(new GetMessageAvailableReactions(message.ChatId, message.Id, 7));
+            if (response is AvailableReactions available && available.UnavailabilityReason == null && !available.AreTags)
+            {
+                var result = new List<ReactionType>();
+                var added = new HashSet<string>();
+
+                AppendAvailableReactions(result, added, available.TopReactions);
+                AppendAvailableReactions(result, added, available.RecentReactions);
+
+                return result;
+            }
+
+            return null;
+        }
+
+        private void AppendAvailableReactions(IList<ReactionType> result, HashSet<string> added, IList<AvailableReaction> reactions)
+        {
+            if (reactions == null)
+            {
+                return;
+            }
+
+            foreach (var item in reactions)
+            {
+                if (result.Count >= 16)
+                {
+                    return;
+                }
+
+                if (item.NeedsPremium || item.Type is ReactionTypeEmoji == false)
+                {
+                    continue;
+                }
+
+                if (added.Add(item.Type.ToKey()))
+                {
+                    result.Add(item.Type);
+                }
+            }
         }
 
         private bool MessageSendNow_Loaded(MessageViewModel message)
