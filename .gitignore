@@ -274,3 +274,6 @@ _Pvt_Extensions
 /Unigram/Libraries/fluent-xaml-theme-editor/FluentEditorShared
 /Unigram/Libraries/ffmpeg/runtimes/ARM
 Unigram/Unigram/Unigram_StoreKey.pfx
+
+# The Extension SDK is a release asset, not a repository file -- Dependencies/README.md.
+/Dependencies/*.vsix

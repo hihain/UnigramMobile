@@ -1,6 +1,6 @@
-# Building the fork
+# Building Unigram Mobile
 
-One command builds everything this fork ships. It is written down because none of the
+One command builds everything this app ships. It is written down because none of the
 flags on it are optional and none of them are obvious.
 
 ## Before the first build
@@ -8,10 +8,11 @@ flags on it are optional and none of them are obvious.
 - **Visual Studio 2017 15.9** with the UWP workload, and the **Windows 10 SDK
   10.0.18362.0**. 15.9 is not a preference: the app targets `10.0.15063` as its minimum
   and later toolsets have dropped that.
-- **The TDLib Extension SDK.** It is not on NuGet; it is a VSIX in `Dependencies/`, built
-  from source, and it has to be unpacked into the per-user Extension SDK folder before
-  anything compiles. `Dependencies/README.md` says how, and why the ARM Release build of
-  it is compiled with the optimiser switched off.
+- **The TDLib Extension SDK.** It is not on NuGet and it is not in this repository -- it
+  is a VSIX attached to a release, built from source, and it has to be unpacked into the
+  per-user Extension SDK folder before anything compiles. `Dependencies/README.md` says
+  how, how it was built, and why the ARM Release build of it has the optimiser switched
+  off.
 - **`Unigram/Unigram/Constants.Secret.cs`**, which is gitignored and stays that way. Copy
   `Constants.Secret.example.cs` over it and fill in an api_id/api_hash of your own; the
   build does not compile without the file.
@@ -58,7 +59,7 @@ Run it from a PowerShell prompt, with an absolute path to the solution:
   `Unigram\Unigram\AppPackages\Unigram_<version>_Test\Unigram_<version>_arm.appxbundle`,
   which is exactly what `tools\deploy-lumia.ps1` looks for.
 - `Platform=ARM` is the only platform the phone can run. x86/x64 exist for the desktop and
-  are not what this fork is for.
+  are not what this app is for.
 
 ## The version number
 

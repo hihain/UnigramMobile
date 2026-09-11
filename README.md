@@ -27,6 +27,14 @@ In agreement with the Unigram author, this fork continues to support Windows 10 
 - Channel statistics for big channels
 - Full support of Windows 10 notifications and Action Centre (reply to a message or mark it as read without opening the app)
 - Continuum support
+- Message reactions, including who reacted
+- Quote replies, and quoted text and code blocks drawn as themselves
+- Spoilers
+- Read receipts, with the reactions to your own messages shown alongside them
+- Continuous history across a supergroup upgrade
+
+## Building
+See [Documentation/Building.md](Documentation/Building.md).
 
 ## Supported Languages
 Unigram Mobile has 18 built-in languages. But you can create your own translation or use a translation others created.

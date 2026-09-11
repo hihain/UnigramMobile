@@ -1,86 +1,74 @@
 # Dependencies
 
-## Where the Extension SDK comes from
+## The TDLib Extension SDK
 
-It is not in this repository. It is about 470 MB for the two of them, which is not
-something to put in somebody's git history, so they are attached to a release instead
-and this says how they were made -- with enough detail to make them again rather than
-trust the ones on offer.
+The app references TDLib as a UWP Extension SDK -- `Telegram.Td.UWP`, an `SDKReference` in
+`Unigram/Unigram/Unigram.csproj`. It is not on NuGet and it is not in this repository: the
+package is about 240 MB, which is not something to put in somebody's git history. It hangs
+off a release on the fork this branch comes from, and this says how it was made, in enough
+detail to make it again rather than take the one on offer on trust.
 
-Built from tdlib/td, checked out at the tag for the version in question, with
-`example/uwp/build.ps1`. That script drives vcpkg and produces the VSIX; the arguments
-that matter are the architecture (`arm` is the one this fork needs) and the
-configuration. The VSIX identity is `Telegram.Td.UWP` version `1.0` for every TDLib
-version, so **only one can be installed at a time** and nothing in the build will tell
-you which one you have -- a mismatch shows up as a wall of compile errors about types
-that do not exist.
+<https://github.com/ahorn42/UnigramMobile/releases/download/tdlib-sdk-1.8.24/Telegram.Td.UWP-1.8.24.vsix>
 
-The ARM Release build is compiled with the optimiser off (`/Od`). With it on, VS2017's
-C++ compiler takes hours on td's generated sources and, on this codebase, produced a
-binary that faulted on startup on 15063. The package is bigger and slower to link;
-neither has been a problem in practice.
+Nothing in the build reads this folder. MSBuild resolves the SDK from the per-user
+Extension SDK location, so the VSIX only has to be unpacked once per machine.
 
-Installing it means unpacking the VSIX into the per-user Extension SDK folder:
+### Installing it
 
-    %LOCALAPPDATA%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Telegram.Td.UWP\1.0
-
-A VSIX is a zip. Unpacking it there works and needs no administrator, which running the
-installer does.
-
-## Telegram.Td.UWP-1.8.24.vsix (Git LFS) — CURRENT
-
-TDLib 1.8.24 built from source as UWP Extension SDK, same identity `Telegram.Td.UWP,
-Version=1.0` and same layout as the 1.8.1 package below, so it installs to the same
-per-user location. The app code requires this version since the 1.8.1→1.8.24 port.
-
-- Source: tdlib/td commit `c5c55092d` (= v1.8.24, 2024-01-27; still C++14/VS2017-buildable)
-- Same toolchain/vcpkg deps and the same **mandatory `/Od` for ARM Release** as described
-  below — the VS2017 ARM optimizer bug reproduces with 1.8.24 as well.
-- x86/x64 configs are built with stock optimization (`/O2`); the bug is ARM-specific.
-- The `Redist\Debug\ARM` slot intentionally contains the same `/Od` *Release* DLL as
-  `Redist\Retail\ARM` (a genuine ARM Debug build was never needed; the release CRT
-  dependencies keep Debug app builds deployable without debug-CRT sideloading).
-
-## Telegram.Td.UWP-1.8.1.vsix (Git LFS)
-
-TDLib 1.8.1 built from source as UWP Extension SDK, identity `Telegram.Td.UWP, Version=1.0`
-(referenced by `Unigram/Unigram/Unigram.csproj` as an SDKReference). Contains all six
-arch/config combinations (x86/x64/ARM × Debug/Release) plus DesignTime metadata.
-
-Rebuilt 2026-08 because the original build artifact (former `tdlib` branch) was lost.
-
-**IMPORTANT — ARM Release is built with `/Od` (optimizer disabled).** The VS2017 15.9 ARM
-optimizer produces a broken `Telegram.Td.dll` at both `/O1` and `/O2`: the app crashes with
-heap corruption (access violation inside coreclr) about one second after the TDLib client
-starts, reproducibly, on Windows 10 Mobile 15254. `/Od` with release CRT, `NDEBUG` and
-retail OpenSSL/zlib works. Bisected 2026-08-29 (OpenSSL, zlib, app IL, CRT flavor and
-NDEBUG code paths were all ruled out as single variables). When rebuilding the ARM Release
-config, configure with:
-
-```
-cmake -DCMAKE_CXX_FLAGS_RELEASE="/MD /Od /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/MD /Od /DNDEBUG" ...
-```
-
-### Install (no admin required)
-
-Instead of running VSIXInstaller (which needs admin for `Scope="Global"`), extract the
-VSIX (it is a zip) and copy its SDK payload to the per-user Extension SDK location:
+A VSIX is a zip. Unpack it into the per-user Extension SDK folder:
 
 ```
 %LOCALAPPDATA%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Telegram.Td.UWP\1.0\
 ```
 
-so that `SDKManifest.xml`, `References\`, `Redist\` and `DesignTime\` sit directly in
-the `1.0` folder. MSBuild resolves per-user Extension SDKs automatically.
+so that `SDKManifest.xml`, `References\`, `Redist\` and `DesignTime\` sit directly in the
+`1.0` folder. MSBuild resolves per-user Extension SDKs on its own, and this way needs no
+administrator -- running VSIXInstaller does, because the VSIX declares `Scope="Global"`.
 
-### How it was built
+**Every TDLib version installs as `Telegram.Td.UWP` version `1.0`.** Nothing distinguishes
+them, so only one can be present at a time and no part of the build will tell you which one
+you have. A mismatch shows up as a wall of compile errors about types that do not exist.
+
+### TDLib 1.8.24 -- the one the app needs
+
+- Source: tdlib/td commit `c5c55092d` (= v1.8.24, 2024-01-27), the last release that still
+  builds with the C++14 toolset VS2017 has.
+- Toolchain: VS2017 15.9 (v141), Windows SDK 10.0.18362.0, CMake, gperf.
+- Built with `td\example\uwp\build.ps1`, which drives vcpkg and exports the VSIX. It does
+  **not** check compiler exit codes, so verify that all six `Telegram.Td.dll` / `.winmd`
+  outputs exist before believing it.
+- Contains all six arch/config combinations (x86/x64/ARM x Debug/Release) plus DesignTime
+  metadata. The `Redist\Debug\ARM` slot deliberately holds the same Release DLL as
+  `Redist\Retail\ARM`: a real ARM Debug build was never needed, and the release CRT
+  dependencies are what keep Debug app builds deployable without sideloading a debug CRT.
+
+### ARM Release is built with the optimiser off
+
+This is not a preference and it is the thing most likely to be undone by accident.
+
+The VS2017 15.9 ARM optimiser produces a broken `Telegram.Td.dll` at both `/O1` and `/O2`:
+about a second after the TDLib client starts, the app dies of heap corruption inside
+coreclr. Reproducibly, on Windows 10 Mobile 15254. `/Od` with the release CRT, `NDEBUG` and
+retail OpenSSL/zlib works. Bisected in August 2026 with OpenSSL, zlib, the app IL, the CRT
+flavour and the `NDEBUG` code paths each ruled out on their own.
+
+```
+cmake -DCMAKE_CXX_FLAGS_RELEASE="/MD /Od /DNDEBUG" -DCMAKE_C_FLAGS_RELEASE="/MD /Od /DNDEBUG" ...
+```
+
+x86 and x64 are built with stock optimisation; the fault is ARM-specific. The ARM package
+is larger and slower to link, and neither has been a problem in practice.
+
+### TDLib 1.8.1 -- notes only
+
+Rebuilt in August 2026 because the original artifact was lost with the `tdlib` branch. The
+app moved to 1.8.24 and no longer builds against it, so it is not published anywhere; these
+notes are here in case it is ever needed again:
 
 - Source: tdlib/td commit `92c2a9c4e521df720abeaa9872e1c2b797d5c93f` (= v1.8.1)
-- Toolchain: VS2017 15.9 (v141), Windows SDK 10.0.18362.0, CMake 4.x, gperf
-- Deps via vcpkg tag `2022.02.23`: openssl 1.1.1m + zlib 1.2.11 for arm-uwp/x64-uwp/x86-uwp
-  (openssl/zlib portfiles need their pkg-config fixup steps removed — those download from
-  msys2 mirrors that are long dead; TDLib uses find_package, not pkg-config)
-- CMake 4.x refuses td 1.8.1's `cmake_minimum_required(3.0.2)` — set env
-  `CMAKE_POLICY_VERSION_MINIMUM=3.5` before building
-- Build: `td\example\uwp\build.ps1` (phases prepare/config/build/export; note it does not
-  check compiler exit codes — verify the six `Telegram.Td.dll`/`.winmd` outputs exist)
+- Dependencies via vcpkg tag `2022.02.23`: openssl 1.1.1m and zlib 1.2.11 for arm-uwp,
+  x64-uwp and x86-uwp. Both portfiles need their pkg-config fixup steps removed -- those
+  download from msys2 mirrors that are long dead, and TDLib uses `find_package` anyway.
+- CMake 4.x refuses td 1.8.1's `cmake_minimum_required(3.0.2)`; set
+  `CMAKE_POLICY_VERSION_MINIMUM=3.5` in the environment before building.
+- The ARM optimiser fault above reproduces here too.
