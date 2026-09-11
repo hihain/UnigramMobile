@@ -1,5 +1,32 @@
 # Dependencies
 
+## Where the Extension SDK comes from
+
+It is not in this repository. It is about 470 MB for the two of them, which is not
+something to put in somebody's git history, so they are attached to a release instead
+and this says how they were made -- with enough detail to make them again rather than
+trust the ones on offer.
+
+Built from tdlib/td, checked out at the tag for the version in question, with
+`example/uwp/build.ps1`. That script drives vcpkg and produces the VSIX; the arguments
+that matter are the architecture (`arm` is the one this fork needs) and the
+configuration. The VSIX identity is `Telegram.Td.UWP` version `1.0` for every TDLib
+version, so **only one can be installed at a time** and nothing in the build will tell
+you which one you have -- a mismatch shows up as a wall of compile errors about types
+that do not exist.
+
+The ARM Release build is compiled with the optimiser off (`/Od`). With it on, VS2017's
+C++ compiler takes hours on td's generated sources and, on this codebase, produced a
+binary that faulted on startup on 15063. The package is bigger and slower to link;
+neither has been a problem in practice.
+
+Installing it means unpacking the VSIX into the per-user Extension SDK folder:
+
+    %LOCALAPPDATA%\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Telegram.Td.UWP\1.0
+
+A VSIX is a zip. Unpacking it there works and needs no administrator, which running the
+installer does.
+
 ## Telegram.Td.UWP-1.8.24.vsix (Git LFS) — CURRENT
 
 TDLib 1.8.24 built from source as UWP Extension SDK, same identity `Telegram.Td.UWP,
