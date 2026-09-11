@@ -15,11 +15,10 @@ flags on it are optional and none of them are obvious.
 - **`Unigram/Unigram/Constants.Secret.cs`**, which is gitignored and stays that way. Copy
   `Constants.Secret.example.cs` over it and fill in an api_id/api_hash of your own; the
   build does not compile without the file.
-- **A signing key at `Unigram/Unigram/Unigram_DevKey.pfx`**, gitignored for the same kind
-  of reason: a signing key in a repository is a key everybody has, and a package signed
-  with it is one every phone that trusted an earlier build will install without asking.
-  Make your own, and give it the subject the manifest already names as its publisher --
-  packaging fails on a mismatch:
+- **A signing key of your own.** `Unigram_StoreKey.pfx` is committed and
+  password-protected, so a fresh clone cannot sign with it. Make one, point
+  `PackageCertificateKeyFile` at it **without committing that change**, and give it the
+  subject the manifest already names as its publisher -- packaging fails on a mismatch:
 
   ```powershell
   $cert = New-SelfSignedCertificate -Type Custom `
