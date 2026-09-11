@@ -1099,7 +1099,13 @@ namespace Unigram.Views
             }
             else if (content is MessageService service)
             {
-                if (args.Item is MessageViewModel viewModel && (viewModel.Content is MessageChatUpgradeFrom || viewModel.Content is MessageChatUpgradeTo))
+                // The upgrade notice is hidden only while the older history sits right
+                // above it, where it would be a seam drawn across a conversation that no
+                // longer has one. With nothing above it, it is the only thing saying the
+                // group did not begin here, and tapping it opens the rest.
+                if (args.Item is MessageViewModel viewModel
+                    && (viewModel.Content is MessageChatUpgradeFrom || viewModel.Content is MessageChatUpgradeTo)
+                    && ViewModel.MigratedChat != null)
                 {
                     service.Visibility = Visibility.Collapsed;
                 }

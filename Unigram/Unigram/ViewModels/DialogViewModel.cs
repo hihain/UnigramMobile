@@ -248,6 +248,14 @@ namespace Unigram.ViewModels
         }
 
         protected Chat _migratedChat;
+
+        /// <summary>
+        /// The group this supergroup was upgraded from, once the top of this history has
+        /// been joined to the end of that one. Null the rest of the time, and it has to be
+        /// put back to null whenever the list is rebuilt or the chat changes: it is what
+        /// LoadNextSliceAsync reads to decide which chat the next slice comes from, and a
+        /// stale one sends the scroll into a conversation it has nothing to do with.
+        /// </summary>
         public Chat MigratedChat
         {
             get => _migratedChat;
@@ -620,6 +628,11 @@ namespace Unigram.ViewModels
             }
         }
 
+        // Set for the duration of a load and read by every other one as "somebody is
+        // already at it", so each of the four loads below clears them in a finally. An
+        // exception that walked past a clear used to leave the chat unable to load anything
+        // at all until the app was restarted: no more history, and no new message either,
+        // because InsertMessage waits on the same _loadMoreLock and wants the flags down.
         protected bool _isLoadingNextSlice;
         protected bool _isLoadingPreviousSlice;
 
@@ -660,93 +673,83 @@ namespace Unigram.ViewModels
 
                 System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadNextSliceAsync");
 
-                //var first = Items.FirstOrDefault(x => x.Id != 0);
-                //if (first is TLMessage firstMessage && firstMessage.Media is TLMessageMediaGroup groupMedia)
-                //{
-                //    first = groupMedia.Layout.Messages.FirstOrDefault();
-                //}
-
-                //var maxId = first?.Id ?? int.MaxValue;
-                var maxId = Items.FirstOrDefault(x => x != null && x.Id != 0)?.Id;
-                if (maxId == null)
+                try
                 {
-                    _isLoadingNextSlice = false;
-                    IsLoading = false;
+                    //var first = Items.FirstOrDefault(x => x.Id != 0);
+                    //if (first is TLMessage firstMessage && firstMessage.Media is TLMessageMediaGroup groupMedia)
+                    //{
+                    //    first = groupMedia.Layout.Messages.FirstOrDefault();
+                    //}
 
-                    return;
-                }
-
-                System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadNextSliceAsync: Begin request");
-
-                Function func;
-                if (_threadId != 0)
-                {
-                    func = new GetMessageThreadHistory(chat.Id, _threadId, maxId.Value, 0, 50);
-                }
-                else if (_type == DialogType.Pinned)
-                {
-                    func = new SearchChatMessages(chat.Id, string.Empty, null, maxId.Value, 0, 50, new SearchMessagesFilterPinned(), 0, null);
-                }
-                else
-                {
-                    func = new GetChatHistory(chat.Id, maxId.Value, 0, 50, false);
-                }
-
-                var response = await ProtoService.SendAsync(func);
-                if (response is FoundChatMessages foundChatMessages)
-                {
-                    response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
-                }
-
-                if (response is Messages messages)
-                {
-                    if (_chat?.Id != chat.Id)
+                    //var maxId = first?.Id ?? int.MaxValue;
+                    var maxId = Items.FirstOrDefault(x => x != null && x.Id != 0)?.Id;
+                    if (maxId == null)
                     {
-                        _isLoadingNextSlice = false;
-                        IsLoading = false;
-
                         return;
                     }
 
-                    if (messages.MessagesValue.Count > 0)
+                    System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadNextSliceAsync: Begin request");
+
+                    Function func;
+                    if (_threadId != 0)
                     {
-                        SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, force);
-                        Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        func = new GetMessageThreadHistory(chat.Id, _threadId, maxId.Value, 0, 50);
+                    }
+                    else if (_type == DialogType.Pinned)
+                    {
+                        func = new SearchChatMessages(chat.Id, string.Empty, null, maxId.Value, 0, 50, new SearchMessagesFilterPinned(), 0, null);
+                    }
+                    else
+                    {
+                        func = new GetChatHistory(chat.Id, maxId.Value, 0, 50, false);
                     }
 
-                    var replied = messages.MessagesValue.OrderByDescending(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
-                    await ProcessMessagesAsync(chat, replied);
-
-                    foreach (var message in replied)
+                    var response = await ProtoService.SendAsync(func);
+                    if (response is FoundChatMessages foundChatMessages)
                     {
-                        if (message.Content is MessageChatUpgradeFrom chatUpgradeFrom)
+                        response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
+                    }
+
+                    if (response is Messages messages)
+                    {
+                        if (_chat?.Id != chat.Id)
                         {
-                            var chatUpgradeTo = await PrepareMigratedAsync(chatUpgradeFrom.BasicGroupId);
-                            if (chatUpgradeTo != null)
-                            {
-                                Items.Insert(0, chatUpgradeTo);
-                            }
+                            return;
                         }
-                        else
+
+                        if (messages.MessagesValue.Count > 0)
+                        {
+                            SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, force);
+                            Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        }
+
+                        var replied = messages.MessagesValue.OrderByDescending(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
+                        await ProcessMessagesAsync(chat, replied);
+
+                        foreach (var message in replied)
                         {
                             Items.Insert(0, message);
+
+                            //var index = InsertMessageInOrder(Messages, message);
                         }
 
-                        //var index = InsertMessageInOrder(Messages, message);
+                        IsLastSliceLoaded = replied.IsEmpty();
+
+                        if (replied.IsEmpty())
+                        {
+                            await AddHeaderAsync();
+                        }
+
+                        await TryJoinMigratedAsync();
                     }
 
-                    IsLastSliceLoaded = replied.IsEmpty();
-
-                    if (replied.IsEmpty())
-                    {
-                        await AddHeaderAsync();
-                    }
+                    LoadPinnedMessagesSliceAsync(maxId.Value, VerticalAlignment.Top);
                 }
-
-                _isLoadingNextSlice = false;
-                IsLoading = false;
-
-                LoadPinnedMessagesSliceAsync(maxId.Value, VerticalAlignment.Top);
+                finally
+                {
+                    _isLoadingNextSlice = false;
+                    IsLoading = false;
+                }
             }
         }
 
@@ -784,98 +787,97 @@ namespace Unigram.ViewModels
                 _isLoadingPreviousSlice = true;
                 IsLoading = true;
 
-                //if (last)
-                //{
-                //    UpdatingScrollMode = force ? UpdatingScrollMode.ForceKeepLastItemInView : UpdatingScrollMode.KeepLastItemInView;
-                //}
-                //else
-                //{
-                //    UpdatingScrollMode = force ? UpdatingScrollMode.ForceKeepItemsInView : UpdatingScrollMode.KeepItemsInView;
-                //}
-
-                System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadPreviousSliceAsync");
-
-                var maxId = Items.LastOrDefault(x => x != null && x.Id != 0)?.Id;
-                if (maxId == null)
+                try
                 {
-                    _isLoadingPreviousSlice = false;
-                    IsLoading = false;
+                    //if (last)
+                    //{
+                    //    UpdatingScrollMode = force ? UpdatingScrollMode.ForceKeepLastItemInView : UpdatingScrollMode.KeepLastItemInView;
+                    //}
+                    //else
+                    //{
+                    //    UpdatingScrollMode = force ? UpdatingScrollMode.ForceKeepItemsInView : UpdatingScrollMode.KeepItemsInView;
+                    //}
 
-                    return;
-                }
+                    System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadPreviousSliceAsync");
 
-                //for (int i = 0; i < Messages.Count; i++)
-                //{
-                //    if (Messages[i].Id != 0 && Messages[i].Id < maxId)
-                //    {
-                //        maxId = Messages[i].Id;
-                //    }
-                //}
-
-                Function func;
-                if (_threadId != 0)
-                {
-                    func = new GetMessageThreadHistory(chat.Id, _threadId, maxId.Value, -49, 50);
-                }
-                else if (_type == DialogType.Pinned)
-                {
-                    func = new SearchChatMessages(chat.Id, string.Empty, null, maxId.Value, -49, 50, new SearchMessagesFilterPinned(), 0, null);
-                }
-                else
-                {
-                    func = new GetChatHistory(chat.Id, maxId.Value, -49, 50, false);
-                }
-
-                var response = await ProtoService.SendAsync(func);
-                if (response is FoundChatMessages foundChatMessages)
-                {
-                    response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
-                }
-
-                if (response is Messages messages)
-                {
-                    if (_chat?.Id != chat.Id)
+                    var maxId = Items.LastOrDefault(x => x != null && x.Id != 0)?.Id;
+                    if (maxId == null)
                     {
-                        _isLoadingPreviousSlice = false;
-                        IsLoading = false;
-
                         return;
                     }
 
-                    if (messages.MessagesValue.Any(x => !Items.ContainsKey(x.Id)))
+                    //for (int i = 0; i < Messages.Count; i++)
+                    //{
+                    //    if (Messages[i].Id != 0 && Messages[i].Id < maxId)
+                    //    {
+                    //        maxId = Messages[i].Id;
+                    //    }
+                    //}
+
+                    Function func;
+                    if (_threadId != 0)
                     {
-                        SetScrollMode(ItemsUpdatingScrollMode.KeepItemsInView, true);
-                        Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepItemsInView");
+                        func = new GetMessageThreadHistory(chat.Id, _threadId, maxId.Value, -49, 50);
+                    }
+                    else if (_type == DialogType.Pinned)
+                    {
+                        func = new SearchChatMessages(chat.Id, string.Empty, null, maxId.Value, -49, 50, new SearchMessagesFilterPinned(), 0, null);
                     }
                     else
                     {
-                        SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
-                        Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        func = new GetChatHistory(chat.Id, maxId.Value, -49, 50, false);
                     }
 
-                    var added = false;
-
-                    var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
-                    await ProcessMessagesAsync(chat, replied);
-
-                    foreach (var message in replied)
+                    var response = await ProtoService.SendAsync(func);
+                    if (response is FoundChatMessages foundChatMessages)
                     {
-                        var index = InsertMessageInOrder(Items, message);
-                        if (index > -1)
+                        response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
+                    }
+
+                    if (response is Messages messages)
+                    {
+                        if (_chat?.Id != chat.Id)
                         {
-                            added = true;
+                            return;
                         }
 
-                        //Messages.Add(message);
+                        if (messages.MessagesValue.Any(x => !Items.ContainsKey(x.Id)))
+                        {
+                            SetScrollMode(ItemsUpdatingScrollMode.KeepItemsInView, true);
+                            Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepItemsInView");
+                        }
+                        else
+                        {
+                            SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
+                            Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        }
+
+                        var added = false;
+
+                        var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
+                        await ProcessMessagesAsync(chat, replied);
+
+                        foreach (var message in replied)
+                        {
+                            var index = InsertMessageInOrder(Items, message);
+                            if (index > -1)
+                            {
+                                added = true;
+                            }
+
+                            //Messages.Add(message);
+                        }
+
+                        IsFirstSliceLoaded = !added || IsEndReached();
                     }
 
-                    IsFirstSliceLoaded = !added || IsEndReached();
+                    LoadPinnedMessagesSliceAsync(maxId.Value, VerticalAlignment.Bottom);
                 }
-
-                _isLoadingPreviousSlice = false;
-                IsLoading = false;
-
-                LoadPinnedMessagesSliceAsync(maxId.Value, VerticalAlignment.Bottom);
+                finally
+                {
+                    _isLoadingPreviousSlice = false;
+                    IsLoading = false;
+                }
             }
         }
 
@@ -951,39 +953,152 @@ namespace Unigram.ViewModels
             }
         }
 
-        private async Task<MessageViewModel> PrepareMigratedAsync(long basicGroupId)
+        /// <summary>
+        /// Puts the end of the older group's history where the upgrade notice is, so that
+        /// the conversation reads as the one thing it is.
+        ///
+        /// What it keys on is where that notice sits, and that is the whole point of it
+        /// being its own method. Joining used to happen only when a slice came back from
+        /// the server with the notice in it -- but the notice arrives in the very first
+        /// fill whenever the supergroup's own history is short enough to fit, or has been
+        /// read once already and is answered out of the cache. In that case no slice ever
+        /// carries it, nothing goes looking for what is above it, and the notice stays put.
+        /// The same group joined on one visit and not on the next for that reason, and not
+        /// because anything was racing.
+        ///
+        /// The caller holds the lock and the loading flags are clear by then: the requests
+        /// below are slow, and a flag left set would stop the chat loading anything at all.
+        /// </summary>
+        private async Task TryJoinMigratedAsync()
         {
-            //if (_migratedChat != null)
-            //{
-            //    return null;
-            //}
-
             var chat = _chat;
-            if (chat == null)
+            if (chat == null || _migratedChat != null)
+            {
+                return;
+            }
+
+            var notice = Items.FirstOrDefault(x => x != null && x.Content is MessageChatUpgradeFrom);
+            if (notice == null || !(notice.Content is MessageChatUpgradeFrom chatUpgradeFrom))
+            {
+                return;
+            }
+
+            IList<MessageViewModel> migrated = null;
+
+            try
+            {
+                migrated = await PrepareMigratedAsync(chatUpgradeFrom.BasicGroupId);
+            }
+            catch (Exception ex)
+            {
+                // Reaching the older group is not worth a chat for.
+                Logs.Logger.Error(Logs.Target.Chat, "Migrated history: " + ex);
+            }
+
+            if (migrated == null || migrated.Count == 0 || _chat?.Id != chat.Id)
+            {
+                // Nothing above it, so the notice stays, and it is then the only thing
+                // saying the group did not begin here. Tapping it opens the older group.
+                return;
+            }
+
+            var index = Items.IndexOf(notice);
+            if (index < 0)
+            {
+                return;
+            }
+
+            // A date header the load put above the notice belongs to the day of the upgrade,
+            // and older messages are about to go above it. The collection writes the
+            // separators the joined history needs on its own, as it does for every insert.
+            if (index > 0 && Items[index - 1].Id == 0 && Items[index - 1].Content is MessageHeaderDate)
+            {
+                Items.RemoveAt(--index);
+            }
+
+            // With the older messages above it the notice would be a seam drawn across a
+            // conversation that no longer has one.
+            Items.RemoveAt(index);
+
+            // Newest first, and each one goes in at the same place, so the oldest ends up
+            // on top.
+            foreach (var older in migrated)
+            {
+                Items.Insert(index, older);
+            }
+        }
+
+        /// <summary>
+        /// The end of the history the group had before it was upgraded, newest first. Null
+        /// or empty when there is no such group or it cannot be read.
+        ///
+        /// Everything here talks to the network, and none of it is worth making the messages
+        /// somebody is waiting for arrive any later than they otherwise would.
+        /// </summary>
+        private async Task<IList<MessageViewModel>> PrepareMigratedAsync(long basicGroupId)
+        {
+            var chat = _chat;
+            var supergroup = CacheService.GetSupergroup(chat);
+            if (chat == null || supergroup == null)
             {
                 return null;
             }
 
-            var supergroup = CacheService.GetSupergroup(chat);
-            if (supergroup == null)
+            // Where the old group ends is in the supergroup full info. It is asked for when
+            // the chat is opened, but that is a send-and-forget, so whether it has arrived
+            // by the time somebody scrolls this far is a race -- and it was a race this lost
+            // often enough that the same group worked on one visit and not on the next. Ask
+            // and wait when it is not there. This runs while scrolling up, where waiting
+            // costs nothing that is already on screen.
+            var fullInfo = CacheService.GetSupergroupFull(chat);
+            if (fullInfo == null)
+            {
+                fullInfo = await ProtoService.SendAsync(
+                    new GetSupergroupFullInfo(supergroup.Id)) as SupergroupFullInfo;
+            }
+
+            if (fullInfo == null
+                || fullInfo.UpgradedFromBasicGroupId != basicGroupId
+                || fullInfo.UpgradedFromMaxMessageId == 0)
             {
                 return null;
             }
 
             var response = await ProtoService.SendAsync(new CreateBasicGroupChat(basicGroupId, false));
-            if (response is Chat migrated)
+            if (!(response is Chat migrated))
             {
-                var messages = await ProtoService.SendAsync(new GetChatHistory(migrated.Id, 0, 0, 1, false)) as Messages;
-                if (messages != null && messages.MessagesValue.Count > 0)
-                {
-                    MigratedChat = migrated;
-                    IsLastSliceLoaded = false;
-
-                    return _messageFactory.Create(this, messages.MessagesValue[0]);
-                }
+                return null;
             }
 
-            return null;
+            // Anchored at the last message the old group ever had, and asking for a slice
+            // rather than for one message. Both halves of that matter, and both were wrong
+            // before: from_message_id 0 means from the last message, which TDLib does not
+            // know for a chat whose history it has never loaded, and a limit of 1 invites
+            // the documented answer that TDLib chooses how many messages to return and may
+            // return none. Either was enough to make this look like a feature nobody had
+            // ever written.
+            var messages = await ProtoService.SendAsync(
+                new GetChatHistory(migrated.Id, fullInfo.UpgradedFromMaxMessageId, 0, 50, false)) as Messages;
+
+            if (messages == null || messages.MessagesValue.Count == 0)
+            {
+                return null;
+            }
+
+            // The whole slice, not just the message on the boundary. Handing back one
+            // message put a single hidden item at the top and then waited for another
+            // scroll to fetch what was behind it -- a scroll that never comes, because
+            // nothing visible moved. The messages have been fetched; show them.
+            var older = messages.MessagesValue
+                .Select(x => _messageFactory.Create(this, x))
+                .ToList();
+
+            await ProcessMessagesAsync(migrated, older);
+
+            MigratedChat = migrated;
+            IsLastSliceLoaded = false;
+
+            return older;
         }
 
         private List<long> _mentions = new List<long>();
@@ -1321,165 +1436,176 @@ namespace Unigram.ViewModels
 
                 System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadMessageSliceAsync");
 
-                Function func;
-                if (_threadId != 0)
+                try
                 {
-                    if (_thread.Messages.Any(x => x.Id == maxId))
+                    Function func;
+                    if (_threadId != 0)
                     {
-                        func = new GetMessageThreadHistory(chat.Id, _threadId, 1, -25, 50);
+                        if (_thread.Messages.Any(x => x.Id == maxId))
+                        {
+                            func = new GetMessageThreadHistory(chat.Id, _threadId, 1, -25, 50);
+                        }
+                        else
+                        {
+                            func = new GetMessageThreadHistory(chat.Id, _threadId, maxId, -25, 50);
+                        }
+                    }
+                    else if (_type == DialogType.Pinned)
+                    {
+                        func = new SearchChatMessages(chat.Id, string.Empty, null, maxId, -25, 50, new SearchMessagesFilterPinned(), 0, null);
                     }
                     else
                     {
-                        func = new GetMessageThreadHistory(chat.Id, _threadId, maxId, -25, 50);
-                    }
-                }
-                else if (_type == DialogType.Pinned)
-                {
-                    func = new SearchChatMessages(chat.Id, string.Empty, null, maxId, -25, 50, new SearchMessagesFilterPinned(), 0, null);
-                }
-                else
-                {
-                    func = new GetChatHistory(chat.Id, maxId, -25, 50, false);
-                }
-
-                var send = ProtoService.SendAsync(func);
-
-                if (alignment != VerticalAlignment.Center)
-                {
-                    var wait = await Task.WhenAny(send, Task.Delay(200));
-                    if (wait != send)
-                    {
-                        Items.Clear();
-                    }
-                }
-
-                var response = await send;
-                if (response is FoundChatMessages foundChatMessages)
-                {
-                    response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
-                }
-
-                if (response is Messages messages)
-                {
-                    if (_chat?.Id != chat.Id)
-                    {
-                        _isLoadingNextSlice = false;
-                        _isLoadingPreviousSlice = false;
-                        IsLoading = false;
-
-                        return;
+                        func = new GetChatHistory(chat.Id, maxId, -25, 50, false);
                     }
 
-                    _groupedMessages.Clear();
+                    var send = ProtoService.SendAsync(func);
 
-                    if (messages.MessagesValue.Count > 0)
+                    if (alignment != VerticalAlignment.Center)
                     {
-                        SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
-                        Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
-                    }
-
-                    var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
-                    await ProcessMessagesAsync(chat, replied);
-
-                    long lastReadMessageId;
-                    long lastMessageId;
-
-                    var thread = _thread;
-                    if (thread != null)
-                    {
-                        lastReadMessageId = thread.ReplyInfo?.LastReadInboxMessageId ?? long.MaxValue;
-                        lastMessageId = thread.ReplyInfo?.LastMessageId ?? long.MaxValue;
-                    }
-                    else
-                    {
-                        lastReadMessageId = chat.LastReadInboxMessageId;
-                        lastMessageId = chat.LastMessage?.Id ?? long.MaxValue;
-                    }
-
-                    // If we're loading from the last read message
-                    // then we want to skip it to align first unread message at top
-                    if (lastReadMessageId != lastMessageId)
-                    {
-                        var target = default(MessageViewModel);
-                        var index = -1;
-
-                        for (int i = 0; i < replied.Count; i++)
+                        var wait = await Task.WhenAny(send, Task.Delay(200));
+                        if (wait != send)
                         {
-                            var current = replied[i];
-                            if (current.Id > lastReadMessageId)
+                            Items.Clear();
+                        }
+                    }
+
+                    var response = await send;
+                    if (response is FoundChatMessages foundChatMessages)
+                    {
+                        response = new Messages(foundChatMessages.TotalCount, foundChatMessages.Messages);
+                    }
+
+                    if (response is Messages messages)
+                    {
+                        if (_chat?.Id != chat.Id)
+                        {
+                            return;
+                        }
+
+                        _groupedMessages.Clear();
+
+                        if (messages.MessagesValue.Count > 0)
+                        {
+                            SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
+                            Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        }
+
+                        var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
+                        await ProcessMessagesAsync(chat, replied);
+
+                        long lastReadMessageId;
+                        long lastMessageId;
+
+                        var thread = _thread;
+                        if (thread != null)
+                        {
+                            lastReadMessageId = thread.ReplyInfo?.LastReadInboxMessageId ?? long.MaxValue;
+                            lastMessageId = thread.ReplyInfo?.LastMessageId ?? long.MaxValue;
+                        }
+                        else
+                        {
+                            lastReadMessageId = chat.LastReadInboxMessageId;
+                            lastMessageId = chat.LastMessage?.Id ?? long.MaxValue;
+                        }
+
+                        // If we're loading from the last read message
+                        // then we want to skip it to align first unread message at top
+                        if (lastReadMessageId != lastMessageId)
+                        {
+                            var target = default(MessageViewModel);
+                            var index = -1;
+
+                            for (int i = 0; i < replied.Count; i++)
                             {
-                                if (target == null && !current.IsOutgoing)
+                                var current = replied[i];
+                                if (current.Id > lastReadMessageId)
                                 {
-                                    target = current;
-                                    index = i;
-                                }
-                                else if (current.IsOutgoing)
-                                {
-                                    target = current;
-                                    index = -1;
+                                    if (target == null && !current.IsOutgoing)
+                                    {
+                                        target = current;
+                                        index = i;
+                                    }
+                                    else if (current.IsOutgoing)
+                                    {
+                                        target = current;
+                                        index = -1;
+                                    }
                                 }
                             }
+
+                            if (target != null)
+                            {
+                                if (index > 0)
+                                {
+                                    replied.Insert(index, _messageFactory.Create(this, new Message(0, target.SenderId, target.ChatId, null, null, target.IsOutgoing, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, target.IsChannelPost, false, false, target.Date, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderUnread(), null)));
+                                }
+                                else if (maxId == lastReadMessageId)
+                                {
+                                    Logs.Logger.Debug(Logs.Target.Chat, "Looking for first unread message, can't find it");
+                                }
+
+                                if (maxId == lastReadMessageId)
+                                {
+                                    maxId = target.Id;
+                                    pixel = 28 + 48 + 4;
+                                }
+                            }
                         }
 
-                        if (target != null)
+                        // If we're loading the last message and it has been read already
+                        // then we want to align it at bottom, as it might be taller than the window height
+                        if (maxId == lastReadMessageId && maxId == lastMessageId && alignment != VerticalAlignment.Center)
                         {
-                            if (index > 0)
-                            {
-                                replied.Insert(index, _messageFactory.Create(this, new Message(0, target.SenderId, target.ChatId, null, null, target.IsOutgoing, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, target.IsChannelPost, false, false, target.Date, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderUnread(), null)));
-                            }
-                            else if (maxId == lastReadMessageId)
-                            {
-                                Logs.Logger.Debug(Logs.Target.Chat, "Looking for first unread message, can't find it");
-                            }
-
-                            if (maxId == lastReadMessageId)
-                            {
-                                maxId = target.Id;
-                                pixel = 28 + 48 + 4;
-                            }
+                            alignment = VerticalAlignment.Bottom;
+                            pixel = null;
                         }
-                    }
 
-                    // If we're loading the last message and it has been read already
-                    // then we want to align it at bottom, as it might be taller than the window height
-                    if (maxId == lastReadMessageId && maxId == lastMessageId && alignment != VerticalAlignment.Center)
-                    {
-                        alignment = VerticalAlignment.Bottom;
-                        pixel = null;
-                    }
+                        // Deliberately not joining the older group on here. This is the load
+                        // the chat cannot open without, and the one place where a slow or
+                        // unanswered request costs the reader the messages they came for. The
+                        // upgrade notice stays visible at the top, and scrolling one further
+                        // is what goes and gets the rest.
+                        //
+                        // The field goes with the list it belonged to: this replaces every item,
+                        // and leaving it set would send the next scroll upwards into the old
+                        // group carrying a message id out of this one.
+                        MigratedChat = null;
 
-                    if (replied.Count > 0 && replied[0].Content is MessageChatUpgradeFrom chatUpgradeFrom)
-                    {
-                        var chatUpgradeTo = await PrepareMigratedAsync(chatUpgradeFrom.BasicGroupId);
-                        if (chatUpgradeTo != null)
+                        Items.ReplaceWith(replied);
+
+                        IsLastSliceLoaded = null;
+                        IsFirstSliceLoaded = IsEndReached();
+
+                        if (_thread != null && _thread.Messages.Any(x => x.Id == maxId))
                         {
-                            replied[0] = chatUpgradeTo;
+                            await AddHeaderAsync();
+                        }
+                        else if (replied.IsEmpty())
+                        {
+                            await AddHeaderAsync();
                         }
                     }
 
-                    Items.ReplaceWith(replied);
-
-                    IsLastSliceLoaded = null;
-                    IsFirstSliceLoaded = IsEndReached();
-
-                    if (_thread != null && _thread.Messages.Any(x => x.Id == maxId))
-                    {
-                        await AddHeaderAsync();
-                    }
-                    else if (replied.IsEmpty())
-                    {
-                        await AddHeaderAsync();
-                    }
+                    LoadPinnedMessagesSliceAsync(maxId, VerticalAlignment.Center);
                 }
-
-                _isLoadingNextSlice = false;
-                _isLoadingPreviousSlice = false;
-                IsLoading = false;
-
-                LoadPinnedMessagesSliceAsync(maxId, VerticalAlignment.Center);
+                finally
+                {
+                    _isLoadingNextSlice = false;
+                    _isLoadingPreviousSlice = false;
+                    IsLoading = false;
+                }
             }
 
             await LoadMessageSliceAsync(previousId, maxId, alignment, pixel, direction, disableAnimation, true);
+
+            // Deliberately after the load and outside it. This is the load the chat cannot
+            // open without, and the messages somebody is waiting for are on screen by now;
+            // the flags are clear, so nothing below can leave the chat unable to load again.
+            using (await _loadMoreLock.WaitAsync())
+            {
+                await TryJoinMigratedAsync();
+            }
         }
 /* // TODO!
         private async Task AddSponsoredMessagesAsync()
@@ -1521,35 +1647,40 @@ namespace Unigram.ViewModels
 
                 System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadScheduledSliceAsync");
 
-                var response = await ProtoService.SendAsync(new GetChatScheduledMessages(chat.Id));
-                if (response is Messages messages)
+                try
                 {
-                    _groupedMessages.Clear();
-
-                    if (messages.MessagesValue.Count > 0)
+                    var response = await ProtoService.SendAsync(new GetChatScheduledMessages(chat.Id));
+                    if (response is Messages messages)
                     {
-                        SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
-                        Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        _groupedMessages.Clear();
+
+                        if (messages.MessagesValue.Count > 0)
+                        {
+                            SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
+                            Logs.Logger.Debug(Logs.Target.Chat, "Setting scroll mode to KeepLastItemInView");
+                        }
+
+                        var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
+                        await ProcessMessagesAsync(chat, replied);
+
+                        var target = replied.FirstOrDefault();
+                        if (target != null)
+                        {
+                            replied.Insert(0, _messageFactory.Create(this, new Message(0, target.SenderId, target.ChatId, null, target.SchedulingState, target.IsOutgoing, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, target.IsChannelPost, false, false, target.Date, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderDate(), null)));
+                        }
+
+                        Items.ReplaceWith(replied);
+
+                        IsLastSliceLoaded = true;
+                        IsFirstSliceLoaded = true;
                     }
-
-                    var replied = messages.MessagesValue.OrderBy(x => x.Id).Select(x => _messageFactory.Create(this, x)).ToList();
-                    await ProcessMessagesAsync(chat, replied);
-
-                    var target = replied.FirstOrDefault();
-                    if (target != null)
-                    {
-                        replied.Insert(0, _messageFactory.Create(this, new Message(0, target.SenderId, target.ChatId, null, target.SchedulingState, target.IsOutgoing, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, target.IsChannelPost, false, false, target.Date, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderDate(), null)));
-                    }
-
-                    Items.ReplaceWith(replied);
-
-                    IsLastSliceLoaded = true;
-                    IsFirstSliceLoaded = true;
                 }
-
-                _isLoadingNextSlice = false;
-                _isLoadingPreviousSlice = false;
-                IsLoading = false;
+                finally
+                {
+                    _isLoadingNextSlice = false;
+                    _isLoadingPreviousSlice = false;
+                    IsLoading = false;
+                }
             }
         }
 
@@ -2388,6 +2519,7 @@ namespace Unigram.ViewModels
 #endif
 
             ProtoService.Send(new CloseChat(chat.Id));
+            MigratedChat = null;
 
             try
             {

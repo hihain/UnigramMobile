@@ -1555,7 +1555,26 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageServiceCommand { get; }
         private async void MessageServiceExecute(MessageViewModel message)
         {
-            if (message.Content is MessageHeaderDate)
+            // Reachable whenever the older history is not attached above this notice, which
+            // is the state it is shown in. Opening the old group as a chat of its own is
+            // what the desktop and Telegram X clients do in every case.
+            if (message.Content is MessageChatUpgradeFrom chatUpgradeFrom)
+            {
+                var response = await ProtoService.SendAsync(new CreateBasicGroupChat(chatUpgradeFrom.BasicGroupId, false));
+                if (response is Chat migrated)
+                {
+                    NavigationService.NavigateToChat(migrated);
+                }
+            }
+            else if (message.Content is MessageChatUpgradeTo chatUpgradeTo)
+            {
+                var response = await ProtoService.SendAsync(new CreateSupergroupChat(chatUpgradeTo.SupergroupId, false));
+                if (response is Chat migrated)
+                {
+                    NavigationService.NavigateToChat(migrated);
+                }
+            }
+            else if (message.Content is MessageHeaderDate)
             {
                 var date = BindConvert.Current.DateTime(message.Date);
 
