@@ -52,6 +52,7 @@ namespace Unigram.Controls.Chats
             Underline.IsChecked = format.Underline == UnderlineType.Single;
             Monospace.IsChecked = string.Equals(format.Name, "Consolas", StringComparison.OrdinalIgnoreCase);
             Spoiler.IsChecked = format.BackgroundColor == Colors.Gray;
+            Quote.IsChecked = format.ForegroundColor == FormattedTextBox.QuoteColor;
         }
 
         private void Bold_Click(object sender, RoutedEventArgs e)
@@ -82,6 +83,11 @@ namespace Unigram.Controls.Chats
         private void Spoiler_Click(object sender, RoutedEventArgs e)
         {
             _textBox?.ToggleSpoiler();
+        }
+
+        private void Quote_Click(object sender, RoutedEventArgs e)
+        {
+            _textBox?.ToggleQuote();
         }
 
         private void Link_Click(object sender, RoutedEventArgs e)

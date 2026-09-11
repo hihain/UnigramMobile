@@ -109,6 +109,15 @@ namespace Unigram.Common
                 {
                     newRun.Flags = TextStyle.Monospace;
                 }
+                else if (entity.Type is TextEntityTypeBlockQuote)
+                {
+                    // Without a flag of its own this lands in the final else below and is
+                    // drawn as a link that leads nowhere, because Entity_Click has no branch
+                    // for it. Callers that lay quotes out as blocks strip the entity before
+                    // getting here; the ones that cannot -- chat list previews, the composer --
+                    // are better off showing the text plainly.
+                    newRun.Flags = TextStyle.Quote;
+                }
                 else if (entity.Type is TextEntityTypeMentionName)
                 {
                     newRun.Flags = TextStyle.Mention;
@@ -223,6 +232,13 @@ namespace Unigram.Common
 
             foreach (var run in runs)
             {
+                // Outside the monospace/else pair on purpose: a quote can contain a code
+                // span, and folding it into either branch would lose one of the two.
+                if (run.HasFlag(TextStyle.Quote))
+                {
+                    CreateOrMerge(run.Offset, run.Length, results, new TextEntityTypeBlockQuote());
+                }
+
                 if (run.HasFlag(TextStyle.Monospace))
                 {
                     var part = text.Substring(run.Offset, run.Length);
@@ -270,7 +286,7 @@ namespace Unigram.Common
 
         private static void CreateOrMerge(int offset, int length, IList<TextEntity> entities, TextEntityType type)
         {
-            var last = entities.LastOrDefault(x => x.Length + x.Offset == offset && AreEquals(x.Type, type));
+            var last = entities.LastOrDefault(x => x.Length + x.Offset == offset && AreEqual(x.Type, type));
             if (last != null)
             {
                 last.Length += length;
@@ -281,15 +297,27 @@ namespace Unigram.Common
             }
         }
 
-        private static bool AreEquals(TextEntityType x, TextEntityType y)
+        /// <summary>
+        /// Whether two entity types are the same thing, which for the two that carry a
+        /// destination means the same destination and not merely the same kind. Public
+        /// because whoever builds the runs has to ask it as well: a run is a stretch of
+        /// text with one entity on it, and two links that touch are two runs however alike
+        /// their formatting looks.
+        /// </summary>
+        public static bool AreEqual(TextEntityType x, TextEntityType y)
         {
+            if (x == null || y == null)
+            {
+                return x == y;
+            }
+
             if (x is TextEntityTypeTextUrl xTextUrl && y is TextEntityTypeTextUrl yTextUrl)
             {
                 return string.Equals(xTextUrl.Url, yTextUrl.Url, StringComparison.OrdinalIgnoreCase);
             }
             else if (x is TextEntityTypeMentionName xMentionName && y is TextEntityTypeMentionName yMentionName)
             {
-                return int.Equals(xMentionName.UserId, yMentionName.UserId);
+                return xMentionName.UserId == yMentionName.UserId;
             }
 
             return x.GetType() == y.GetType();
@@ -306,6 +334,7 @@ namespace Unigram.Common
         Underline = 16,
         Spoiler = 32,
         Mention = 64,
-        Url = 128
+        Url = 128,
+        Quote = 256
     }
 }

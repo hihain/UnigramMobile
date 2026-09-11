@@ -37,6 +37,23 @@ namespace Unigram.Common
 {
     public static class Extensions
     {
+        /// <summary>
+        /// A wash of a brush: its colour, mostly transparent. The box behind a quote is made
+        /// this way rather than from a fixed grey, which would disappear in one theme or the
+        /// other, and out of the brush the bar beside it uses, so the two are plainly one
+        /// object.
+        /// </summary>
+        public static Brush Tint(this Brush brush, double opacity)
+        {
+            var solid = brush as SolidColorBrush;
+            if (solid == null)
+            {
+                return null;
+            }
+
+            return new SolidColorBrush(solid.Color) { Opacity = opacity };
+        }
+
         public static async Task<StorageMedia> PickSingleMediaAsync(this FileOpenPicker picker)
         {
             var file = await picker.PickSingleFileAsync();

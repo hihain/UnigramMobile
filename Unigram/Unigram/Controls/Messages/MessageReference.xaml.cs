@@ -2,8 +2,10 @@
 using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.ViewModels;
+using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 
 namespace Unigram.Controls.Messages
@@ -25,6 +27,16 @@ namespace Unigram.Controls.Messages
 
             Label.MaxLines = quote != null ? 5 : 2;
             MessageLabel.FontStyle = quote != null ? Windows.UI.Text.FontStyle.Italic : Windows.UI.Text.FontStyle.Normal;
+            QuoteMark.Visibility = quote != null ? Visibility.Visible : Visibility.Collapsed;
+
+            // The same box a quote inside a message gets, washed out of the bar's own colour,
+            // and given to every reply rather than only the ones carrying a quote: a reply is
+            // a quotation too, it just has no quoted text of its own to mark or to italicise.
+            // Read off the control rather than the app resources, because an outgoing bubble
+            // overrides that brush for everything inside it, and falling back to a transparent
+            // brush rather than none so the empty parts go on taking taps.
+            QuoteBackground.Background = LayoutRoot.BorderBrush.Tint(0.18)
+                ?? new SolidColorBrush(Colors.Transparent);
         }
 
         private void ApplyQuote()
@@ -39,7 +51,9 @@ namespace Unigram.Controls.Messages
                 ServiceLabel.Text += ", ";
             }
 
-            MessageLabel.Text = "“" + _quote.ReplaceSpoilers() + "”";
+            // No quotation marks around it: the mark in the corner says the same thing,
+            // and saying it twice is what made this look unlike a quote inside a message.
+            MessageLabel.Text = _quote.ReplaceSpoilers();
         }
 
         #region Message

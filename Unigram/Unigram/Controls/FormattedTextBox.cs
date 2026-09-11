@@ -160,6 +160,17 @@ namespace Unigram.Controls
             }
         }
 
+        /// <summary>
+        /// The colour a quoted stretch is painted in the composer, and the mark by which it
+        /// is recognised again on the way out.
+        ///
+        /// A RichEditBox only knows character formats, and a quote is not one. The box
+        /// already solves that twice over: monospace rides on the font name, a spoiler on
+        /// the background colour. This is the same trick on the one property those two leave
+        /// alone, which is why a quote can still contain bold, a link or a spoiler.
+        /// </summary>
+        public static readonly Color QuoteColor = Colors.SteelBlue;
+
         private ChatTextFormatting _formatting;
         public ChatTextFormatting Formatting
         {
@@ -191,9 +202,8 @@ namespace Unigram.Controls
 
             //var clipboard = Clipboard.GetContent();
 
-            var clone = Document.Selection.GetClone();
-            clone.StartOf(TextRangeUnit.Link, true);
-            var mention = TryGetUserId(clone, out long userId);
+            var link = GetSelectedLink();
+            var mention = TryGetUserId(link, out long userId);
 
             var formatting = new MenuFlyoutSubItem { Text = Strings.Additional.Formatting, Icon = new FontIcon { Glyph = "\uE8D3" } }; // Icons.Fontcolor
             CreateFlyoutItem(formatting.Items, length && format.Bold == FormatEffect.Off, ContextBold_Click, Strings.Resources.Bold, new FontIcon { Glyph = Icons.Bold }, VirtualKey.B);
@@ -201,9 +211,10 @@ namespace Unigram.Controls
             CreateFlyoutItem(formatting.Items, length && format.Underline == UnderlineType.None, ContextUnderline_Click, Strings.Resources.Underline, new FontIcon { Glyph = Icons.Underline }, VirtualKey.U);
             CreateFlyoutItem(formatting.Items, length && format.Strikethrough == FormatEffect.Off, ContextStrikethrough_Click, Strings.Resources.Strike, new FontIcon { Glyph = Icons.Strikethrough, FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily }, VirtualKey.X, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
             CreateFlyoutItem(formatting.Items, length && format.Name != "Consolas", ContextMonospace_Click, Strings.Resources.Mono, new FontIcon { Glyph = Icons.Monospace }, VirtualKey.M, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
-            CreateFlyoutItem(formatting.Items, length && format.BackgroundColor != Colors.Gray, ContextSpoiler_Click, Strings.Resources.Spoiler, new FontIcon { Glyph = Icons.Spoiler }, VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
+            CreateFlyoutItem(formatting.Items, length && format.BackgroundColor != Colors.Gray, ContextSpoiler_Click, Strings.Resources.Spoiler, new FontIcon { Glyph = Icons.Spoiler, FontFamily = App.Current.Resources["TelegramIconsFontFamily"] as FontFamily }, VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
+            CreateFlyoutItem(formatting.Items, length && format.ForegroundColor != QuoteColor, ContextQuote_Click, Strings.Additional.QuoteBlock, new FontIcon { Glyph = Icons.QuoteBlock, FontFamily = App.Current.Resources["TelegramIconsFontFamily"] as FontFamily }, VirtualKey.Q, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
             formatting.Items.Add(new MenuFlyoutSeparator());
-            CreateFlyoutItem(formatting.Items, !mention, ContextLink_Click, clone.Link.Length > 0 ? Strings.Additional.EditLink : Strings.Resources.CreateLink, new FontIcon { Glyph = Icons.Link }, VirtualKey.K);
+            CreateFlyoutItem(formatting.Items, !mention, ContextLink_Click, link.Link.Length > 0 ? Strings.Additional.EditLink : Strings.Resources.CreateLink, new FontIcon { Glyph = Icons.Link }, VirtualKey.K);
             formatting.Items.Add(new MenuFlyoutSeparator());
             CreateFlyoutItem(formatting.Items, length && !IsDefault(format), ContextPlain_Click, Strings.Resources.Regular, null, VirtualKey.N, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
             formatting.Items.Add(new MenuFlyoutSeparator());
@@ -363,6 +374,26 @@ namespace Unigram.Controls
             _formatting?.Update(Document.Selection.CharacterFormat);
         }
 
+        public void ToggleQuote()
+        {
+            ContextQuote_Click();
+        }
+
+        private void ContextQuote_Click()
+        {
+            var format = Document.Selection.CharacterFormat;
+
+            // Unlike the spoiler, this does not clear what is already there. A quote is the
+            // one format people routinely put other formatting inside.
+            Document.BatchDisplayUpdates();
+            format.ForegroundColor = format.ForegroundColor == QuoteColor
+                ? Document.GetDefaultCharacterFormat().ForegroundColor
+                : QuoteColor;
+            Document.ApplyDisplayUpdates();
+
+            _formatting?.Update(Document.Selection.CharacterFormat);
+        }
+
         public void CreateLink()
         {
             ContextLink_Click();
@@ -371,10 +402,8 @@ namespace Unigram.Controls
         private async void ContextLink_Click()
         {
             var range = Document.Selection.GetClone();
-            var clone = Document.Selection.GetClone();
-            clone.StartOf(TextRangeUnit.Link, true);
 
-            if (clone.Link.Length > 0)
+            if (GetSelectedLink().Link.Length > 0)
             {
                 range.Expand(TextRangeUnit.Link);
             }
@@ -396,11 +425,23 @@ namespace Unigram.Controls
 
             Document.BatchDisplayUpdates();
             range.SetRange(start, end);
+
+            // Everything over the link is reset to plain below, deliberately, so that a link
+            // looks like a link. That threw the quote marker away with it, cutting a quote
+            // into three around any link put inside one. Noted here and restored after the
+            // link is assigned, because assigning it is the last thing to touch the format.
+            var quoted = range.CharacterFormat.ForegroundColor == QuoteColor;
+
             range.CharacterFormat = Document.GetDefaultCharacterFormat();
 
             range.SetText(end > start ? TextSetOptions.Unlink : TextSetOptions.None, dialog.Text);
             range.SetRange(start, start + dialog.Text.Length);
             range.Link = $"\"{dialog.Link}\"";
+
+            if (quoted)
+            {
+                range.CharacterFormat.ForegroundColor = QuoteColor;
+            }
 
             Document.Selection.SetRange(range.EndPosition, range.EndPosition);
             Document.ApplyDisplayUpdates();
@@ -469,6 +510,27 @@ namespace Unigram.Controls
                 //document.TextScript == format.TextScript &&
                 document.Underline == format.Underline &&
                 document.Weight == format.Weight;
+        }
+
+        /// <summary>
+        /// The one character whose link decides whether the link dialog edits a link that is
+        /// already there or makes a new one: the last selected one, or the one the caret sits
+        /// on when nothing is selected.
+        ///
+        /// It used to ask the selection to walk to the start of its own link. Where two links
+        /// touch there is one position that is both the end of the first and the start of the
+        /// second, and the walk answers with the first. Selecting the second word and asking
+        /// for a link then opened the dialog on the first word's link, with both words as its
+        /// text -- and confirming replaced the pair with a single link. The last selected
+        /// character is inside the selection and so belongs to one link only.
+        /// </summary>
+        private ITextRange GetSelectedLink()
+        {
+            var start = Math.Min(Document.Selection.StartPosition, Document.Selection.EndPosition);
+            var end = Math.Max(Document.Selection.StartPosition, Document.Selection.EndPosition);
+
+            var from = end > start ? end - 1 : start;
+            return Document.GetRange(from, from + 1);
         }
 
         protected bool TryGetUserId(ITextRange range, out long userId)
@@ -655,7 +717,6 @@ namespace Unigram.Controls
             var runs = new List<TextStyleRun>();
 
             var last = default(TextStyleRun);
-            var type = default(TextEntityType);
 
             var hidden = 0;
 
@@ -663,6 +724,13 @@ namespace Unigram.Controls
             {
                 var range = Document.GetRange(i, i + 1);
                 var flags = default(TextStyle);
+
+                // Belongs to this character and no other. It used to live outside the loop
+                // and was cleared only when a run was created, so a link left its type
+                // standing: the run that started where the link ended picked it up, and the
+                // link grew to cover everything after it that shared the surrounding
+                // formatting. Invisible until a quote, or bold, carried on past the link.
+                var type = default(TextEntityType);
 
                 if (string.Equals(range.CharacterFormat.Name, "Consolas", StringComparison.OrdinalIgnoreCase))
                 {
@@ -698,6 +766,10 @@ namespace Unigram.Controls
                     {
                         flags |= TextStyle.Spoiler;
                     }
+                    if (range.CharacterFormat.ForegroundColor == QuoteColor)
+                    {
+                        flags |= TextStyle.Quote;
+                    }
 
                     if (range.Link.Length > 0 && TryGetEntityType(range.Link, out TextEntityType linkType))
                     {
@@ -708,7 +780,12 @@ namespace Unigram.Controls
                     }
                 }
 
-                if (last != null && last.Flags == flags)
+                // The type has to match too, not just the flags. Two links that touch carry
+                // the same one flag and nothing between them but the hidden characters that
+                // mark where each begins, so on flags alone they read as one run -- and the
+                // run keeps the first link's address, which quietly points the second link
+                // at the first one's target.
+                if (last != null && last.Flags == flags && TextStyleRun.AreEqual(last.Type, type))
                 {
                     last.End++;
                 }
@@ -723,7 +800,6 @@ namespace Unigram.Controls
                     if (flags != 0)
                     {
                         last = new TextStyleRun { Start = i - hidden, End = i - hidden + 1, Flags = flags, Type = type };
-                        type = null;
                     }
                 }
             }
@@ -803,6 +879,21 @@ namespace Unigram.Controls
 
                 if (entities != null && entities.Count > 0)
                 {
+                    // A quote is the one entity that legitimately contains others, so it
+                    // cannot wait its turn below. Formatting a link inserts hidden characters
+                    // into the document, and from there on an offset no longer means what
+                    // TDLib meant by it: a quote applied afterwards counts those hidden
+                    // characters towards its own length and stops short of its end. Applied
+                    // here, while the document still matches the text that was sent.
+                    foreach (var entity in entities)
+                    {
+                        if (entity.Type is TextEntityTypeBlockQuote)
+                        {
+                            Document.GetRange(entity.Offset, entity.Offset + entity.Length)
+                                .CharacterFormat.ForegroundColor = QuoteColor;
+                        }
+                    }
+
                     // We want to enumerate entities from last to first to not
                     // fuck up ranges due to hidden texts when formatting a link
                     foreach (var entity in entities.Reverse())
@@ -874,6 +965,18 @@ namespace Unigram.Controls
 
                 if (entities != null && entities.Count > 0)
                 {
+                    // A quote goes on before everything else, for the reason SetText gives:
+                    // it is the one entity that contains others, and a link applied inside it
+                    // first would have moved the end of it out of reach.
+                    foreach (var entity in entities)
+                    {
+                        if (entity.Type is TextEntityTypeBlockQuote)
+                        {
+                            Document.GetRange(index + entity.Offset, index + entity.Offset + entity.Length)
+                                .CharacterFormat.ForegroundColor = QuoteColor;
+                        }
+                    }
+
                     // We want to enumerate entities from last to first to not
                     // fuck up ranges due to hidden texts when formatting a link
                     foreach (var entity in entities.Reverse())
@@ -887,6 +990,18 @@ namespace Unigram.Controls
                         else if (entity.Type is TextEntityTypeItalic)
                         {
                             range.CharacterFormat.Italic = FormatEffect.On;
+                        }
+                        else if (entity.Type is TextEntityTypeUnderline)
+                        {
+                            range.CharacterFormat.Underline = UnderlineType.Single;
+                        }
+                        else if (entity.Type is TextEntityTypeStrikethrough)
+                        {
+                            range.CharacterFormat.Strikethrough = FormatEffect.On;
+                        }
+                        else if (entity.Type is TextEntityTypeSpoiler)
+                        {
+                            range.CharacterFormat.BackgroundColor = Colors.Gray;
                         }
                         else if (entity.Type is TextEntityTypeCode || entity.Type is TextEntityTypePre || entity.Type is TextEntityTypePreCode)
                         {

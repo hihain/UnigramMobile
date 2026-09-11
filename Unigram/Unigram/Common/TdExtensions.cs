@@ -587,20 +587,39 @@ namespace Unigram.Common
             return string.IsNullOrEmpty(text.ToPlainText());
         }
 
-        public static bool IsEditable(this TextEntity entity)
+        /// <summary>
+        /// The tag this app writes for an entity in its own clipboard format, or 0 for one
+        /// the format cannot carry and the copy therefore leaves behind.
+        ///
+        /// ChatTextBox.OnPaste reads these numbers back. The two ends have to agree on every
+        /// one of them, so a type added here has to be added there in the same breath.
+        /// </summary>
+        public static byte ClipboardTag(this TextEntityType type)
         {
-            switch (entity.Type)
+            switch (type)
             {
                 case TextEntityTypeBold bold:
+                    return 1;
                 case TextEntityTypeItalic italic:
+                    return 2;
                 case TextEntityTypeCode code:
                 case TextEntityTypePre pre:
                 case TextEntityTypePreCode preCode:
+                    return 3;
                 case TextEntityTypeTextUrl textUrl:
+                    return 4;
                 case TextEntityTypeMentionName mentionName:
-                    return true;
+                    return 5;
+                case TextEntityTypeUnderline underline:
+                    return 6;
+                case TextEntityTypeStrikethrough strikethrough:
+                    return 7;
+                case TextEntityTypeSpoiler spoiler:
+                    return 8;
+                case TextEntityTypeBlockQuote blockQuote:
+                    return 9;
                 default:
-                    return false;
+                    return 0;
             }
         }
 

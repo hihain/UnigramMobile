@@ -202,6 +202,14 @@
 
             <FontFamily x:Key="SymbolThemeFontFamily">ms-appx:///Assets/Fonts/SEGMDL2.TTF#Segoe MDL2 Assets</FontFamily>
             <FontFamily x:Key="TelegramThemeFontFamily">ms-appx:///Assets/Fonts/Telegram.ttf#Telegram</FontFamily>
+            <!--
+                Upstream Unigram's icon font, which has hundreds of glyphs this fork's older
+                one never had. Kept beside it rather than replacing it: the two number their
+                icons differently, and this font is referenced from some sixty places. The
+                family inside the file was renamed from Telegram so that two files cannot
+                claim to be the same family.
+            -->
+            <FontFamily x:Key="TelegramIconsFontFamily">ms-appx:///Assets/Fonts/TelegramIcons.ttf#TgIcons2</FontFamily>
 
             <Style TargetType="FontIcon">
                 <Setter Property="FontFamily" Value="{StaticResource SymbolThemeFontFamily}"/>

@@ -631,6 +631,17 @@ namespace Unigram.Strings
         }
 
         /// <summary>
+        /// Localized resource similar to "Quote"
+        /// </summary>
+        public static string QuoteBlock
+        {
+            get
+            {
+                return Resource.GetString("QuoteBlock");
+            }
+        }
+
+        /// <summary>
         /// Localized resource similar to "Reply with Quote"
         /// </summary>
         public static string QuoteReply

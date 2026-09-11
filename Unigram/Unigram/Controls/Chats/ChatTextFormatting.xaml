@@ -75,9 +75,23 @@
             AutomationProperties.Name="{CustomResource Spoiler}"
             ToolTipService.ToolTip="{CustomResource Spoiler}"
             AllowFocusOnInteraction="False"
-            Glyph="&#xE7B3;"
-            CheckedGlyph="&#xE7B3;"
+            Glyph="&#xEAA1;"
+            CheckedGlyph="&#xEAA1;"
             CheckedForeground="{ThemeResource TelegramBackgroundAccentBrush}"
+            FontFamily="{StaticResource TelegramIconsFontFamily}"
+            IsOneWay="False"
+            FontSize="16"/>
+
+        <controls:GlyphToggleButton
+            x:Name="Quote"
+            Click="Quote_Click"
+            AutomationProperties.Name="{CustomResource Additional.QuoteBlock}"
+            ToolTipService.ToolTip="{CustomResource Additional.QuoteBlock}"
+            AllowFocusOnInteraction="False"
+            Glyph="&#xEAC7;"
+            CheckedGlyph="&#xEAC7;"
+            CheckedForeground="{ThemeResource TelegramBackgroundAccentBrush}"
+            FontFamily="{StaticResource TelegramIconsFontFamily}"
             IsOneWay="False"
             FontSize="16"/>
 

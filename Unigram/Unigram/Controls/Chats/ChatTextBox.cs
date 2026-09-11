@@ -110,6 +110,8 @@ namespace Unigram.Controls.Chats
                         var entity = new TextEntity { Offset = reader.ReadInt32(), Length = reader.ReadInt32() };
                         var type = reader.ReadByte();
 
+                        // The numbers come from TdExtensions.ClipboardTag, which is the only
+                        // thing that writes them.
                         switch (type)
                         {
                             case 1:
@@ -125,8 +127,31 @@ namespace Unigram.Controls.Chats
                                 entity.Type = new TextEntityTypeTextUrl { Url = reader.ReadString(reader.ReadUInt32()) };
                                 break;
                             case 5:
-                                entity.Type = new TextEntityTypeMentionName { UserId = reader.ReadInt32() };
+                                // Eight bytes. A user id has not fitted in four since TDLib
+                                // widened it, and reading four left the four that were left
+                                // over to be read as the next entity's offset.
+                                entity.Type = new TextEntityTypeMentionName { UserId = reader.ReadInt64() };
                                 break;
+                            case 6:
+                                entity.Type = new TextEntityTypeUnderline();
+                                break;
+                            case 7:
+                                entity.Type = new TextEntityTypeStrikethrough();
+                                break;
+                            case 8:
+                                entity.Type = new TextEntityTypeSpoiler();
+                                break;
+                            case 9:
+                                entity.Type = new TextEntityTypeBlockQuote();
+                                break;
+                        }
+
+                        // A tag this build does not know may be followed by however many
+                        // bytes of its own, so there is no way to find the next entity and
+                        // the rest of the stream has to be left alone.
+                        if (entity.Type == null)
+                        {
+                            break;
                         }
 
                         entities.Add(entity);

@@ -689,40 +689,44 @@ namespace Unigram.ViewModels
                 var dataPackage = new DataPackage();
                 dataPackage.SetText(input.Text);
 
-                if (input.Entities.Count > 0)
+                // Tagged before anything is written, because the count goes in first: an
+                // entity this format has no tag for has to be left out then, not discovered
+                // halfway through and skipped, which would leave the reader counting one
+                // entity too many.
+                var tagged = new List<Tuple<TextEntity, byte>>();
+
+                foreach (var entity in input.Entities)
+                {
+                    var tag = entity.Type.ClipboardTag();
+                    if (tag != 0)
+                    {
+                        tagged.Add(Tuple.Create(entity, tag));
+                    }
+                }
+
+                if (tagged.Count > 0)
                 {
                     var stream = new InMemoryRandomAccessStream();
                     using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
                     {
-                        writer.WriteInt32(input.Entities.Count(x => x.IsEditable()));
+                        writer.WriteInt32(tagged.Count);
 
-                        foreach (var entity in input.Entities.Where(x => x.IsEditable()))
+                        foreach (var item in tagged)
                         {
-                            writer.WriteInt32(entity.Offset);
-                            writer.WriteInt32(entity.Length);
+                            writer.WriteInt32(item.Item1.Offset);
+                            writer.WriteInt32(item.Item1.Length);
+                            writer.WriteByte(item.Item2);
 
-                            switch (entity.Type)
+                            if (item.Item1.Type is TextEntityTypeTextUrl textUrl)
                             {
-                                case TextEntityTypeBold bold:
-                                    writer.WriteByte(1);
-                                    break;
-                                case TextEntityTypeItalic italic:
-                                    writer.WriteByte(2);
-                                    break;
-                                case TextEntityTypeCode code:
-                                case TextEntityTypePre pre:
-                                case TextEntityTypePreCode preCode:
-                                    writer.WriteByte(3);
-                                    break;
-                                case TextEntityTypeTextUrl textUrl:
-                                    writer.WriteByte(4);
-                                    writer.WriteInt32(textUrl.Url.Length);
-                                    writer.WriteString(textUrl.Url);
-                                    break;
-                                case TextEntityTypeMentionName mentionName:
-                                    writer.WriteByte(5);
-                                    writer.WriteInt64(mentionName.UserId);
-                                    break;
+                                // Bytes rather than characters: that is what the reader asks
+                                // the stream for, and a url is not always ascii.
+                                writer.WriteInt32((int)writer.MeasureString(textUrl.Url));
+                                writer.WriteString(textUrl.Url);
+                            }
+                            else if (item.Item1.Type is TextEntityTypeMentionName mentionName)
+                            {
+                                writer.WriteInt64(mentionName.UserId);
                             }
                         }
 

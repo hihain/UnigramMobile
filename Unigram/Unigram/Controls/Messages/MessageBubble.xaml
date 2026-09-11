@@ -157,6 +157,19 @@
                 </Paragraph>
             </RichTextBlock>
 
+            <!--
+                A quote or a code block is a box, not a character format, so a message that
+                has one is laid out here instead of in the RichTextBlock above. Deferred on
+                purpose: hardly any message has one, and this is the most-created control in
+                the app.
+            -->
+            <StackPanel
+                x:Name="MessageBlocks"
+                x:DeferLoadStrategy="Lazy"
+                Visibility="Collapsed"
+                Grid.Column="1"
+                Grid.Row="2"/>
+
             <Border
                 x:Name="Media"
                 Grid.Column="1"

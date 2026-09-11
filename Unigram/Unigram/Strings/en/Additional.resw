@@ -307,6 +307,10 @@
     <value>Show in Folder</value>
     <comment>DiagnosticsPage</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Quote</value>
+    <comment>Text formatting menu</comment>
+  </data>
   <data name="QuoteReply" xml:space="preserve">
     <value>Reply with Quote</value>
     <comment>Message context menu</comment>

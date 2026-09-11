@@ -215,6 +215,7 @@
     <Compile Include="Common\RemoteFileStream.cs" />
     <Compile Include="Common\SoundEffects.cs" />
     <Compile Include="Common\SunDate.cs" />
+    <Compile Include="Common\TextParagraph.cs" />
     <Compile Include="Common\TextStyleRun.cs" />
     <Compile Include="Common\ThemeColorizer.cs" />
     <Compile Include="Common\TitleBar.cs" />
@@ -1702,6 +1703,9 @@
       <SubType>Designer</SubType>
     </PRIResource>
     <Content Include="Assets\Fonts\Telegram.ttf" />
+    <Content Include="Assets\Fonts\TelegramIcons.ttf" />
+    <Content Include="Assets\Fonts\UbuntuMono-Regular.ttf" />
+    <Content Include="Assets\Fonts\UbuntuMono-UFL.txt" />
     <Content Include="Assets\Images\BoxArt.png" />
     <Content Include="Assets\Images\Reply.scale-100.png" />
     <Content Include="Assets\Images\Reply.scale-125.png" />

@@ -1287,10 +1287,15 @@
                         Visibility="Collapsed"
                         HorizontalAlignment="Center"
                         HorizontalScrollBarVisibility="Auto">
+                        <!--
+                            No fixed width: it used to be pinned to exactly the buttons it had
+                            at the time, so adding one silently clipped it off the end, and the
+                            scroller had nothing to scroll because its content was that width.
+                            Sized to content, the scroller does its job.
+                        -->
                         <chats:ChatTextFormatting
                             x:Name="TextFormatting"
                             TextBox="{x:Bind TextField}"
-                            Width="295"
                             Visibility="Collapsed"/>
                     </ScrollViewer>
                 </Border>

@@ -35,7 +35,7 @@
     </HyperlinkButton.Template>
 
     <UserControl>
-        <Grid Background="Transparent" MinHeight="36">
+        <Grid x:Name="QuoteBackground" Background="Transparent" MinHeight="36">
             <VisualStateManager.VisualStateGroups>
                 <VisualStateGroup>
                     <VisualState x:Name="Normal"/>
@@ -48,6 +48,7 @@
 
                             <Setter Target="LayoutRoot.Margin" Value="0,4,0,2"/>
                             <Setter Target="LayoutRoot.BorderBrush" Value="#FFFFFF"/>
+                            <Setter Target="QuoteMark.Foreground" Value="#FFFFFF"/>
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -55,6 +56,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Border x:Name="ThumbRoot" x:DeferLoadStrategy="Lazy" Background="{ThemeResource ListViewItemPlaceholderBackgroundThemeBrush}" Width="36" Height="36" Margin="8,0,0,0">
                 <Border x:Name="ThumbEllipse">
@@ -64,11 +66,27 @@
                 </Border>
             </Border>
 
-            <TextBlock x:Name="Label" Margin="8,0,0,2" VerticalAlignment="Center" MaxLines="2" Foreground="{ThemeResource MessageForegroundBrush}" FontFamily="{ThemeResource EmojiThemeFontFamily}" Style="{StaticResource ReplyBodyTextBlockStyle}" Grid.Column="1">
+            <TextBlock x:Name="Label" Margin="8,0,8,2" VerticalAlignment="Center" MaxLines="2" Foreground="{ThemeResource MessageForegroundBrush}" FontFamily="{ThemeResource EmojiThemeFontFamily}" Style="{StaticResource ReplyBodyTextBlockStyle}" Grid.Column="1">
                 <Run x:Name="TitleLabel" Foreground="{ThemeResource MessageHeaderForegroundBrush}"/>
                 <LineBreak/>
                 <Run x:Name="ServiceLabel" Foreground="{ThemeResource MessageSubtleForegroundBrush}"/><Run x:Name="MessageLabel" Foreground="{ThemeResource MessageForegroundBrush}"/>
             </TextBlock>
+
+            <!--
+                Shown only when this reply actually carries a quote, so that the two kinds of
+                quote in the app, this one and a quote inside a message, are marked the
+                same way. Not hit-testable: the whole reference is one big hyperlink.
+            -->
+            <TextBlock x:Name="QuoteMark"
+                       Text="&#x201D;"
+                       Foreground="{ThemeResource MessageHeaderBorderBrush}"
+                       FontWeight="SemiBold"
+                       FontSize="22"
+                       Margin="4,-4,2,0"
+                       VerticalAlignment="Top"
+                       IsHitTestVisible="False"
+                       Visibility="Collapsed"
+                       Grid.Column="2"/>
         </Grid>
     </UserControl>
 </HyperlinkButton>

@@ -26,10 +26,22 @@ namespace Unigram.Controls.Messages
 {
     public sealed partial class MessageBubble : StackPanel
     {
+        /// <summary>
+        /// Ubuntu Mono, packaged with the app under Assets/Fonts, so it is here whatever the
+        /// device has installed. Both a fenced block and an inline code span want it.
+        /// </summary>
+        private static readonly FontFamily Monospace = new FontFamily("ms-appx:///Assets/Fonts/UbuntuMono-Regular.ttf#Ubuntu Mono");
+
         private MessageViewModel _message;
 
         private bool _placeholder;
         private bool _placeholderVertical;
+
+        /// <summary>
+        /// The empty box that keeps the end of the last line clear for the clock, when the
+        /// clock shares that line. Null whenever the current message does not need one.
+        /// </summary>
+        private Border _footerSpacer;
         private double _maxWidth;
 
         private string _query;
@@ -83,6 +95,7 @@ namespace Unigram.Controls.Messages
             else
             {
                 Span.Inlines.Clear();
+                HideMessageBlocks();
                 Media.Child = null;
 
                 Reactions.UpdateMessageReactions(null);
@@ -735,7 +748,7 @@ namespace Unigram.Controls.Messages
                 else
                     FooterToNormal();
                 Grid.SetRow(Footer, 2);
-                Grid.SetRow(Message, 2);
+                SetTextRow(2);
             }
             else if (IsFullMedia(content))
             {
@@ -776,7 +789,7 @@ namespace Unigram.Controls.Messages
                 Media.Margin = new Thickness(left, top, right, bottom);
                 _placeholder = caption;
                 Grid.SetRow(Footer, caption ? 4 : 3);
-                Grid.SetRow(Message, caption ? 4 : 2);
+                SetTextRow(caption ? 4 : 2);
             }
             else if (content is MessageSticker || content is MessageDice || content is MessageVideoNote || content is MessageBigEmoji)
             { //TODO: Test new stuff => I left out the XAML-changes of this commit!
@@ -802,7 +815,7 @@ namespace Unigram.Controls.Messages
                 _placeholder = false;
                 FooterToLightMedia(message.IsOutgoing && !message.IsChannelPost);
                 Grid.SetRow(Footer, 3);
-                Grid.SetRow(Message, 2);
+                SetTextRow(2);
             }
             else if ((content is MessageText webPage && webPage.WebPage != null) || content is MessageGame || (content is MessageContact contact && !string.IsNullOrEmpty(contact.Contact.Vcard)))
             {
@@ -810,7 +823,7 @@ namespace Unigram.Controls.Messages
                 _placeholder = false;
                 FooterToNormal();
                 Grid.SetRow(Footer, 4);
-                Grid.SetRow(Message, 2);
+                SetTextRow(2);
             }
             else if (content is MessagePoll)
             {
@@ -818,7 +831,7 @@ namespace Unigram.Controls.Messages
                 _placeholder = false;
                 FooterToNormal();
                 Grid.SetRow(Footer, 3);
-                Grid.SetRow(Message, 2);
+                SetTextRow(2);
             }
             else if (content is MessageInvoice invoice)
             {
@@ -828,7 +841,7 @@ namespace Unigram.Controls.Messages
                 _placeholder = caption;
                 FooterToNormal();
                 Grid.SetRow(Footer, caption ? 3 : 4);
-                Grid.SetRow(Message, 2);
+                SetTextRow(2);
             }
             else /*if (IsInlineMedia(message.Media))*/
             {
@@ -851,7 +864,7 @@ namespace Unigram.Controls.Messages
                 Media.Margin = new Thickness(0, 4, 0, caption ? 8 : 2);
                 _placeholder = caption;
                 Grid.SetRow(Footer, caption ? 4 : 3);
-                Grid.SetRow(Message, caption ? 4 : 2);
+                SetTextRow(caption ? 4 : 2);
             }
 
             //if (display != null)
@@ -998,42 +1011,49 @@ namespace Unigram.Controls.Messages
         private void UpdateMessageText(MessageViewModel message)
         {
             Span.Inlines.Clear();
+            ClearFooterSpacer();
 
             var result = false;
             var adjust = false;
 
             var content = message.GeneratedContent ?? message.Content;
+
+            // The text is pulled out of the content first rather than rendered inside each
+            // branch, because the choice between the two layouts has to be made before a
+            // single inline is created and the caption is the same object either way.
+            FormattedText formatted = null;
+
             if (content is MessageText text)
             {
-                result = ReplaceEntities(message, Span, text.Text, out adjust);
+                formatted = text.Text;
             }
             else if (content is MessageAlbum album)
             {
-                result = ReplaceEntities(message, Span, album.Caption, out adjust);
+                formatted = album.Caption;
             }
             else if (content is MessageAnimation animation)
             {
-                result = ReplaceEntities(message, Span, animation.Caption, out adjust);
+                formatted = animation.Caption;
             }
             else if (content is MessageAudio audio)
             {
-                result = ReplaceEntities(message, Span, audio.Caption, out adjust);
+                formatted = audio.Caption;
             }
             else if (content is MessageDocument document)
             {
-                result = ReplaceEntities(message, Span, document.Caption, out adjust);
+                formatted = document.Caption;
             }
             else if (content is MessagePhoto photo)
             {
-                result = ReplaceEntities(message, Span, photo.Caption, out adjust);
+                formatted = photo.Caption;
             }
             else if (content is MessageVideo video)
             {
-                result = ReplaceEntities(message, Span, video.Caption, out adjust);
+                formatted = video.Caption;
             }
             else if (content is MessageVoiceNote voiceNote)
             {
-                result = ReplaceEntities(message, Span, voiceNote.Caption, out adjust);
+                formatted = voiceNote.Caption;
             }
             else if (content is MessageUnsupported unsupported)
             {
@@ -1052,6 +1072,19 @@ namespace Unigram.Controls.Messages
                 result = true;
             }
 
+            if (formatted != null)
+            {
+                if (TextParagraphs.HasBlocks(formatted))
+                {
+                    UpdateMessageBlocks(message, formatted);
+                    return;
+                }
+
+                result = ReplaceEntities(message, Span, formatted, out adjust);
+            }
+
+            HideMessageBlocks();
+
             Message.Visibility = result ? Visibility.Visible : Visibility.Collapsed;
             //Footer.HorizontalAlignment = adjust ? HorizontalAlignment.Left : HorizontalAlignment.Right;
 
@@ -1059,6 +1092,258 @@ namespace Unigram.Controls.Messages
             if (adjust)
             {
                 Span.Inlines.Add(new LineBreak());
+            }
+
+            if (result && _placeholder)
+            {
+                AddFooterSpacer(Message.Blocks[0] as Paragraph);
+            }
+        }
+
+        /// <summary>
+        /// Lays the message out as a stack of blocks instead of as one RichTextBlock, which
+        /// is what a quote or a code block needs: both draw a bar beside however many lines
+        /// they wrap to, and an inline cannot draw next to a line it is not on.
+        ///
+        /// Only messages that contain one come here. Every other message keeps the single
+        /// control it has always had, because this is the most-created control in the app and
+        /// the common case should not pay for the rare one.
+        /// </summary>
+        private void UpdateMessageBlocks(MessageViewModel message, FormattedText text)
+        {
+            if (MessageBlocks == null)
+            {
+                FindName(nameof(MessageBlocks));
+
+                // Realised late, so it missed whatever row UpdateMessageContent picked.
+                Grid.SetRow(MessageBlocks, Grid.GetRow(Message));
+            }
+
+            MessageBlocks.Children.Clear();
+
+            foreach (var paragraph in TextParagraphs.Split(text.Text, text.Entities))
+            {
+                MessageBlocks.Children.Add(CreateBlock(message, paragraph));
+            }
+
+            MessageBlocks.Visibility = MessageBlocks.Children.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            // The footer shares this grid row with the text, which works as long as the last
+            // line is text: it stops short of the right edge and the clock sits in the gap.
+            // A box is full width and has nowhere to stop, so when the message ends in one a
+            // line is left free underneath for the clock to land on.
+            var trailing = MessageBlocks.Children.Count > 0
+                ? MessageBlocks.Children[MessageBlocks.Children.Count - 1]
+                : null;
+
+            var box = _placeholder ? trailing as Border : null;
+            var last = _placeholder ? trailing as RichTextBlock : null;
+
+            MessageBlocks.Margin = box != null
+                ? new Thickness(0, 0, 0, Footer.ActualHeight > 0 ? Footer.ActualHeight : 16)
+                : new Thickness();
+
+            // Ends in text instead, so it has a last line to share with the clock like any
+            // other message and gets spaced the same way.
+            if (last != null)
+            {
+                AddFooterSpacer(last.Blocks[0] as Paragraph);
+            }
+
+            Message.Visibility = Visibility.Collapsed;
+
+            // The footer has a grid row of its own below the text, so unlike the inline path
+            // there is no last line to keep clear for it.
+            _placeholderVertical = false;
+        }
+
+        /// <summary>
+        /// Bubbles are recycled, so one that used to show blocks has to put them away before
+        /// it is handed a message that does not.
+        /// </summary>
+        private void HideMessageBlocks()
+        {
+            if (MessageBlocks != null && MessageBlocks.Visibility == Visibility.Visible)
+            {
+                MessageBlocks.Children.Clear();
+                MessageBlocks.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private FrameworkElement CreateBlock(MessageViewModel message, TextParagraph paragraph)
+        {
+            var block = new RichTextBlock
+            {
+                Style = Message.Style,
+                FontFamily = Message.FontFamily,
+                Foreground = GetBrush("MessageForegroundBrush"),
+                TextAlignment = TextAlignment.DetectFromContent
+            };
+
+            block.ContextMenuOpening += Message_ContextMenuOpening;
+
+            Span span;
+
+            if (paragraph.Kind == TextParagraphKind.Code)
+            {
+                // Drawn inline, a code block was wrapped in a Hyperlink so that tapping it
+                // copied the code, and that is worth keeping. Its text goes in verbatim
+                // rather than through the entity pass: Telegram does not format inside a
+                // code block, and a Hyperlink nested in a Hyperlink is a crash, not a wrong
+                // colour.
+                var data = paragraph.Text;
+
+                var hyperlink = new Hyperlink
+                {
+                    UnderlineStyle = UnderlineStyle.None,
+                    Foreground = GetBrush("MessageForegroundBrush")
+                };
+
+                hyperlink.Click += (s, args) => MessageHelper.CopyText(data);
+                hyperlink.Inlines.Add(new Run { Text = data });
+
+                block.FontFamily = Monospace;
+
+                // A point below the message text. Code runs long and the screen is narrow,
+                // so the line that fits is worth more here than the one that matches.
+                block.FontSize = (double)App.Current.Resources["MessageFontSize"] - 1;
+
+                span = hyperlink;
+            }
+            else
+            {
+                span = new Span();
+
+                bool adjust;
+                ReplaceEntities(message, span, paragraph.Text, paragraph.Entities, out adjust, block);
+
+                if (paragraph.Kind == TextParagraphKind.Quote)
+                {
+                    // The same treatment the reply quote has always had, so the two kinds of
+                    // quote in this app look like the same idea. Set on the Span after the
+                    // entity pass, which ends by assigning the font size: a run that asked
+                    // for italic itself keeps it, everything else inherits it from here.
+                    span.FontStyle = FontStyle.Italic;
+                    span.FontSize = Math.Max(1, span.FontSize - 1);
+                }
+            }
+
+            var body = new Paragraph();
+            body.Inlines.Add(span);
+            block.Blocks.Add(body);
+
+            if (paragraph.Kind == TextParagraphKind.Plain)
+            {
+                return block;
+            }
+
+            // Deliberately the same bar, brush and inset a reply and a link preview already
+            // use, so a block reads as the one thing this app draws that shape for.
+            var border = new Border
+            {
+                BorderBrush = GetBrush("MessageHeaderBorderBrush"),
+                BorderThickness = new Thickness(2, 0, 0, 0),
+                Margin = new Thickness(0, 6, 0, 4)
+            };
+
+            if (paragraph.Kind == TextParagraphKind.Quote)
+            {
+                // Washed out of the bar's own colour rather than the text's, so the box and
+                // the bar beside it are plainly the same object.
+                border.Background = GetBrush("MessageHeaderBorderBrush").Tint(0.18);
+                border.Padding = new Thickness(8, 2, 4, 2);
+                border.Child = WithQuotationMark(block);
+            }
+            else
+            {
+                // A wash of the foreground colour rather than a fixed grey, which would be
+                // invisible in one theme or the other.
+                border.Background = GetBrush("MessageForegroundBrush").Tint(0.12);
+
+                // Not the same number top and bottom: a line of text carries its own space
+                // above it and none below, so equal insets do not look equal.
+                border.Padding = new Thickness(8, 3, 6, 8);
+                border.Child = WithLanguage(block, paragraph.Language);
+            }
+
+            return border;
+        }
+
+        /// <summary>
+        /// Puts the closing quotation mark in the top right corner, the way the web client
+        /// does. The bar alone reads as an indent; the mark is what says quotation.
+        /// </summary>
+        private FrameworkElement WithQuotationMark(RichTextBlock block)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var mark = new TextBlock
+            {
+                Text = "”",
+                Foreground = GetBrush("MessageHeaderBorderBrush"),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 22,
+                Margin = new Thickness(4, -6, 0, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+
+                // Never in the way of a tap meant for the text or a link inside the quote.
+                IsHitTestVisible = false
+            };
+
+            Grid.SetColumn(mark, 1);
+
+            grid.Children.Add(block);
+            grid.Children.Add(mark);
+
+            return grid;
+        }
+
+        /// <summary>
+        /// Labels a fenced block with the language its sender named, when it named one.
+        /// </summary>
+        private FrameworkElement WithLanguage(RichTextBlock block, string language)
+        {
+            if (string.IsNullOrEmpty(language))
+            {
+                return block;
+            }
+
+            var label = new TextBlock
+            {
+                Text = language,
+                Foreground = GetBrush("MessageHeaderForegroundBrush"),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 11,
+
+                // Half a line of air, so the label reads as a caption over the code rather
+                // than as its first line.
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+
+            var stack = new StackPanel();
+            stack.Children.Add(label);
+            stack.Children.Add(block);
+
+            return stack;
+        }
+
+        /// <summary>
+        /// Puts the message text in a grid row. UpdateMessageContent moves it depending on
+        /// what else is in the bubble -- under the media for a caption, over the footer for
+        /// plain text -- and the block layout has to travel with it, or a quote in a photo
+        /// caption is drawn above the photo.
+        /// </summary>
+        private void SetTextRow(int row)
+        {
+            Grid.SetRow(Message, row);
+
+            if (MessageBlocks != null)
+            {
+                Grid.SetRow(MessageBlocks, row);
             }
         }
 
@@ -1098,7 +1383,12 @@ namespace Unigram.Controls.Messages
             return ReplaceEntities(message, span, text.Text, text.Entities, out adjust);
         }
 
-        private bool ReplaceEntities(MessageViewModel message, Span span, string text, IList<TextEntity> entities, out bool adjust)
+        /// <param name="host">
+        /// The control the inlines end up in. Text highlighters and the flow direction are
+        /// set on it rather than on Message, because a message laid out as blocks has one of
+        /// these per paragraph and the bubble-wide control is not showing anything.
+        /// </param>
+        private bool ReplaceEntities(MessageViewModel message, Span span, string text, IList<TextEntity> entities, out bool adjust, RichTextBlock host = null)
         {
             if (string.IsNullOrEmpty(text))
             {
@@ -1106,11 +1396,16 @@ namespace Unigram.Controls.Messages
                 return false;
             }
 
+            if (host == null)
+            {
+                host = Message;
+            }
+
             // W10M 15254 reports UniversalApiContract 5 but does not implement
             // IRichTextBlock5 — touching TextHighlighters there throws InvalidCastException
             if (ApiInfo.CanUseTextHighlighters)
             {
-                Message.TextHighlighters.Clear();
+                host.TextHighlighters.Clear();
             }
 
             TextHighlighter spoiler = null;
@@ -1135,13 +1430,14 @@ namespace Unigram.Controls.Messages
                 {
                     var data = text.Substring(entity.Offset, entity.Length);
                     var hyperlink = new Hyperlink();
-                    hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, data);
+                    hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, data, host);
                     hyperlink.Foreground = GetBrush("MessageForegroundBrush");
                     hyperlink.UnderlineStyle = UnderlineStyle.None;
                     //hyperlink.Foreground = foreground;
 
                     span.Inlines.Add(hyperlink);
-                    hyperlink.Inlines.Add(new Run { Text = data, FontFamily = new FontFamily("Consolas") });
+
+                    hyperlink.Inlines.Add(new Run { Text = data, FontFamily = Monospace });
                 }
                 else
                 {
@@ -1166,7 +1462,7 @@ namespace Unigram.Controls.Messages
                                 data = mentionName.UserId;
                             }
 
-                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, null);
+                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, null, host);
                             hyperlink.Foreground = GetBrush("MessageForegroundLinkBrush");
                             //hyperlink.Foreground = foreground;
 
@@ -1185,7 +1481,7 @@ namespace Unigram.Controls.Messages
                                 data = text.Substring(original.Offset, original.Length);
                             }
 
-                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, data);
+                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, data, host);
                             hyperlink.Foreground = GetBrush("MessageForegroundLinkBrush");
                             //hyperlink.Foreground = foreground;
 
@@ -1208,7 +1504,7 @@ namespace Unigram.Controls.Messages
 
                         if (ApiInfo.CanUseTextHighlighters)
                         {
-                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, null);
+                            hyperlink.Click += (s, args) => Entity_Click(message, entity.Type, null, host);
 
                             if (spoiler == null)
                             {
@@ -1325,32 +1621,32 @@ namespace Unigram.Controls.Messages
                 spoiler.Foreground = new SolidColorBrush(Colors.Black);
                 spoiler.Background = new SolidColorBrush(Colors.Black);
 
-                Message.TextHighlighters.Add(spoiler);
+                host.TextHighlighters.Add(spoiler);
             }
 
             if (AdjustEmojis(span, text))
             {
-                Message.FlowDirection = FlowDirection.LeftToRight;
+                host.FlowDirection = FlowDirection.LeftToRight;
                 adjust = (message.ReplyToMessageId == 0 || message.ReplyToMessageState == ReplyToMessageState.Hidden) && message.Content is MessageText;
             }
             else if (ApiInfo.FlowDirection == FlowDirection.LeftToRight && MessageHelper.IsAnyCharacterRightToLeft(text))
             {
                 //Footer.HorizontalAlignment = HorizontalAlignment.Left;
                 //span.Inlines.Add(new LineBreak());
-                Message.FlowDirection = FlowDirection.RightToLeft;
+                host.FlowDirection = FlowDirection.RightToLeft;
                 adjust = true;
             }
             else if (ApiInfo.FlowDirection == FlowDirection.RightToLeft && !MessageHelper.IsAnyCharacterRightToLeft(text))
             {
                 //Footer.HorizontalAlignment = HorizontalAlignment.Left;
                 //span.Inlines.Add(new LineBreak());
-                Message.FlowDirection = FlowDirection.LeftToRight;
+                host.FlowDirection = FlowDirection.LeftToRight;
                 adjust = true;
             }
             else
             {
                 //Footer.HorizontalAlignment = HorizontalAlignment.Right;
-                Message.FlowDirection = ApiInfo.FlowDirection;
+                host.FlowDirection = ApiInfo.FlowDirection;
                 adjust = false;
             }
 
@@ -1392,7 +1688,7 @@ namespace Unigram.Controls.Messages
             return App.Current.Resources[key] as SolidColorBrush;
         }
 
-        private void Entity_Click(MessageViewModel message, TextEntityType type, string data)
+        private void Entity_Click(MessageViewModel message, TextEntityType type, string data, RichTextBlock host)
         {
             if (type is TextEntityTypeBotCommand)
             {
@@ -1436,9 +1732,9 @@ namespace Unigram.Controls.Messages
             }
             else if (type is TextEntityTypeSpoiler)
             {
-                if (ApiInfo.CanUseTextHighlighters && Message.TextHighlighters.Count > 0)
+                if (ApiInfo.CanUseTextHighlighters && host.TextHighlighters.Count > 0)
                 {
-                    Message.TextHighlighters.RemoveAt(Message.TextHighlighters.Count - 1);
+                    host.TextHighlighters.RemoveAt(host.TextHighlighters.Count - 1);
                 }
             }
         }
@@ -1483,50 +1779,99 @@ namespace Unigram.Controls.Messages
             }
         }
 
+        /// <summary>
+        /// The clock sits in the same grid cell as the text, in whatever gap is left at the
+        /// end of the last line. Nothing used to make that gap, so a line that runs to the
+        /// right edge got the clock printed on top of it. A long link is the reliable way
+        /// to see it.
+        ///
+        /// The gap is made by putting an empty box the size of the footer at the very end of
+        /// the text and letting the text engine place it: if the last line has room the box
+        /// sits there and the clock lands on the box, and if it does not the box wraps to a
+        /// line of its own, which becomes the free line the clock lands on instead.
+        ///
+        /// This replaces a measuring pass that compared the last character rectangle against
+        /// the footer width and set a margin from the difference. Nothing is measured here,
+        /// so the rounding that pass had to guard against cannot send the layout round in
+        /// circles.
+        /// </summary>
+        private void AddFooterSpacer(Paragraph paragraph)
+        {
+            if (paragraph == null || !SettingsService.Current.Diagnostics.BubbleMeasureAlpha)
+            {
+                return;
+            }
+
+            var spacer = new Border
+            {
+                // A hole in the text, not something to tap: a tap here belongs to the
+                // message, the way a tap on the blank end of any line does.
+                IsHitTestVisible = false
+            };
+
+            ResizeFooterSpacer(spacer);
+
+            paragraph.Inlines.Add(new InlineUIContainer { Child = spacer });
+            _footerSpacer = spacer;
+        }
+
+        /// <summary>
+        /// Bubbles are recycled, and the spacer belongs to the message that is leaving. The
+        /// inline path keeps its paragraph, so the box has to be taken out of it by hand;
+        /// the block path throws its controls away and only needs the field cleared.
+        /// </summary>
+        private void ClearFooterSpacer()
+        {
+            _footerSpacer = null;
+
+            var paragraph = Message.Blocks.Count > 0 ? Message.Blocks[0] as Paragraph : null;
+            if (paragraph == null)
+            {
+                return;
+            }
+
+            // Everything past the Span the XAML declares was put there by AddFooterSpacer,
+            // and clearing the Span does not reach it.
+            while (paragraph.Inlines.Count > 1)
+            {
+                paragraph.Inlines.RemoveAt(paragraph.Inlines.Count - 1);
+            }
+        }
+
+        private void ResizeFooterSpacer(Border spacer)
+        {
+            // The footer hangs six pixels past the right edge of the text and carries six
+            // more as padding on its left, so the room it needs inside the text is its width
+            // less six, and the air between the last word and the clock comes for free.
+            var width = Math.Max(0, Footer.ActualWidth - 6);
+
+            // Two less than its height for the same reason: the footer is laid out two
+            // pixels below the row it is aligned to the bottom of.
+            var height = Math.Max(1, Footer.ActualHeight - 2);
+
+            // Only when the numbers actually differ. Assigning the same ones would still ask
+            // for another layout pass, and this runs from a SizeChanged that pass would
+            // raise.
+            if (spacer.Width != width)
+            {
+                spacer.Width = width;
+            }
+
+            if (spacer.Height != height)
+            {
+                spacer.Height = height;
+            }
+        }
+
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (!SettingsService.Current.Diagnostics.BubbleMeasureAlpha)
+            // The footer is measured after the text it has to fit beside, and it changes
+            // width on its own besides: an edit adds a word to it, a send adds a tick.
+            var spacer = _footerSpacer;
+            if (spacer != null)
             {
-                return;
+                ResizeFooterSpacer(spacer);
             }
-
-            var message = _message;
-            if (message == null)
-            {
-                return;
-            }
-
-            var content = message.GeneratedContent ?? message.Content;
-            if (content is MessageSticker || content is MessageDice || content is MessageVideoNote || content is MessageBigEmoji || _placeholder) //TODO: check & also ignored changes...
-            {
-                var footerWidth = Footer.ActualWidth - 5;
-
-                // For some reason ActualWidth isn't reporting the correct value:
-                // it seems instead to report the width of the inner text.
-                var width = Message.RenderSize.Width;
-                var rect = Message.ContentEnd.GetCharacterRect(LogicalDirection.Forward);
-
-                var diff = width - rect.Right;
-                if (diff < footerWidth /*|| _placeholderVertical*/)
-                {
-                    // Sometimes rect.Right is slightly higher than width, because of layout rounding.
-                    // This, in some (not so) rare conditions causes a layout cycle.
-                    width = Math.Max(width, rect.Right);
-
-                    if (Message.ActualHeight < rect.Height * 2 && width + footerWidth < _maxWidth - ContentPanel.Padding.Left - ContentPanel.Padding.Right /*&& !_placeholderVertical*/)
-                    {
-                        Message.Margin = new Thickness(0, 0, footerWidth, 0);
-                    }
-                    else
-                    {
-                        Message.Margin = new Thickness(0, 0, 0, Footer.ActualHeight);
-                    }
-
-                    return;
-                }
-            }
-
-            Message.Margin = new Thickness();
         }
 
         private SpriteVisual _highlight;

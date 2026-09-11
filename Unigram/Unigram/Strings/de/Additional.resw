@@ -303,6 +303,10 @@
     <value>Im Ordner anzeigen</value>
     <comment>DiagnosticsPage</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Zitat</value>
+    <comment>Text formatting menu</comment>
+  </data>
   <data name="QuoteReply" xml:space="preserve">
     <value>Mit Zitat antworten</value>
     <comment>Message context menu</comment>

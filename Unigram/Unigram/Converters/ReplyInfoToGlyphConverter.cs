@@ -50,7 +50,17 @@ namespace Unigram.Converters
         public const string Strikethrough = "\uE8DE";
         public const string Monospace = "\uE943";
         public const string Link = "\uE71B";
-        public const string Spoiler = "\uE7B3";
+        /// <summary>
+        /// From TelegramIcons, like QuoteBlock below. The old glyph was Segoe MDL2's
+        /// hide-password eye, which was the nearest thing available before this fork had a
+        /// font with the real one in it.
+        /// </summary>
+        public const string Spoiler = "\uEAA1";
+
+        /// <summary>
+        /// From TelegramIcons, not the older Telegram font: this one has no quote glyph.
+        /// </summary>
+        public const string QuoteBlock = "\uEAC7";
 
         public const string BasicGroup = "\uE125";
         public const string Group = "\uE902";
