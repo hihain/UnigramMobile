@@ -63,6 +63,7 @@ namespace Unigram.Services
         private bool _alreadyRegistered;
 
         private bool _suppress;
+        private DateTime _suppressSince;
 
         public NotificationsService(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, ISessionService sessionService, IEventAggregator aggregator)
         {
@@ -337,19 +338,59 @@ namespace Unigram.Services
         {
             // We want to ignore both delayed and unreceived notifications,
             // as they're the result of update difference on sync.
+            //
+            // Both at once is what says the library is still fetching what it missed, which
+            // is not the same as it merely holding a notification back for a moment: that
+            // happens for a message arriving right now as well, and those are the ones the
+            // app is here to announce.
             if (update.HaveDelayedNotifications && update.HaveUnreceivedNotifications)
             {
-                //_suppress = true;
+                if (!_suppress)
+                {
+                    _suppress = true;
+                    _suppressSince = DateTime.Now;
+                }
             }
             else if (_suppress && !update.HaveDelayedNotifications && !update.HaveUnreceivedNotifications)
             {
-                //_suppress = false;
+                _suppress = false;
             }
+        }
+
+        /// <summary>
+        /// Whether a notification the library is offering now belongs to the backlog it is
+        /// catching up on, in which case it has already been announced: while the app was
+        /// away it was the push task that put it on the screen, and repeating it means every
+        /// message that arrived in the meantime is played again, one after another, for as
+        /// long as it takes to get through them.
+        ///
+        /// Upstream turned this off in November 2020 during the push refactoring, by
+        /// commenting out the two lines that set the flag rather than by deleting the check.
+        /// The check is worth having; what it lacked was a way out of its own making.
+        /// </summary>
+        private bool IsSuppressed()
+        {
+            if (!_suppress)
+            {
+                return false;
+            }
+
+            // A latch only something else can open is a latch that can stay shut. The library
+            // says when it has caught up and normally says it within seconds; if that word
+            // never comes, notifications start working again by themselves instead of staying
+            // off until the app is restarted.
+            if (DateTime.Now - _suppressSince > TimeSpan.FromSeconds(60))
+            {
+                _suppress = false;
+                return false;
+            }
+
+            return true;
         }
 
         public async void Handle(UpdateNotificationGroup update)
         {
-            if (_suppress)
+            if (IsSuppressed())
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
                 return;
