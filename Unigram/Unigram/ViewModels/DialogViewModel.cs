@@ -107,6 +107,7 @@ namespace Unigram.ViewModels
             _animations = AnimationDrawerViewModel.GetForCurrentView(protoService.SessionId);
 
             NextMentionCommand = new RelayCommand(NextMentionExecute);
+            NextReactionCommand = new RelayCommand(NextReactionExecute);
             PreviousSliceCommand = new RelayCommand(PreviousSliceExecute);
             ClearReplyCommand = new RelayCommand(ClearReplyExecute);
             JoinChannelCommand = new RelayCommand(JoinChannelExecute);
@@ -132,6 +133,7 @@ namespace Unigram.ViewModels
             JumpDateCommand = new RelayCommand(JumpDateExecute);
             GroupStickersCommand = new RelayCommand(GroupStickersExecute);
             ReadMentionsCommand = new RelayCommand(ReadMentionsExecute);
+            ReadReactionsCommand = new RelayCommand(ReadReactionsExecute);
             SendCommand = new RelayCommand<string>(SendMessage);
             SwitchCommand = new RelayCommand<string>(SwitchExecute);
             SetTimerCommand = new RelayCommand(SetTimerExecute);
@@ -985,9 +987,17 @@ namespace Unigram.ViewModels
         private List<long> _mentions = new List<long>();
         private long _lastMention;
 
+        private List<long> _reactions = new List<long>();
+        private long _lastReaction;
+
         public void SetLastViewedMention(long messageId)
         {
             _lastMention = messageId;
+        }
+
+        public void SetLastViewedReaction(long messageId)
+        {
+            _lastReaction = messageId;
         }
 
         public RelayCommand NextMentionCommand { get; }
@@ -1036,6 +1046,57 @@ namespace Unigram.ViewModels
                     {
                         _mentions = stack;
                         NextMentionExecute();
+                    }
+                }
+            }
+        }
+
+        public RelayCommand NextReactionCommand { get; }
+        private async void NextReactionExecute()
+        {
+            var chat = _chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            if (_reactions != null && _reactions.Count > 0)
+            {
+                await LoadMessageSliceAsync(null, _reactions.RemoveLast());
+            }
+            else
+            {
+                long fromMessageId;
+                if (_lastReaction != 0)
+                {
+                    fromMessageId = _lastReaction;
+                }
+                else
+                {
+                    var first = Items.FirstOrDefault();
+                    if (first != null)
+                    {
+                        fromMessageId = first.Id;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                var response = await ProtoService.SendAsync(new SearchChatMessages(chat.Id, string.Empty, null, fromMessageId, -9, 10, new SearchMessagesFilterUnreadReaction(), _threadId, null));
+                if (response is FoundChatMessages messages)
+                {
+                    var stack = new List<long>();
+                    foreach (var message in messages.Messages)
+                    {
+                        stack.Add(message.Id);
+                    }
+
+                    if (stack.Count > 0)
+                    {
+                        _reactions = stack;
+                        NextReactionExecute();
                     }
                 }
             }
@@ -3497,6 +3558,22 @@ namespace Unigram.ViewModels
             }
 
             ProtoService.Send(new ReadAllChatMentions(chat.Id));
+        }
+
+        #endregion
+
+        #region Read reactions
+
+        public RelayCommand ReadReactionsCommand { get; }
+        private void ReadReactionsExecute()
+        {
+            var chat = _chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            ProtoService.Send(new ReadAllChatReactions(chat.Id));
         }
 
         #endregion

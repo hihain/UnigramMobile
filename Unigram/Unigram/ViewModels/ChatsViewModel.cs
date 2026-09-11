@@ -260,6 +260,11 @@ namespace Unigram.ViewModels
                 {
                     ProtoService.Send(new ReadAllChatMentions(chat.Id));
                 }
+
+                if (chat.UnreadReactionCount > 0)
+                {
+                    ProtoService.Send(new ReadAllChatReactions(chat.Id));
+                }
             }
             else
             {
@@ -292,6 +297,11 @@ namespace Unigram.ViewModels
                     if (chat.UnreadMentionCount > 0)
                     {
                         ProtoService.Send(new ReadAllChatMentions(chat.Id));
+                    }
+
+                    if (chat.UnreadReactionCount > 0)
+                    {
+                        ProtoService.Send(new ReadAllChatReactions(chat.Id));
                     }
                 }
                 else if (chat.UnreadCount == 0 && !chat.IsMarkedAsUnread)

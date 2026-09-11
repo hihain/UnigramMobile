@@ -238,6 +238,10 @@ namespace Unigram.Views
             visual.Size = new Vector2(36, 36);
             visual.Offset = new Vector3(0, 1, 0);
 
+            visual = DropShadowEx.Attach(ArrowReactionsShadow, 2, 0.25f, null);
+            visual.Size = new Vector2(36, 36);
+            visual.Offset = new Vector3(0, 1, 0);
+
             //if (ApiInformation.IsMethodPresent("Windows.UI.Xaml.Hosting.ElementCompositionPreview", "SetImplicitShowAnimation"))
             //{
             //    var showShowAnimation = Window.Current.Compositor.CreateSpringScalarAnimation();
@@ -3257,6 +3261,11 @@ namespace Unigram.Views
             ViewModel.ReadMentionsCommand.Execute();
         }
 
+        private void Reactions_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            ViewModel.ReadReactionsCommand.Execute();
+        }
+
         private void ItemsStackPanel_Loading(FrameworkElement sender, object args)
         {
             sender.MaxWidth = SettingsService.Current.IsAdaptiveWideEnabled ? 664 : double.PositiveInfinity;
@@ -3409,6 +3418,7 @@ namespace Unigram.Views
             UpdateChatActionBar(chat);
 
             UpdateChatUnreadMentionCount(chat, chat.UnreadMentionCount);
+            UpdateChatUnreadReactionCount(chat, chat.UnreadReactionCount);
             UpdateChatDefaultDisableNotification(chat, chat.DefaultDisableNotification);
 
             TypeIcon.Text = chat.Type is ChatTypeSecret ? Icons.Secret : string.Empty;
@@ -3645,6 +3655,19 @@ namespace Unigram.Views
             else
             {
                 MentionsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        public void UpdateChatUnreadReactionCount(Chat chat, int count)
+        {
+            if (ViewModel.Type == DialogType.History && count > 0)
+            {
+                UnreadReactionsPanel.Visibility = Visibility.Visible;
+                UnreadReactions.Text = count.ToString();
+            }
+            else
+            {
+                UnreadReactionsPanel.Visibility = Visibility.Collapsed;
             }
         }
 

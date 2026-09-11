@@ -1519,6 +1519,13 @@ namespace Unigram.Services
                     value.UnreadMentionCount = updateChatUnreadMentionCount.UnreadMentionCount;
                 }
             }
+            else if (update is UpdateChatUnreadReactionCount updateChatUnreadReactionCount)
+            {
+                if (_chats.TryGetValue(updateChatUnreadReactionCount.ChatId, out Chat value))
+                {
+                    value.UnreadReactionCount = updateChatUnreadReactionCount.UnreadReactionCount;
+                }
+            }
             else if (update is UpdateConnectionState updateConnectionState)
             {
                 _connectionState = updateConnectionState.State;
@@ -1624,6 +1631,13 @@ namespace Unigram.Services
             else if (update is UpdateMessageSendSucceeded updateMessageSendSucceeded)
             {
 
+            }
+            else if (update is UpdateMessageUnreadReactions updateMessageUnreadReactions)
+            {
+                if (_chats.TryGetValue(updateMessageUnreadReactions.ChatId, out Chat value))
+                {
+                    value.UnreadReactionCount = updateMessageUnreadReactions.UnreadReactionCount;
+                }
             }
             else if (update is UpdateNewChat updateNewChat)
             {

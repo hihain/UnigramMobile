@@ -327,4 +327,8 @@
     <value>Insert New Line</value>
     <comment>Send button context menu</comment>
   </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Go to next reaction</value>
+    <comment>ChatView</comment>
+  </data>
 </root>

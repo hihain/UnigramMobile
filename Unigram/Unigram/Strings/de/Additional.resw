@@ -323,4 +323,8 @@
     <value>Neue Zeile einfügen</value>
     <comment>Send button context menu</comment>
   </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Zur nächsten Reaktion springen</value>
+    <comment>ChatView</comment>
+  </data>
 </root>

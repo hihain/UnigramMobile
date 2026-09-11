@@ -96,6 +96,11 @@ namespace Unigram.Views
                     ViewModel.SetLastViewedMention(message.Id);
                 }
 
+                if (message.UnreadReactions.Count > 0)
+                {
+                    ViewModel.SetLastViewedReaction(message.Id);
+                }
+
                 if (message.Content is MessageAlbum album)
                 {
                     messages.AddRange(album.Messages.Keys);

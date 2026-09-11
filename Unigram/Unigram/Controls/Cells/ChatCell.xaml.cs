@@ -333,7 +333,12 @@ namespace Unigram.Controls.Cells
         public void UpdateChatUnreadMentionCount(Chat chat, ChatPosition position = null)
         {
             UpdateChatReadInbox(chat, position);
-            UnreadMentionsBadge.Visibility = chat.UnreadMentionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            var mentions = chat.UnreadMentionCount > 0;
+
+            UnreadMentionsBadge.Visibility = mentions || chat.UnreadReactionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+            UnreadMentionsLabel.Visibility = mentions ? Visibility.Visible : Visibility.Collapsed;
+            UnreadReactionsLabel.Visibility = mentions ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public void UpdateNotificationSettings(Chat chat)

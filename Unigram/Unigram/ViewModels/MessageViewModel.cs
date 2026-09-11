@@ -1,4 +1,5 @@
-﻿using Telegram.Td.Api;
+﻿using System.Collections.Generic;
+using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
@@ -31,6 +32,40 @@ namespace Unigram.ViewModels
 
         public bool IsFirst { get; set; } = true;
         public bool IsLast { get; set; } = true;
+
+        private Dictionary<string, UnreadReaction> _unreadReactions;
+        public IDictionary<string, UnreadReaction> UnreadReactions
+        {
+            get
+            {
+                if (_unreadReactions == null)
+                {
+                    _unreadReactions = new Dictionary<string, UnreadReaction>();
+
+                    if (_message.UnreadReactions != null)
+                    {
+                        foreach (var item in _message.UnreadReactions)
+                        {
+                            var key = item.Type.ToKey();
+                            if (string.IsNullOrEmpty(key))
+                            {
+                                continue;
+                            }
+
+                            _unreadReactions[key] = item;
+                        }
+                    }
+                }
+
+                return _unreadReactions;
+            }
+        }
+
+        public void UpdateUnreadReactions(IList<UnreadReaction> value)
+        {
+            _message.UnreadReactions = value;
+            _unreadReactions = null;
+        }
 
         public ReplyMarkup ReplyMarkup { get => _message.ReplyMarkup; set => _message.ReplyMarkup = value; }
         public MessageContent Content { get => _message.Content; set => _message.Content = value; }
@@ -284,6 +319,7 @@ namespace Unigram.ViewModels
             _message.CanGetStatistics = message.CanGetStatistics;
             _message.ChatId = message.ChatId;
             _message.ContainsUnreadMention = message.ContainsUnreadMention;
+            UpdateUnreadReactions(message.UnreadReactions);
             //_message.Content = message.Content;
             //_message.Date = message.Date;
             _message.EditDate = message.EditDate;

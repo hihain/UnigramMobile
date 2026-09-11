@@ -242,13 +242,23 @@
                     Visibility="Collapsed"
                     Grid.Column="4"
                     Grid.Row="1">
-                <TextBlock x:Name="UnreadMentionsLabel"
-                           Text="&#xE168;"
-                           FontFamily="{StaticResource SymbolThemeFontFamily}"
-                           Style="{StaticResource CaptionTextBlockStyle}"
-                           Foreground="{ThemeResource ChatUnreadLabelBrush}"
-                           VerticalAlignment="Center"
-                           TextAlignment="Center"/>
+                <Grid>
+                    <TextBlock x:Name="UnreadMentionsLabel"
+                               Text="&#xE168;"
+                               FontFamily="{StaticResource SymbolThemeFontFamily}"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource ChatUnreadLabelBrush}"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"/>
+                    <TextBlock x:Name="UnreadReactionsLabel"
+                               Text="&#x2665;"
+                               Visibility="Collapsed"
+                               FontFamily="{ThemeResource ContentControlThemeFontFamily}"
+                               FontSize="14"
+                               Foreground="{ThemeResource ChatUnreadLabelBrush}"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"/>
+                </Grid>
             </Border>
             <Border x:Name="UnreadBadge"
                     Background="{ThemeResource ChatUnreadBadgeBrush}"

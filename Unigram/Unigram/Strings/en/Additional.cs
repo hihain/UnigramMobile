@@ -38,6 +38,16 @@ namespace Unigram.Strings
                 return Resource.GetString("InsertNewLine");
             }
         }
+        /// <summary>
+        /// Localized resource similar to "Go to next reaction"
+        /// </summary>
+        public static string AccDescrReactionDown
+        {
+            get
+            {
+                return Resource.GetString("AccDescrReactionDown");
+            }
+        }
         private static ResourceLoader resourceLoader;
         
         /// <summary>
