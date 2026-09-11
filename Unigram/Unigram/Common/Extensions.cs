@@ -245,17 +245,16 @@ namespace Unigram.Common
 
         public static uint GetHeight(this ImageProperties props)
         {
+            // ImageProperties.Width/Height already report the EXIF-oriented dimensions
+            // (verified: raw 1600x900 + EXIF orientation 6 -> Width=900, Height=1600),
+            // so no swap is needed here.
             return props.Height;
-            //return props.Orientation == PhotoOrientation.Rotate180 ? props.Height : props.Width;
         }
 
         public static uint GetWidth(this ImageProperties props)
         {
             return props.Width;
-            //return props.Orientation == PhotoOrientation.Rotate180 ? props.Width : props.Height;
         }
-
-
 
         public static uint GetHeight(this VideoProperties props)
         {

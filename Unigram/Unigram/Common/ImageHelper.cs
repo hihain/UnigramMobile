@@ -27,8 +27,8 @@ namespace Unigram.Common
 
             if (editState?.Rectangle is Rect crop)
             {
-                width = (uint)(crop.Width * props.Width);
-                height = (uint)(crop.Height * props.Height);
+                width = (uint)(crop.Width * width);
+                height = (uint)(crop.Height * height);
             }
 
             if (width > requestedMinSide || height > requestedMinSide)
@@ -269,10 +269,20 @@ namespace Unigram.Common
             using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
             {
                 var decoder = await BitmapDecoder.CreateAsync(fileStream);
-                var cropWidth = (double)decoder.PixelWidth;
-                var cropHeight = (double)decoder.PixelHeight;
 
-                if (decoder.PixelWidth > 1280 || decoder.PixelHeight > 1280)
+                // The crop rectangle is expressed in the EXIF-oriented image space
+                // (the editor displays the image with RespectExifOrientation), but
+                // BitmapTransform.Bounds is applied in the final (EXIF-oriented,
+                // scaled, flipped, rotated) space, so all the math below runs in the
+                // oriented space. ScaledWidth/ScaledHeight on the other hand are
+                // defined in the source (non-oriented) space, so for 90-degree EXIF
+                // orientations the scaled dimensions have to be swapped back.
+                var orientedWidth = (double)decoder.OrientedPixelWidth;
+                var orientedHeight = (double)decoder.OrientedPixelHeight;
+                var cropWidth = orientedWidth;
+                var cropHeight = orientedHeight;
+
+                if (orientedWidth > 1280 || orientedHeight > 1280)
                 {
                     double ratioX = (double)1280 / cropWidth;
                     double ratioY = (double)1280 / cropHeight;
@@ -283,12 +293,25 @@ namespace Unigram.Common
                 }
 
                 cropRectangle = new Rect(
-                    cropRectangle.X * decoder.PixelWidth,
-                    cropRectangle.Y * decoder.PixelHeight,
-                    cropRectangle.Width * decoder.PixelWidth,
-                    cropRectangle.Height * decoder.PixelHeight);
+                    cropRectangle.X * orientedWidth,
+                    cropRectangle.Y * orientedHeight,
+                    cropRectangle.Width * orientedWidth,
+                    cropRectangle.Height * orientedHeight);
 
-                var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(decoder.PixelWidth, decoder.PixelHeight), new Size(cropWidth, cropHeight), min, max);
+                // The crop rectangle is expressed in the rotated/flipped image space,
+                // but BitmapTransform.Bounds is applied in the final space, so the
+                // rectangle has to be transformed back before scaling the bounds.
+                if (rotation != BitmapRotation.None)
+                {
+                    cropRectangle = RotateArea(cropRectangle, (uint)orientedWidth, (uint)orientedHeight, (int)rotation);
+                }
+
+                if (flip == BitmapFlip.Horizontal)
+                {
+                    cropRectangle = FlipArea(cropRectangle, (uint)orientedWidth);
+                }
+
+                var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(orientedWidth, orientedHeight), new Size(cropWidth, cropHeight), min, max);
 
                 var bounds = new BitmapBounds();
                 bounds.X = (uint)scaledCrop.X;
@@ -297,8 +320,16 @@ namespace Unigram.Common
                 bounds.Height = (uint)scaledCrop.Height;
 
                 var transform = new BitmapTransform();
-                transform.ScaledWidth = (uint)scaledSize.Width;
-                transform.ScaledHeight = (uint)scaledSize.Height;
+                if (decoder.OrientedPixelWidth != decoder.PixelWidth)
+                {
+                    transform.ScaledWidth = (uint)scaledSize.Height;
+                    transform.ScaledHeight = (uint)scaledSize.Width;
+                }
+                else
+                {
+                    transform.ScaledWidth = (uint)scaledSize.Width;
+                    transform.ScaledHeight = (uint)scaledSize.Height;
+                }
                 transform.Bounds = bounds;
                 transform.InterpolationMode = BitmapInterpolationMode.Linear;
                 transform.Rotation = rotation;
@@ -316,6 +347,29 @@ namespace Unigram.Common
             }
 
             return file;
+        }
+
+        private static Rect RotateArea(Rect area, uint width, uint height, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var point = new Point(height - area.Bottom, width - (width - area.X));
+                area = new Rect(point.X, point.Y, area.Height, area.Width);
+
+                var temp = width;
+                width = height;
+                height = temp;
+            }
+
+            return area;
+        }
+
+        private static Rect FlipArea(Rect area, uint width)
+        {
+            var point = new Point(width - area.Right, area.Y);
+            var result = new Rect(point.X, point.Y, area.Width, area.Height);
+
+            return result;
         }
 
         private static (Rect, Size) Scale(Rect rect, Size start, Size size, int min, int max)
@@ -379,10 +433,20 @@ namespace Unigram.Common
         public static async Task<ImageSource> CropAndPreviewAsync(IRandomAccessStream imageStream, BitmapEditState editState)
         {
             var decoder = await BitmapDecoder.CreateAsync(imageStream);
-            var cropWidth = (double)decoder.PixelWidth;
-            var cropHeight = (double)decoder.PixelHeight;
 
-            if (decoder.PixelWidth > 1280 || decoder.PixelHeight > 1280)
+            // The crop rectangle is expressed in the EXIF-oriented image space
+            // (the editor displays the image with RespectExifOrientation), but
+            // BitmapTransform.Bounds is applied in the final (EXIF-oriented,
+            // scaled, flipped, rotated) space, so all the math below runs in the
+            // oriented space. ScaledWidth/ScaledHeight on the other hand are
+            // defined in the source (non-oriented) space, so for 90-degree EXIF
+            // orientations the scaled dimensions have to be swapped back.
+            var orientedWidth = (double)decoder.OrientedPixelWidth;
+            var orientedHeight = (double)decoder.OrientedPixelHeight;
+            var cropWidth = orientedWidth;
+            var cropHeight = orientedHeight;
+
+            if (orientedWidth > 1280 || orientedHeight > 1280)
             {
                 double ratioX = (double)1280 / cropWidth;
                 double ratioY = (double)1280 / cropHeight;
@@ -393,12 +457,25 @@ namespace Unigram.Common
             }
 
             var cropRectangle = new Rect(
-                editState.Rectangle.X * decoder.PixelWidth,
-                editState.Rectangle.Y * decoder.PixelHeight,
-                editState.Rectangle.Width * decoder.PixelWidth,
-                editState.Rectangle.Height * decoder.PixelHeight);
+                editState.Rectangle.X * orientedWidth,
+                editState.Rectangle.Y * orientedHeight,
+                editState.Rectangle.Width * orientedWidth,
+                editState.Rectangle.Height * orientedHeight);
 
-            var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(decoder.PixelWidth, decoder.PixelHeight), new Size(cropWidth, cropHeight), 1280, 0);
+            // The crop rectangle is expressed in the rotated/flipped image space,
+            // but BitmapTransform.Bounds is applied in the final space, so the
+            // rectangle has to be transformed back before scaling the bounds.
+            if (editState.Rotation != BitmapRotation.None)
+            {
+                cropRectangle = RotateArea(cropRectangle, (uint)orientedWidth, (uint)orientedHeight, (int)editState.Rotation);
+            }
+
+            if (editState.Flip == BitmapFlip.Horizontal)
+            {
+                cropRectangle = FlipArea(cropRectangle, (uint)orientedWidth);
+            }
+
+            var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(orientedWidth, orientedHeight), new Size(cropWidth, cropHeight), 1280, 0);
 
             var bounds = new BitmapBounds();
             bounds.X = (uint)scaledCrop.X;
@@ -407,8 +484,16 @@ namespace Unigram.Common
             bounds.Height = (uint)scaledCrop.Height;
 
             var transform = new BitmapTransform();
-            transform.ScaledWidth = (uint)scaledSize.Width;
-            transform.ScaledHeight = (uint)scaledSize.Height;
+            if (decoder.OrientedPixelWidth != decoder.PixelWidth)
+            {
+                transform.ScaledWidth = (uint)scaledSize.Height;
+                transform.ScaledHeight = (uint)scaledSize.Width;
+            }
+            else
+            {
+                transform.ScaledWidth = (uint)scaledSize.Width;
+                transform.ScaledHeight = (uint)scaledSize.Height;
+            }
             transform.Bounds = bounds;
             transform.InterpolationMode = BitmapInterpolationMode.Linear;
             transform.Rotation = editState.Rotation;
@@ -543,6 +628,10 @@ namespace Unigram.Common
                         break;
                 }
 
+                // Scale first, then translate: with the row-vector convention
+                // (point * matrix) the last multiplied matrix is applied last, so
+                // multiplying the translation after the scale would scale the offset
+                // too, shifting the strokes whenever a crop is active.
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateScale(scaleX, scaleY));
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateTranslation(-(offsetX * size.X), -(offsetY * size.Y)));
 
@@ -644,6 +733,10 @@ namespace Unigram.Common
                         break;
                 }
 
+                // Scale first, then translate: with the row-vector convention
+                // (point * matrix) the last multiplied matrix is applied last, so
+                // multiplying the translation after the scale would scale the offset
+                // too, shifting the strokes whenever a crop is active.
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateScale(scaleX, scaleY));
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateTranslation(-(offsetX * size.X), -(offsetY * size.Y)));
 
