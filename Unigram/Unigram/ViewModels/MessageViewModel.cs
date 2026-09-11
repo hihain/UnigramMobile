@@ -91,6 +91,7 @@ namespace Unigram.ViewModels
         public bool CanBeSaved => _message.CanBeSaved;
         public bool CanGetMessageThread => _message.CanGetMessageThread;
         public bool CanGetStatistics => _message.CanGetStatistics;
+        public bool CanGetViewers => _message.CanGetViewers;
         public bool IsOutgoing { get => _message.IsOutgoing; set => _message.IsOutgoing = value; }
         public bool IsPinned { get => _message.IsPinned; set => _message.IsPinned = value; }
         public MessageSchedulingState SchedulingState => _message.SchedulingState;
@@ -317,6 +318,7 @@ namespace Unigram.ViewModels
             _message.CanBeForwarded = message.CanBeForwarded;
             _message.CanGetMessageThread = message.CanGetMessageThread;
             _message.CanGetStatistics = message.CanGetStatistics;
+            _message.CanGetViewers = message.CanGetViewers;
             _message.ChatId = message.ChatId;
             _message.ContainsUnreadMention = message.ContainsUnreadMention;
             UpdateUnreadReactions(message.UnreadReactions);

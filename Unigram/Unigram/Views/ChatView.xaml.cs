@@ -2129,6 +2129,11 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessageSendNow_Loaded, ViewModel.MessageSendNowCommand, message, Strings.Resources.MessageScheduleSend, new FontIcon { Glyph = Icons.Send, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
                 flyout.CreateFlyoutItem(MessageReschedule_Loaded, ViewModel.MessageRescheduleCommand, message, Strings.Resources.MessageScheduleEditTime, new FontIcon { Glyph = Icons.Schedule });
 
+                if (MessageViewers_Loaded(message))
+                {
+                    LoadMessageViewers(message, flyout);
+                }
+
                 // Generic
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageQuote_Loaded, ViewModel.MessageQuoteCommand, message, Strings.Additional.QuoteReply, new FontIcon { Glyph = Icons.Reply });
@@ -2283,6 +2288,99 @@ namespace Unigram.Views
                 {
                     result.Add(item.Type);
                 }
+            }
+        }
+
+        private bool MessageViewers_Loaded(MessageViewModel message)
+        {
+            if (message.SchedulingState != null || !message.IsOutgoing)
+            {
+                return false;
+            }
+
+            var chat = message.GetChat();
+            if (chat == null || (chat.Type is ChatTypeBasicGroup == false && chat.Type is ChatTypeSupergroup == false))
+            {
+                return false;
+            }
+
+            return message.CanGetViewers;
+        }
+
+        private FontIcon MessageViewersIcon(bool played)
+        {
+            if (played)
+            {
+                return new FontIcon { Glyph = Icons.Play };
+            }
+
+            return new FontIcon { Glyph = Icons.MarkAsRead, FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily };
+        }
+
+        // The viewers arrive after the menu is already on screen, so the entry is only
+        // ever updated in place. Swapping items of an open flyout fails on 15254.
+        private async void LoadMessageViewers(MessageViewModel message, MenuFlyout flyout)
+        {
+            var played = message.Content is MessageVoiceNote || message.Content is MessageVideoNote;
+
+            var placeholder = new MenuFlyoutItem();
+            placeholder.Text = "…";
+            placeholder.IsEnabled = false;
+            placeholder.Icon = MessageViewersIcon(played);
+
+            flyout.Items.Insert(0, placeholder);
+            flyout.Items.Insert(1, new MenuFlyoutSeparator());
+
+            try
+            {
+                var response = await message.ProtoService.SendAsync(new GetMessageViewers(message.ChatId, message.Id));
+
+                var profiles = new List<User>();
+                IList<MessageViewer> entries = null;
+
+                if (response is MessageViewers viewers)
+                {
+                    entries = viewers.Viewers;
+
+                    foreach (var viewer in viewers.Viewers)
+                    {
+                        var user = message.ProtoService.GetUser(viewer.UserId);
+                        if (user != null)
+                        {
+                            profiles.Add(user);
+                        }
+                    }
+                }
+                else if (response is Error error)
+                {
+                    placeholder.Text = error.Message;
+                    return;
+                }
+
+                if (profiles.Count == 0)
+                {
+                    placeholder.Text = Strings.Resources.NobodyViewed;
+                    return;
+                }
+
+                if (profiles.Count == 1)
+                {
+                    placeholder.Text = profiles[0].GetFullName();
+                    placeholder.CommandParameter = profiles[0].Id;
+                    placeholder.Command = ViewModel.OpenUserCommand;
+                }
+                else
+                {
+                    placeholder.Text = Locale.Declension(played ? "MessagePlayed" : "MessageSeen", profiles.Count);
+                    placeholder.CommandParameter = new MessageViewersArgs { Viewers = entries, Played = played };
+                    placeholder.Command = ViewModel.MessageViewersCommand;
+                }
+
+                placeholder.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                placeholder.Text = ex.Message;
             }
         }
 

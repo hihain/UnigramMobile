@@ -141,6 +141,7 @@ namespace Unigram.ViewModels
             OpenMessageCommand = new RelayCommand<Message>(OpenMessageExecute);
             ScheduledCommand = new RelayCommand(ScheduledExecute);
             SetSenderCommand = new RelayCommand<MessageSender>(SetSenderExecute);
+            OpenUserCommand = new RelayCommand<long>(OpenUser);
 
             MessagesForwardCommand = new RelayCommand(MessagesForwardExecute, MessagesForwardCanExecute);
             MessagesDeleteCommand = new RelayCommand(MessagesDeleteExecute, MessagesDeleteCanExecute);
@@ -151,6 +152,7 @@ namespace Unigram.ViewModels
             MessageReplyNextCommand = new RelayCommand(MessageReplyNextExecute);
             MessageReplyCommand = new RelayCommand<MessageViewModel>(MessageReplyExecute);
             MessageQuoteCommand = new RelayCommand<MessageViewModel>(MessageQuoteExecute);
+            MessageViewersCommand = new RelayCommand<MessageViewersArgs>(MessageViewersExecute);
             MessageRetryCommand = new RelayCommand<MessageViewModel>(MessageRetryExecute);
             MessageDeleteCommand = new RelayCommand<MessageViewModel>(MessageDeleteExecute);
             MessageForwardCommand = new RelayCommand<MessageViewModel>(MessageForwardExecute);
@@ -2968,6 +2970,8 @@ namespace Unigram.ViewModels
         }
 
         #endregion
+
+        public RelayCommand<long> OpenUserCommand { get; }
 
         #region Join channel
 

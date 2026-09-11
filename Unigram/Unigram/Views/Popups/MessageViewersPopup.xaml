@@ -1,0 +1,57 @@
+<controls:ContentPopup
+    x:Class="Unigram.Views.Popups.MessageViewersPopup"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Unigram.Views.Popups"
+    xmlns:controls="using:Unigram.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="TITLE"
+    PrimaryButtonText="Button1"
+    PrimaryButtonClick="ContentDialog_PrimaryButtonClick">
+
+    <ListView x:Name="ScrollingHost"
+              IsItemClickEnabled="True"
+              ItemClick="OnItemClick"
+              SelectionMode="None"
+              Padding="12,0"
+              VerticalAlignment="Stretch"
+              ContainerContentChanging="OnContainerContentChanging">
+        <ListView.ItemTemplate>
+            <DataTemplate>
+                <Grid Margin="0,6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <controls:ProfilePicture IsHitTestVisible="False"
+                                             Width="36"
+                                             Height="36"
+                                             Margin="0,0,12,0"
+                                             Grid.RowSpan="2"/>
+                    <TextBlock VerticalAlignment="Bottom"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               FontFamily="{ThemeResource EmojiThemeFontFamily}"
+                               Style="{StaticResource BodyTextBlockStyle}"
+                               Grid.Column="1"/>
+                    <TextBlock VerticalAlignment="Top"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"
+                               Grid.Row="1"
+                               Grid.Column="1"/>
+                </Grid>
+            </DataTemplate>
+        </ListView.ItemTemplate>
+        <ListView.Footer>
+            <Border Height="12"/>
+        </ListView.Footer>
+    </ListView>
+</controls:ContentPopup>

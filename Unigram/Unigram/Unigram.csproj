@@ -910,6 +910,9 @@
     <Compile Include="Views\Popups\LoginUrlInfoPopup.xaml.cs">
       <DependentUpon>LoginUrlInfoPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Popups\MessageViewersPopup.xaml.cs">
+      <DependentUpon>MessageViewersPopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Popups\PollResultsPopup.xaml.cs">
       <DependentUpon>PollResultsPopup.xaml</DependentUpon>
     </Compile>
@@ -2315,6 +2318,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\Popups\LoginUrlInfoPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Popups\MessageViewersPopup.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

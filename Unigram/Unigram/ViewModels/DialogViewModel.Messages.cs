@@ -90,6 +90,17 @@ namespace Unigram.ViewModels
             TextField?.Focus(FocusState.Keyboard);
         }
 
+        public RelayCommand<MessageViewersArgs> MessageViewersCommand { get; }
+        private async void MessageViewersExecute(MessageViewersArgs args)
+        {
+            if (args == null || args.Viewers == null || args.Viewers.Count == 0)
+            {
+                return;
+            }
+
+            await new MessageViewersPopup(ProtoService, this, args.Viewers, args.Played).ShowQueuedAsync();
+        }
+
         public RelayCommand<MessageViewModel> MessageQuoteCommand { get; }
         private async void MessageQuoteExecute(MessageViewModel message)
         {
@@ -1606,5 +1617,11 @@ namespace Unigram.ViewModels
         }
 
         #endregion
+    }
+
+    public class MessageViewersArgs
+    {
+        public IList<MessageViewer> Viewers { get; set; }
+        public bool Played { get; set; }
     }
 }
