@@ -496,13 +496,19 @@ namespace Unigram
         }
 
 #if !DEBUG
+        // Both of these keep the app alive, which is the point of them in a release build.
+        // They used to hand the exception to AppCenter on the way past; with that gone they
+        // were swallowing it whole, and a crash that leaves no trace is worse than one that
+        // does. The TDLib log is where the rest of the app writes, so it goes there too.
         private void OnUnobservedException(object sender, UnobservedTaskExceptionEventArgs e)
         {
+            Client.Execute(new AddLogMessage(1, "Unobserved task exception:\n" + e.Exception));
             e.SetObserved();
         }
 
         private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
+            Client.Execute(new AddLogMessage(1, "Unhandled exception:\n" + e.Exception));
             e.Handled = true;
         }
 #endif
