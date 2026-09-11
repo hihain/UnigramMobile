@@ -1797,6 +1797,7 @@
     <PRIResource Include="Strings\hi\Additional.resw">
       <SubType>Designer</SubType>
     </PRIResource>
+    <None Include="Unigram_DevKey.pfx" />
     <None Include="Unigram_StoreKey.pfx" />
     <None Include="Unigram_TemporaryKey.pfx" />
   </ItemGroup>

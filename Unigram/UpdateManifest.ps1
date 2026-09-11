@@ -3,6 +3,14 @@ param (
   [string]$config = "DEBUG"
 )
 
+# This runs as a pre-build event, where nothing reads what it prints. Without this, a
+# script that falls over halfway leaves the manifest holding the version of whatever
+# commit it was last saved on, the build carries on and packages it, and the first sign
+# of trouble is a phone refusing the install. The two exits below are the exception:
+# no git and no commit count are the source-without-history case, and that one is
+# allowed to build.
+$ErrorActionPreference = "Stop"
+
 Write-Output "Config: $config"
 Write-Output "Path: $path"
 

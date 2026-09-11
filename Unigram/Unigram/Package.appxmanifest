@@ -1,5 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3" xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4" xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5" IgnorableNamespaces="uap uap3 uap4 uap5 mp">
+  <!--
+    Generated in part. UpdateManifest.ps1 runs before every build and rewrites the
+    Identity name and version and both DisplayName values, all from the branch that is
+    being built. The values standing here are only whatever the last commit happened to
+    carry, and the version in particular is meaningless: it is derived from the commit
+    count, so it differs on every branch and on every commit.
+
+    So do not hand-edit those, and do not commit what a build leaves behind in them;
+    discard the churn instead. Everything else in this file is written by hand.
+  -->
   <Identity Name="49197Wirdschon.UnigramMobile" Publisher="CN=DC409D7A-979D-42E5-AAA5-E9A0F674260F" Version="26.8.6083.0" />
   <mp:PhoneIdentity PhoneProductId="bf16cc61-265a-4c8a-9ead-f4f77e6a0a97" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
