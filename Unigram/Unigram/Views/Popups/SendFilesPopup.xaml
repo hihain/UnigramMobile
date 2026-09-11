@@ -140,7 +140,7 @@
 
         <DataTemplate x:Key="MediaItemTemplate" x:DataType="entities:StorageMedia">
             <Grid>
-<Grid MinHeight="48"
+                <Grid MinHeight="48"
                       Tapped="Preview_TappedAsync"
                       Tag="{x:Bind}">
                     <Image
@@ -299,7 +299,7 @@
                 ToolTipService.ToolTip="{CustomResource SendWithoutGrouping}"                
                 FontFamily="{StaticResource TelegramThemeFontFamily}"
                 FontSize="{StaticResource GlyphButtonFontSize}"
-                Visibility="{x:Bind IsAlbumAvailable, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                Visibility="{x:Bind IsGroupingAvailable, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
                 IsChecked="{x:Bind IsAlbum, Mode=OneWay}"
                 IsOneWay="False"
                 Grid.Column="5"/>

@@ -37,8 +37,9 @@ namespace Unigram.Views.Popups
 
         private bool _hasMessageContext = true;
 
-        // Stroke thickness presets (canvas-relative units, normalized by the
-        // canvas width when strokes are rendered onto the output bitmap).
+        // Stroke thickness presets, in editor canvas pixels. PencilCanvas divides by its
+        // own width when a stroke starts, so the same stroke comes out proportional on an
+        // output bitmap of any size.
         private static readonly float[] _thicknessValues = { 2, 3, 4, 6, 9, 13, 20 };
         private readonly List<(Border Ring, Ellipse Dot)> _thicknessPresets = new List<(Border, Ellipse)>();
         private int _thicknessIndex = 2;
@@ -787,17 +788,19 @@ namespace Unigram.Views.Popups
 
         private void SelectThicknessPreset(int index)
         {
-            _thicknessIndex = index;
+            // The index comes back out of a saved setting as well as out of a button, and
+            // the setting is a float that nothing keeps inside the range this array has.
+            _thicknessIndex = Math.Max(0, Math.Min(_thicknessValues.Length - 1, index));
 
             for (int i = 0; i < _thicknessPresets.Count; i++)
             {
-                _thicknessPresets[i].Ring.Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+                _thicknessPresets[i].Ring.Visibility = i == _thicknessIndex ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            DrawSlider.SetDefault(new Vector2(DrawSlider.GetDefault().X, (float)index / (_thicknessValues.Length - 1)));
+            DrawSlider.SetDefault(new Vector2(DrawSlider.GetDefault().X, (float)_thicknessIndex / (_thicknessValues.Length - 1)));
 
             Canvas.Stroke = DrawSlider.Stroke;
-            Canvas.StrokeThickness = _thicknessValues[index];
+            Canvas.StrokeThickness = _thicknessValues[_thicknessIndex];
 
             Brush_Click(null, null);
         }

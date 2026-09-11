@@ -51,7 +51,15 @@ namespace Unigram.Views.Popups
         }
 
         public bool IsMediaOnly => Items.All(x => x is StoragePhoto || x is StorageVideo);
+
+        // Whether the album panel is the one that lays the selection out. It also draws a
+        // single item -- that is the only place a lone photo gets sized to its own aspect
+        // instead of sitting in a list row.
         public bool IsAlbumAvailable => IsMediaSelected && Items.Count > 0 && Items.Count <= 10 && Items.All(x => (x is StoragePhoto || x is StorageVideo) && x.Ttl == 0);
+
+        // Whether grouping is a choice worth offering. One item is one message either way,
+        // so the toggle would say nothing.
+        public bool IsGroupingAvailable => IsAlbumAvailable && Items.Count > 1;
         public bool IsTtlAvailable { get; }
 
         private bool _isMediaSelected;
@@ -421,6 +429,7 @@ namespace Unigram.Views.Popups
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsMediaOnly"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsAlbumAvailable"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsGroupingAvailable"));
 
             if (IsMediaSelected && !IsMediaOnly)
             {
