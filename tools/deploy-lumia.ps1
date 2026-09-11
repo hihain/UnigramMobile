@@ -113,21 +113,59 @@ else {
     Write-Host '[deploy] nothing installed yet -- a first install needs -WithDependencies'
 }
 
-$mp = [Net.Http.MultipartFormDataContent]::new()
-foreach ($f in $files) {
-    $name = [IO.Path]::GetFileName($f)
-    Write-Host ("[deploy] adding {0} ({1:N1} MB)" -f $name, ((Get-Item $f).Length / 1MB))
-    $bc = [Net.Http.ByteArrayContent]::new([IO.File]::ReadAllBytes($f))
-    $bc.Headers.ContentDisposition = [Net.Http.Headers.ContentDispositionHeaderValue]::new('form-data')
-    $bc.Headers.ContentDisposition.Name = "`"$name`""
-    $bc.Headers.ContentDisposition.FileName = "`"$name`""
-    $bc.Headers.ContentType = [Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
-    $mp.Add($bc)
+# Built fresh for every attempt. The content streams are read as the request is sent, so
+# a retry cannot reuse the body of the one that was turned away.
+function New-Upload {
+    $mp = [Net.Http.MultipartFormDataContent]::new()
+    foreach ($f in $files) {
+        $name = [IO.Path]::GetFileName($f)
+        $bc = [Net.Http.ByteArrayContent]::new([IO.File]::ReadAllBytes($f))
+        $bc.Headers.ContentDisposition = [Net.Http.Headers.ContentDispositionHeaderValue]::new('form-data')
+        $bc.Headers.ContentDisposition.Name = "`"$name`""
+        $bc.Headers.ContentDisposition.FileName = "`"$name`""
+        $bc.Headers.ContentType = [Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
+        $mp.Add($bc)
+    }
+
+    # The leading comma is not a typo. MultipartFormDataContent is itself enumerable, so
+    # returning it plainly hands back the parts it holds instead of the thing holding them.
+    return ,$mp
 }
 
-Write-Host "[deploy] uploading $(Get-Date -Format HH:mm:ss) ..."
-$ins = Wdp POST "/api/app/packagemanager/package?package=$([uri]::EscapeDataString([IO.Path]::GetFileName($bundle)))" $mp
-Write-Host "[deploy] install request: $([int]$ins.StatusCode)  $(Txt $ins)"
+foreach ($f in $files) {
+    Write-Host ("[deploy] sending {0} ({1:N1} MB)" -f [IO.Path]::GetFileName($f), ((Get-Item $f).Length / 1MB))
+}
+
+# The phone turns a package away with a 409 while it is still busy with another deployment,
+# and that is the only place it says so. Asking the state endpoint does not help: it reports
+# the last deployment that finished, so it answers Success while a new one is being refused.
+# Without the check below the script went on to poll that Success for four hundred seconds
+# and then blamed a timeout, which was the one explanation that could not have been right.
+$code = 0
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Write-Host "[deploy] uploading $(Get-Date -Format HH:mm:ss) ..."
+    $ins = Wdp POST "/api/app/packagemanager/package?package=$([uri]::EscapeDataString([IO.Path]::GetFileName($bundle)))" (New-Upload)
+    $code = [int]$ins.StatusCode
+    Write-Host "[deploy] install request: $code  $(Txt $ins)"
+
+    if ($code -ne 409) { break }
+
+    if ($attempt -lt 3) {
+        Write-Host '[deploy] the phone is busy with another deployment -- waiting 20s and sending again'
+        Start-Sleep 20
+    }
+}
+
+if ($code -eq 409) {
+    Write-Host '[deploy] the phone stayed busy with another deployment. Nothing was installed.' -ForegroundColor Red
+    Write-Host '[deploy] a reboot clears a deployment that is stuck.' -ForegroundColor Red
+    exit 1
+}
+
+if ($code -ne 202) {
+    Write-Host "[deploy] the phone did not accept the package ($code). Nothing was installed." -ForegroundColor Red
+    exit 1
+}
 
 $ok = $false
 for ($i = 0; $i -lt 80; $i++) {
@@ -139,6 +177,7 @@ for ($i = 0; $i -lt 80; $i++) {
     Write-Host "  ... installing ($i) $($state.Substring(0, [Math]::Min(90, $state.Length)))"
 }
 
+# Accepted, so this really is a timeout rather than a refusal in disguise.
 if (-not $ok) { Write-Host '[deploy] INSTALL NOT CONFIRMED' -ForegroundColor Red; exit 1 }
 
 $full = (Installed).PackageFullName

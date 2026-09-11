@@ -15,6 +15,28 @@ flags on it are optional and none of them are obvious.
 - **`Unigram/Unigram/Constants.Secret.cs`**, which is gitignored and stays that way. Copy
   `Constants.Secret.example.cs` over it and fill in an api_id/api_hash of your own; the
   build does not compile without the file.
+- **A signing key at `Unigram/Unigram/Unigram_DevKey.pfx`**, gitignored for the same kind
+  of reason: a signing key in a repository is a key everybody has, and a package signed
+  with it is one every phone that trusted an earlier build will install without asking.
+  Make your own, and give it the subject the manifest already names as its publisher --
+  packaging fails on a mismatch:
+
+  ```powershell
+  $cert = New-SelfSignedCertificate -Type Custom `
+    -Subject "CN=DC409D7A-979D-42E5-AAA5-E9A0F674260F" `
+    -KeyUsage DigitalSignature -CertStoreLocation "Cert:\CurrentUser\My" `
+    -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+
+  [IO.File]::WriteAllBytes("<repo>\Unigram\Unigram\Unigram_DevKey.pfx", $cert.Export("Pfx"))
+  ```
+
+  `Export-PfxCertificate` is the usual way to write one out and is no use here: it insists
+  on a password or a DPAPI protector, and MSBuild wants a file that opens without either.
+  Exporting through .NET gives a passwordless one.
+
+  To use a subject of your own instead, change `Publisher` on the `<Identity>` element in
+  `Package.appxmanifest` to match it. `UpdateManifest.ps1` rewrites the name and the
+  version on every build but leaves the publisher alone, so that edit survives.
 
 ## The command
 

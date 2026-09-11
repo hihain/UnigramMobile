@@ -1479,6 +1479,7 @@
     <Compile Include="Common\Emoji.cs" />
     <Compile Include="Common\RelayCommand.cs" />
     <Compile Include="Common\NavigationService.cs" />
+    <Compile Include="BuildInfo.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="Controls\AttachPickerFlyout.xaml.cs">
       <DependentUpon>AttachPickerFlyout.xaml</DependentUpon>
@@ -1797,7 +1798,6 @@
     <PRIResource Include="Strings\hi\Additional.resw">
       <SubType>Designer</SubType>
     </PRIResource>
-    <None Include="Unigram_DevKey.pfx" />
     <None Include="Unigram_StoreKey.pfx" />
     <None Include="Unigram_TemporaryKey.pfx" />
   </ItemGroup>

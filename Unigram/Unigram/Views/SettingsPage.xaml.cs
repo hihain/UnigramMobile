@@ -50,7 +50,19 @@ namespace Unigram.Views
         private string GetVersion()
         {
             PackageVersion version = Services.SettingsService.GetAppVersion();
-            return $"{version.Major}.{version.Minor}.{version.Build}";
+            var text = $"{version.Major}.{version.Minor}.{version.Build}";
+
+            // Which build this is, as opposed to where it sits in the order. The number
+            // above is what the phone compares to decide whether an update is newer, and
+            // it is the wrong shape for saying anything else -- two builds of different
+            // work can carry the same one, and after a branch is rewritten the same work
+            // carries a different one.
+            if (BuildInfo.Commit != "unknown")
+            {
+                text += $" ({BuildInfo.Commit})";
+            }
+
+            return text;
         }
 
         private MasterDetailView _masterDetail;
