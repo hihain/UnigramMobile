@@ -1657,10 +1657,6 @@ namespace Unigram.Services
                 if (updateOption.Name == "my_id" && updateOption.Value is OptionValueInteger myId)
                 {
                     _settings.UserId = (int)myId.Value;
-
-#if !DEBUG
-                    Microsoft.AppCenter.AppCenter.SetUserId($"uid={myId.Value}");
-#endif
                 }
             }
             else if (update is UpdateRecentStickers updateRecentStickers)

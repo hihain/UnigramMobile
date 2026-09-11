@@ -11,7 +11,6 @@ namespace Unigram
             ApiHash = "";
 
             AppChannel = "sideload";
-            AppCenterId = "";
         }
     }
 }
