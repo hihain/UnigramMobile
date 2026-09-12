@@ -111,8 +111,8 @@ namespace Unigram.Services
 
         private void OnColorValuesChanged(UISettings sender, object args)
         {
-            _aggregator.Publish(new UpdateSelectedBackground(true, _protoService.GetSelectedBackground(true)));
-            _aggregator.Publish(new UpdateSelectedBackground(false, _protoService.GetSelectedBackground(false)));
+            _aggregator.Publish(new UpdateDefaultBackground(true, _protoService.GetSelectedBackground(true)));
+            _aggregator.Publish(new UpdateDefaultBackground(false, _protoService.GetSelectedBackground(false)));
         }
 
         public Dictionary<string, string[]> GetMapping(TelegramTheme flags)
@@ -318,8 +318,8 @@ namespace Unigram.Services
                 });
             }
 
-            _aggregator.Publish(new UpdateSelectedBackground(true, _protoService.GetSelectedBackground(true)));
-            _aggregator.Publish(new UpdateSelectedBackground(false, _protoService.GetSelectedBackground(false)));
+            _aggregator.Publish(new UpdateDefaultBackground(true, _protoService.GetSelectedBackground(true)));
+            _aggregator.Publish(new UpdateDefaultBackground(false, _protoService.GetSelectedBackground(false)));
         }
 
         public async void Refresh()

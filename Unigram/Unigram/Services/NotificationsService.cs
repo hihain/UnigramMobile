@@ -63,6 +63,7 @@ namespace Unigram.Services
         private bool _alreadyRegistered;
 
         private bool _suppress;
+        private DateTime _suppressSince;
 
         public NotificationsService(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, ISessionService sessionService, IEventAggregator aggregator)
         {
@@ -127,7 +128,7 @@ namespace Unigram.Services
                         return;
                     }
 
-                    _protoService.Send(new DeleteAccount("Decline ToS update"));
+                    _protoService.Send(new DeleteAccount("Decline ToS update", string.Empty));
                 }
 
                 await Task.Delay(2000);
@@ -337,19 +338,59 @@ namespace Unigram.Services
         {
             // We want to ignore both delayed and unreceived notifications,
             // as they're the result of update difference on sync.
+            //
+            // Both at once is what says the library is still fetching what it missed, which
+            // is not the same as it merely holding a notification back for a moment: that
+            // happens for a message arriving right now as well, and those are the ones the
+            // app is here to announce.
             if (update.HaveDelayedNotifications && update.HaveUnreceivedNotifications)
             {
-                //_suppress = true;
+                if (!_suppress)
+                {
+                    _suppress = true;
+                    _suppressSince = DateTime.Now;
+                }
             }
             else if (_suppress && !update.HaveDelayedNotifications && !update.HaveUnreceivedNotifications)
             {
-                //_suppress = false;
+                _suppress = false;
             }
+        }
+
+        /// <summary>
+        /// Whether a notification the library is offering now belongs to the backlog it is
+        /// catching up on, in which case it has already been announced: while the app was
+        /// away it was the push task that put it on the screen, and repeating it means every
+        /// message that arrived in the meantime is played again, one after another, for as
+        /// long as it takes to get through them.
+        ///
+        /// Upstream turned this off in November 2020 during the push refactoring, by
+        /// commenting out the two lines that set the flag rather than by deleting the check.
+        /// The check is worth having; what it lacked was a way out of its own making.
+        /// </summary>
+        private bool IsSuppressed()
+        {
+            if (!_suppress)
+            {
+                return false;
+            }
+
+            // A latch only something else can open is a latch that can stay shut. The library
+            // says when it has caught up and normally says it within seconds; if that word
+            // never comes, notifications start working again by themselves instead of staying
+            // off until the app is restarted.
+            if (DateTime.Now - _suppressSince > TimeSpan.FromSeconds(60))
+            {
+                _suppress = false;
+                return false;
+            }
+
+            return true;
         }
 
         public async void Handle(UpdateNotificationGroup update)
         {
-            if (_suppress)
+            if (IsSuppressed())
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
                 return;
@@ -799,7 +840,6 @@ namespace Unigram.Services
             switch (update.AuthorizationState)
             {
                 case AuthorizationStateWaitTdlibParameters waitTdlibParameters:
-                case AuthorizationStateWaitEncryptionKey waitEncryptionKey:
                     break;
                 default:
                     _authorizationStateTask.TrySetResult(update.AuthorizationState);
@@ -847,11 +887,11 @@ namespace Unigram.Services
                     var formatted = Client.Execute(new ParseMarkdown(new FormattedText(messageText, new TextEntity[0]))) as FormattedText;
 
                     var replyToMsgId = data.ContainsKey("msg_id") ? long.Parse(data["msg_id"]) << 20 : 0;
-                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId, new MessageSendOptions(false, true, false, null), null, new InputMessageText(formatted, false, false)));
+                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId == 0 ? null : new InputMessageReplyToMessage(0, replyToMsgId, null), new MessageSendOptions(false, true, false, false, null, 0, false), null, new InputMessageText(formatted, null, false)));
 
                     if (chat.Type is ChatTypePrivate && chat.LastMessage != null)
                     {
-                        await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                        await _protoService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, null, true));
                     }
                 }
                 else if (string.Equals(action, "markasread", StringComparison.OrdinalIgnoreCase))
@@ -861,7 +901,7 @@ namespace Unigram.Services
                         return;
                     }
 
-                    await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                    await _protoService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, null, true));
                 }
             }
         }
@@ -988,9 +1028,9 @@ namespace Unigram.Services
                 {
                     result = $"{from.LastName.Trim()}: ";
                 }
-                else if (!string.IsNullOrEmpty(from.Username))
+                else if (!string.IsNullOrEmpty(from.ActiveUsername()))
                 {
-                    result = $"{from.Username.Trim()}: ";
+                    result = $"{from.ActiveUsername().Trim()}: ";
                 }
                 else if (from.Type is UserTypeDeleted)
                 {
@@ -1125,9 +1165,9 @@ namespace Unigram.Services
                     {
                         result = $"{senderUser.LastName.Trim()}: ";
                     }
-                    else if (!string.IsNullOrEmpty(senderUser.Username))
+                    else if (!string.IsNullOrEmpty(senderUser.ActiveUsername()))
                     {
-                        result = $"{senderUser.Username.Trim()}: ";
+                        result = $"{senderUser.ActiveUsername().Trim()}: ";
                     }
                     else if (senderUser.Type is UserTypeDeleted)
                     {
@@ -1446,8 +1486,11 @@ namespace Unigram.Services
             _protoService.Send(new SetChatNotificationSettings(chat.Id,
                 new ChatNotificationSettings(
                     useDefault, muteFor,
-                    settings.UseDefaultSound, settings.Sound,
+                    settings.UseDefaultSound, settings.SoundId,
                     settings.UseDefaultShowPreview, settings.ShowPreview,
+                    settings.UseDefaultMuteStories, settings.MuteStories,
+                    settings.UseDefaultStorySound, settings.StorySoundId,
+                    settings.UseDefaultShowStorySender, settings.ShowStorySender,
                     settings.UseDefaultDisablePinnedMessageNotifications, settings.DisablePinnedMessageNotifications,
                     settings.UseDefaultDisableMentionNotifications, settings.DisableMentionNotifications)));
         }

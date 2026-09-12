@@ -277,4 +277,28 @@
     <value>Ինքնակամ բեռնել ձայնայինները</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Մեջբերում</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Պատասխանել մեջբերումով</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Ընտրել մեջբերումը</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Ընտրեք հաղորդագրության այն հատվածը, որը ցանկանում եք մեջբերել։</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Ընտրվածը չափազանց երկար է մեջբերելու համար։</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Անցնել հաջորդ արձագանքին</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Զետեղել նոր տող</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Թաքցնել արխիվացված զրույցները</value>
+  </data>
 </root>

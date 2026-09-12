@@ -39,12 +39,16 @@ namespace Unigram.Common
             args.Handled = true;
         }
 
-        public static void CreateFlyoutSeparator(this MenuFlyout flyout)
+        public static MenuFlyoutSeparator CreateFlyoutSeparator(this MenuFlyout flyout)
         {
             if (flyout.Items.Count > 0 && flyout.Items[flyout.Items.Count - 1] is MenuFlyoutItem)
             {
-                flyout.Items.Add(new MenuFlyoutSeparator());
+                var separator = new MenuFlyoutSeparator();
+                flyout.Items.Add(separator);
+                return separator;
             }
+
+            return null;
         }
 
         public static void CreateFlyoutSeparator(this MenuFlyoutSubItem flyout)
@@ -134,17 +138,17 @@ namespace Unigram.Common
             flyout.Items.Add(flyoutItem);
         }
 
-        public static void CreateFlyoutItem(this MenuFlyout flyout, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
+        public static MenuFlyoutItem CreateFlyoutItem(this MenuFlyout flyout, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
         {
-            flyout.Items.CreateFlyoutItem(command, parameter, text, icon, key, modifiers);
+            return flyout.Items.CreateFlyoutItem(command, parameter, text, icon, key, modifiers);
         }
 
-        public static void CreateFlyoutItem(this MenuFlyoutSubItem flyout, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
+        public static MenuFlyoutItem CreateFlyoutItem(this MenuFlyoutSubItem flyout, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
         {
-            flyout.Items.CreateFlyoutItem(command, parameter, text, icon, key, modifiers);
+            return flyout.Items.CreateFlyoutItem(command, parameter, text, icon, key, modifiers);
         }
 
-        public static void CreateFlyoutItem(this IList<MenuFlyoutItemBase> items, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
+        public static MenuFlyoutItem CreateFlyoutItem(this IList<MenuFlyoutItemBase> items, ICommand command, object parameter, string text, IconElement icon = null, VirtualKey? key = null, VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
         {
             var flyoutItem = new MenuFlyoutItem();
             flyoutItem.IsEnabled = command != null;
@@ -163,6 +167,7 @@ namespace Unigram.Common
             }
 
             items.Add(flyoutItem);
+            return flyoutItem;
         }
 
         public static IconElement GetGlyph(string glyph)

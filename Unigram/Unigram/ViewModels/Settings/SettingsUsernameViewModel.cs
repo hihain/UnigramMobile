@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Common;
@@ -29,7 +29,7 @@ namespace Unigram.ViewModels.Settings
             var response = await ProtoService.SendAsync(new GetMe());
             if (response is User user)
             {
-                _username = user.Username;
+                _username = user.ActiveUsername();
             }
 
             RaisePropertyChanged(() => Username);

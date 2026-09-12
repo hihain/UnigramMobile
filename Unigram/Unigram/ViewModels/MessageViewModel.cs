@@ -1,4 +1,5 @@
-﻿using Telegram.Td.Api;
+﻿using System.Collections.Generic;
+using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
@@ -32,17 +33,53 @@ namespace Unigram.ViewModels
         public bool IsFirst { get; set; } = true;
         public bool IsLast { get; set; } = true;
 
+        private Dictionary<string, UnreadReaction> _unreadReactions;
+        public IDictionary<string, UnreadReaction> UnreadReactions
+        {
+            get
+            {
+                if (_unreadReactions == null)
+                {
+                    _unreadReactions = new Dictionary<string, UnreadReaction>();
+
+                    if (_message.UnreadReactions != null)
+                    {
+                        foreach (var item in _message.UnreadReactions)
+                        {
+                            var key = item.Type.ToKey();
+                            if (string.IsNullOrEmpty(key))
+                            {
+                                continue;
+                            }
+
+                            _unreadReactions[key] = item;
+                        }
+                    }
+                }
+
+                return _unreadReactions;
+            }
+        }
+
+        public void UpdateUnreadReactions(IList<UnreadReaction> value)
+        {
+            _message.UnreadReactions = value;
+            _unreadReactions = null;
+        }
+
         public ReplyMarkup ReplyMarkup { get => _message.ReplyMarkup; set => _message.ReplyMarkup = value; }
         public MessageContent Content { get => _message.Content; set => _message.Content = value; }
         public long MediaAlbumId => _message.MediaAlbumId;
         public MessageInteractionInfo InteractionInfo { get => _message.InteractionInfo; set => _message.InteractionInfo = value; }
         public string AuthorSignature => _message.AuthorSignature;
         public long ViaBotUserId => _message.ViaBotUserId;
-        public double TtlExpiresIn { get => _message.TtlExpiresIn; set => _message.TtlExpiresIn = value; }
-        public int Ttl => _message.Ttl;
-        public long ReplyToMessageId { get => _message.ReplyToMessageId; set => _message.ReplyToMessageId = value; }
-        public long ReplyInChatId => _message.ReplyInChatId;
+        public double TtlExpiresIn { get => _message.SelfDestructIn; set => _message.SelfDestructIn = value; }
+        public int Ttl => (_message.SelfDestructType as MessageSelfDestructTypeTimer)?.SelfDestructTime ?? 0;
+        public long ReplyToMessageId => (_message.ReplyTo as MessageReplyToMessage)?.MessageId ?? 0;
+        public long ReplyInChatId => (_message.ReplyTo as MessageReplyToMessage)?.ChatId ?? 0;
+        public TextQuote ReplyToQuote => (_message.ReplyTo as MessageReplyToMessage)?.Quote;
         public MessageForwardInfo ForwardInfo => _message.ForwardInfo;
+        public MessageImportInfo ImportInfo => _message.ImportInfo;
         public int EditDate { get => _message.EditDate; set => _message.EditDate = value; }
         public int Date => _message.Date;
         public bool ContainsUnreadMention { get => _message.ContainsUnreadMention; set => _message.ContainsUnreadMention = value; }
@@ -52,8 +89,10 @@ namespace Unigram.ViewModels
         public bool CanBeForwarded => _message.CanBeForwarded;
         public bool CanBeEdited => _message.CanBeEdited;
         public bool CanBeSaved => _message.CanBeSaved;
+        public bool CanGetAddedReactions => _message.CanGetAddedReactions;
         public bool CanGetMessageThread => _message.CanGetMessageThread;
         public bool CanGetStatistics => _message.CanGetStatistics;
+        public bool CanGetViewers => _message.CanGetViewers;
         public bool IsOutgoing { get => _message.IsOutgoing; set => _message.IsOutgoing = value; }
         public bool IsPinned { get => _message.IsPinned; set => _message.IsPinned = value; }
         public MessageSchedulingState SchedulingState => _message.SchedulingState;
@@ -223,7 +262,7 @@ namespace Unigram.ViewModels
                     if (chat != null && chat.Type is ChatTypeSupergroup super && !super.IsChannel)
                     {
                         var supergroup = message.ProtoService.GetSupergroup(super.SupergroupId);
-                        return supergroup != null && supergroup.Username.Length > 0 && !(message.Content is MessageContact) && !(message.Content is MessageLocation);
+                        return supergroup != null && supergroup.ActiveUsername().Length > 0 && !(message.Content is MessageContact) && !(message.Content is MessageLocation);
                     }
                 }
             }
@@ -278,10 +317,13 @@ namespace Unigram.ViewModels
             _message.CanBeEdited = message.CanBeEdited;
             _message.CanBeSaved = message.CanBeSaved;
             _message.CanBeForwarded = message.CanBeForwarded;
+            _message.CanGetAddedReactions = message.CanGetAddedReactions;
             _message.CanGetMessageThread = message.CanGetMessageThread;
             _message.CanGetStatistics = message.CanGetStatistics;
+            _message.CanGetViewers = message.CanGetViewers;
             _message.ChatId = message.ChatId;
             _message.ContainsUnreadMention = message.ContainsUnreadMention;
+            UpdateUnreadReactions(message.UnreadReactions);
             //_message.Content = message.Content;
             //_message.Date = message.Date;
             _message.EditDate = message.EditDate;
@@ -293,12 +335,11 @@ namespace Unigram.ViewModels
             _message.MessageThreadId = message.MessageThreadId;
             _message.MediaAlbumId = message.MediaAlbumId;
             _message.ReplyMarkup = message.ReplyMarkup;
-            _message.ReplyInChatId = message.ReplyInChatId;
-            _message.ReplyToMessageId = message.ReplyToMessageId;
+            _message.ReplyTo = message.ReplyTo;
             _message.SenderId = message.SenderId;
             _message.SendingState = message.SendingState;
-            _message.Ttl = message.Ttl;
-            _message.TtlExpiresIn = message.TtlExpiresIn;
+            _message.SelfDestructType = message.SelfDestructType;
+            _message.SelfDestructIn = message.SelfDestructIn;
             _message.ViaBotUserId = message.ViaBotUserId;
             _message.InteractionInfo = message.InteractionInfo;
 

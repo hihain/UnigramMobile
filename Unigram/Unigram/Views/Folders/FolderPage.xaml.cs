@@ -32,7 +32,7 @@ namespace Unigram.Views.Folders
             var button = args.Element as Button;
             var content = button.Content as Grid;
 
-            var element = button.DataContext as ChatFilterElement;
+            var element = button.DataContext as ChatFolderElement;
 
             var title = content.Children[1] as TextBlock;
             var photo = content.Children[0] as ProfilePicture;
@@ -46,29 +46,29 @@ namespace Unigram.Views.Folders
             {
                 switch (flag.Flag)
                 {
-                    case ChatListFilterFlags.IncludeContacts:
+                    case ChatListFolderFlags.IncludeContacts:
                         title.Text = Strings.Resources.FilterContacts;
                         break;
-                    case ChatListFilterFlags.IncludeNonContacts:
+                    case ChatListFolderFlags.IncludeNonContacts:
                         title.Text = Strings.Resources.FilterNonContacts;
                         break;
-                    case ChatListFilterFlags.IncludeGroups:
+                    case ChatListFolderFlags.IncludeGroups:
                         title.Text = Strings.Resources.FilterGroups;
                         break;
-                    case ChatListFilterFlags.IncludeChannels:
+                    case ChatListFolderFlags.IncludeChannels:
                         title.Text = Strings.Resources.FilterChannels;
                         break;
-                    case ChatListFilterFlags.IncludeBots:
+                    case ChatListFolderFlags.IncludeBots:
                         title.Text = Strings.Resources.FilterBots;
                         break;
 
-                    case ChatListFilterFlags.ExcludeMuted:
+                    case ChatListFolderFlags.ExcludeMuted:
                         title.Text = Strings.Resources.FilterMuted;
                         break;
-                    case ChatListFilterFlags.ExcludeRead:
+                    case ChatListFolderFlags.ExcludeRead:
                         title.Text = Strings.Resources.FilterRead;
                         break;
-                    case ChatListFilterFlags.ExcludeArchived:
+                    case ChatListFolderFlags.ExcludeArchived:
                         title.Text = Strings.Resources.FilterArchived;
                         break;
                 }
@@ -91,7 +91,7 @@ namespace Unigram.Views.Folders
             var flyout = new MenuFlyout();
 
             var element = sender as FrameworkElement;
-            var chat = element.DataContext as ChatFilterElement;
+            var chat = element.DataContext as ChatFolderElement;
 
             flyout.CreateFlyoutItem(viewModel.RemoveIncludeCommand, chat, Strings.Resources.StickersRemove, new FontIcon { Glyph = Icons.Delete });
 
@@ -109,7 +109,7 @@ namespace Unigram.Views.Folders
             var flyout = new MenuFlyout();
 
             var element = sender as FrameworkElement;
-            var chat = element.DataContext as ChatFilterElement;
+            var chat = element.DataContext as ChatFolderElement;
 
             flyout.CreateFlyoutItem(viewModel.RemoveExcludeCommand, chat, Strings.Resources.StickersRemove, new FontIcon { Glyph = Icons.Delete });
 
@@ -137,7 +137,7 @@ namespace Unigram.Views.Folders
         {
             FlyoutBase.GetAttachedFlyout(EmojiButton).Hide();
 
-            if (e.ClickedItem is ChatFilterIcon icon)
+            if (e.ClickedItem is ChatFolderIconKind icon)
             {
                 ViewModel.SetIcon(icon);
             }
@@ -150,7 +150,7 @@ namespace Unigram.Views.Folders
                 return;
             }
 
-            if (args.ItemContainer.ContentTemplateRoot is BitmapIcon image && args.Item is ChatFilterIcon icon)
+            if (args.ItemContainer.ContentTemplateRoot is BitmapIcon image && args.Item is ChatFolderIconKind icon)
             {
                 image.UriSource = new Uri($"ms-appx:///Assets/Filters/{icon}.png");
             }
@@ -158,12 +158,12 @@ namespace Unigram.Views.Folders
 
         #region Binding
 
-        private string ConvertTitle(ChatFilter filter)
+        private string ConvertTitle(ChatFolder filter)
         {
             return filter == null ? Strings.Resources.FilterNew : filter.Title;
         }
 
-        private Uri ConvertEmoji(ChatFilterIcon icon)
+        private Uri ConvertEmoji(ChatFolderIconKind icon)
         {
             return new Uri($"ms-appx:///Assets/Filters/{icon}.png");
         }

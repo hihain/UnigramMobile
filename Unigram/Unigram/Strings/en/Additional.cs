@@ -28,6 +28,26 @@ namespace Unigram.Strings
     public sealed partial class Additional
     {
         
+        /// <summary>
+        /// Localized resource similar to "Insert New Line"
+        /// </summary>
+        public static string InsertNewLine
+        {
+            get
+            {
+                return Resource.GetString("InsertNewLine");
+            }
+        }
+        /// <summary>
+        /// Localized resource similar to "Go to next reaction"
+        /// </summary>
+        public static string AccDescrReactionDown
+        {
+            get
+            {
+                return Resource.GetString("AccDescrReactionDown");
+            }
+        }
         private static ResourceLoader resourceLoader;
         
         /// <summary>
@@ -609,7 +629,62 @@ namespace Unigram.Strings
                 return Resource.GetString("ShowInFolder");
             }
         }
-        
+
+        /// <summary>
+        /// Localized resource similar to "Quote"
+        /// </summary>
+        public static string QuoteBlock
+        {
+            get
+            {
+                return Resource.GetString("QuoteBlock");
+            }
+        }
+
+        /// <summary>
+        /// Localized resource similar to "Reply with Quote"
+        /// </summary>
+        public static string QuoteReply
+        {
+            get
+            {
+                return Resource.GetString("QuoteReply");
+            }
+        }
+
+        /// <summary>
+        /// Localized resource similar to "Select Quote"
+        /// </summary>
+        public static string QuoteSelectTitle
+        {
+            get
+            {
+                return Resource.GetString("QuoteSelectTitle");
+            }
+        }
+
+        /// <summary>
+        /// Localized resource similar to "Select the part of the message you want to quote."
+        /// </summary>
+        public static string QuoteSelectHint
+        {
+            get
+            {
+                return Resource.GetString("QuoteSelectHint");
+            }
+        }
+
+        /// <summary>
+        /// Localized resource similar to "The selection is too long to be quoted."
+        /// </summary>
+        public static string QuoteTooLong
+        {
+            get
+            {
+                return Resource.GetString("QuoteTooLong");
+            }
+        }
+
         public static void Initialize()
         {
             string executingAssemblyName;

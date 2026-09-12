@@ -61,27 +61,27 @@ namespace Unigram.Views
             flyout.CreateFlyoutItem(DialogArchive_Loaded, viewModel.ChatArchiveCommand, chat, chat.Positions.Any(x => x.List is ChatListArchive) ? Strings.Resources.Unarchive : Strings.Resources.Archive, new FontIcon { Glyph = Icons.Archive });
             flyout.CreateFlyoutItem(DialogPin_Loaded, viewModel.ChatPinCommand, chat, position.IsPinned ? Strings.Resources.UnpinFromTop : Strings.Resources.PinToTop, new FontIcon { Glyph = position.IsPinned ? Icons.Unpin : Icons.Pin });
 
-            if (viewModel.Items.ChatList is ChatListFilter chatListFilter)
+            if (viewModel.Items.ChatList is ChatListFolder chatListFilter)
             {
-                flyout.CreateFlyoutItem(viewModel.FolderRemoveCommand, (chatListFilter.ChatFilterId, chat), Strings.Resources.FilterRemoveFrom, new FontIcon { Glyph = "\uE92B", FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily });
+                flyout.CreateFlyoutItem(viewModel.FolderRemoveCommand, (chatListFilter.ChatFolderId, chat), Strings.Resources.FilterRemoveFrom, new FontIcon { Glyph = "\uE92B", FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily });
             }
             else
             {
                 var response = await ViewModel.ProtoService.SendAsync(new GetChatListsToAddChat(chat.Id)) as ChatLists;
                 if (response != null && response.ChatListsValue.Count > 0)
                 {
-                    var filters = ViewModel.CacheService.ChatFilters;
+                    var filters = ViewModel.CacheService.ChatFolders;
 
                     var item = new MenuFlyoutSubItem();
                     item.Text = Strings.Resources.FilterAddTo;
                     item.Icon = new FontIcon { Glyph = "\uE929", FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily };
 
-                    foreach (var chatList in response.ChatListsValue.OfType<ChatListFilter>())
+                    foreach (var chatList in response.ChatListsValue.OfType<ChatListFolder>())
                     {
-                        var filter = filters.FirstOrDefault(x => x.Id == chatList.ChatFilterId);
+                        var filter = filters.FirstOrDefault(x => x.Id == chatList.ChatFolderId);
                         if (filter != null)
                         {
-                            item.CreateFlyoutItem(ViewModel.FolderAddCommand, (filter.Id, chat), filter.Title, new FontIcon { Glyph = Icons.FromFilter(Icons.ParseFilter(filter.IconName)), FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily });
+                            item.CreateFlyoutItem(ViewModel.FolderAddCommand, (filter.Id, chat), filter.Title, new FontIcon { Glyph = Icons.FromFilter(Icons.ParseFilter(filter.Icon?.Name)), FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily });
                         }
                     }
 
@@ -168,7 +168,7 @@ namespace Unigram.Views
                 var supergroup = ViewModel.ProtoService.GetSupergroup(super.SupergroupId);
                 if (supergroup != null)
                 {
-                    return string.IsNullOrEmpty(supergroup.Username) && !super.IsChannel;
+                    return string.IsNullOrEmpty(supergroup.ActiveUsername()) && !super.IsChannel;
                 }
             }
 

@@ -15,5 +15,9 @@
     <SolidColorBrush x:Key="MessageOverlayBackgroundBrush" Color="{ThemeResource MessageOverlayBackgroundOutColor}" />
     <SolidColorBrush x:Key="MessageCallForegroundBrush" Color="{ThemeResource MessageCallForegroundOutColor}" />
     <SolidColorBrush x:Key="MessageCallMissedForegroundBrush" Color="{ThemeResource MessageCallMissedForegroundOutColor}" />
+    <SolidColorBrush x:Key="MessageReactionBackgroundBrush" Color="{ThemeResource MessageReactionBackgroundOutColor}" />
+    <SolidColorBrush x:Key="MessageReactionForegroundBrush" Color="{ThemeResource MessageReactionForegroundOutColor}" />
+    <SolidColorBrush x:Key="MessageReactionChosenBackgroundBrush" Color="{ThemeResource MessageReactionChosenBackgroundOutColor}" />
+    <SolidColorBrush x:Key="MessageReactionChosenForegroundBrush" Color="{ThemeResource MessageReactionChosenForegroundOutColor}" />
 
 </ResourceDictionary>

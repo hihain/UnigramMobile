@@ -43,7 +43,7 @@ namespace Unigram.Services
         IOptionsService Options { get; }
         JsonValueObject Config { get; }
 
-        IList<ChatFilterInfo> ChatFilters { get; }
+        IList<ChatFolderInfo> ChatFolders { get; }
 
         IList<string> AnimationSearchEmojis { get; }
         string AnimationSearchProvider { get; }
@@ -170,7 +170,7 @@ namespace Unigram.Services
         private IList<long> _installedStickerSets;
         private IList<long> _installedMaskSets;
 
-        private IList<ChatFilterInfo> _chatFilters = new ChatFilterInfo[0];
+        private IList<ChatFolderInfo> _chatFolders = new ChatFolderInfo[0];
 
         private UpdateAnimationSearchParameters _animationSearchParameters;
 
@@ -211,9 +211,10 @@ namespace Unigram.Services
         {
             _client = Client.Create(this);
 
-            var parameters = new TdlibParameters
+            var parameters = new SetTdlibParameters
             {
                 DatabaseDirectory = System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, $"{_session}"),
+                DatabaseEncryptionKey = new byte[0],
                 UseSecretChats = true,
                 UseMessageDatabase = true,
                 ApiId = Constants.ApiId,
@@ -331,8 +332,7 @@ namespace Unigram.Services
                 //_client.Send(new SetOption("online", new OptionValueBoolean(online)));
                 _client.Send(new SetOption("online", new OptionValueBoolean(false)));
                 _client.Send(new SetOption("notification_group_count_max", new OptionValueInteger(25)));
-                _client.Send(new SetTdlibParameters(parameters));
-                _client.Send(new CheckDatabaseEncryptionKey(new byte[0]));
+                _client.Send(parameters);
                 _client.Send(new GetApplicationConfig(), result => UpdateConfig(result));
 
                 _longRunningTask = _longRunningTask ?? Task.Factory.StartNew(Client.Run, TaskCreationOptions.LongRunning);
@@ -397,12 +397,12 @@ namespace Unigram.Services
                     {
                         if (entity.Type is TextEntityTypeTextUrl textUrl || entity.Type is TextEntityTypeUrl)
                         {
-                            await SendAsync(new GetWebPagePreview(formattedText));
+                            await SendAsync(new GetWebPagePreview(formattedText, null));
                             break;
                         }
                     }
 
-                    Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, new InputMessageText(formattedText, false, false)));
+                    Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), null, false, new InputMessageText(formattedText, null, false)));
                 }
             }
 
@@ -418,7 +418,7 @@ namespace Unigram.Services
                 var message = title + Environment.NewLine + string.Join(Environment.NewLine, update.Strings);
                 var formattedText = new FormattedText(message, new[] { new TextEntity { Offset = 0, Length = title.Length, Type = new TextEntityTypeBold() } });
 
-                Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, new InputMessageText(formattedText, true, false)));
+                Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), null, false, new InputMessageText(formattedText, new LinkPreviewOptions(true, string.Empty, false, false, false), false)));
             }
         }
 
@@ -456,7 +456,7 @@ namespace Unigram.Services
             _installedStickerSets = null;
             _installedMaskSets = null;
 
-            _chatFilters = new ChatFilterInfo[0];
+            _chatFolders = new ChatFolderInfo[0];
 
             _animationSearchParameters = null;
 
@@ -607,9 +607,9 @@ namespace Unigram.Services
             {
                 return 1;
             }
-            else if (chatList is ChatListFilter filter)
+            else if (chatList is ChatListFolder filter)
             {
-                return filter.ChatFilterId;
+                return filter.ChatFolderId;
             }
 
             return -1;
@@ -663,9 +663,9 @@ namespace Unigram.Services
             get { return _config; }
         }
 
-        public IList<ChatFilterInfo> ChatFilters
+        public IList<ChatFolderInfo> ChatFolders
         {
-            get { return _chatFilters; }
+            get { return _chatFolders; }
         }
 
         public IList<string> AnimationSearchEmojis
@@ -729,23 +729,19 @@ namespace Unigram.Services
 
         public string GetTitle(MessageForwardInfo info)
         {
-            if (info?.Origin is MessageForwardOriginUser fromUser)
+            if (info?.Origin is MessageOriginUser fromUser)
             {
                 return GetUser(fromUser.SenderUserId)?.GetFullName();
             }
-            else if (info?.Origin is MessageForwardOriginChat fromChat)
+            else if (info?.Origin is MessageOriginChat fromChat)
             {
                 return GetTitle(GetChat(fromChat.SenderChatId));
             }
-            else if (info?.Origin is MessageForwardOriginChannel fromChannel)
+            else if (info?.Origin is MessageOriginChannel fromChannel)
             {
                 return GetTitle(GetChat(fromChannel.ChatId));
             }
-            else if (info?.Origin is MessageForwardOriginMessageImport fromImport)
-            {
-                return fromImport.SenderName;
-            }
-            else if (info?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+            else if (info?.Origin is MessageOriginHiddenUser fromHiddenUser)
             {
                 return fromHiddenUser.SenderName;
             }
@@ -1349,6 +1345,13 @@ namespace Unigram.Services
                     value.ActionBar = updateChatActionBar.ActionBar;
                 }
             }
+            else if (update is UpdateChatAvailableReactions updateChatAvailableReactions)
+            {
+                if (_chats.TryGetValue(updateChatAvailableReactions.ChatId, out Chat value))
+                {
+                    value.AvailableReactions = updateChatAvailableReactions.AvailableReactions;
+                }
+            }
             else if (update is UpdateChatHasProtectedContent updateChatHasProtectedContent)
             {
                 if (_chats.TryGetValue(updateChatHasProtectedContent.ChatId, out Chat value))
@@ -1382,9 +1385,9 @@ namespace Unigram.Services
                     Monitor.Exit(value);
                 }
             }
-            else if (update is UpdateChatFilters updateChatFilters)
+            else if (update is UpdateChatFolders updateChatFolders)
             {
-                _chatFilters = updateChatFilters.ChatFilters.ToList();
+                _chatFolders = updateChatFolders.ChatFolders.ToList();
             }
             else if (update is UpdateChatHasScheduledMessages updateChatHasScheduledMessages)
             {
@@ -1393,11 +1396,11 @@ namespace Unigram.Services
                     value.HasScheduledMessages = updateChatHasScheduledMessages.HasScheduledMessages;
                 }
             }
-            else if (update is UpdateChatIsBlocked updateChatIsBlocked)
+            else if (update is UpdateChatBlockList updateChatIsBlocked)
             {
                 if (_chats.TryGetValue(updateChatIsBlocked.ChatId, out Chat value))
                 {
-                    value.IsBlocked = updateChatIsBlocked.IsBlocked;
+                    value.BlockList = updateChatIsBlocked.BlockList;
                 }
             }
             else if (update is UpdateChatIsMarkedAsUnread updateChatIsMarkedAsUnread)
@@ -1516,6 +1519,13 @@ namespace Unigram.Services
                     value.UnreadMentionCount = updateChatUnreadMentionCount.UnreadMentionCount;
                 }
             }
+            else if (update is UpdateChatUnreadReactionCount updateChatUnreadReactionCount)
+            {
+                if (_chats.TryGetValue(updateChatUnreadReactionCount.ChatId, out Chat value))
+                {
+                    value.UnreadReactionCount = updateChatUnreadReactionCount.UnreadReactionCount;
+                }
+            }
             else if (update is UpdateConnectionState updateConnectionState)
             {
                 _connectionState = updateConnectionState.State;
@@ -1566,7 +1576,7 @@ namespace Unigram.Services
             }
             else if (update is UpdateInstalledStickerSets updateInstalledStickerSets)
             {
-                if (updateInstalledStickerSets.IsMasks)
+                if (updateInstalledStickerSets.StickerType is StickerTypeMask)
                 {
                     _installedMaskSets = updateInstalledStickerSets.StickerSetIds;
                 }
@@ -1622,6 +1632,13 @@ namespace Unigram.Services
             {
 
             }
+            else if (update is UpdateMessageUnreadReactions updateMessageUnreadReactions)
+            {
+                if (_chats.TryGetValue(updateMessageUnreadReactions.ChatId, out Chat value))
+                {
+                    value.UnreadReactionCount = updateMessageUnreadReactions.UnreadReactionCount;
+                }
+            }
             else if (update is UpdateNewChat updateNewChat)
             {
                 _chats[updateNewChat.Chat.Id] = updateNewChat.Chat;
@@ -1654,10 +1671,6 @@ namespace Unigram.Services
                 if (updateOption.Name == "my_id" && updateOption.Value is OptionValueInteger myId)
                 {
                     _settings.UserId = (int)myId.Value;
-
-#if !DEBUG
-                    Microsoft.AppCenter.AppCenter.SetUserId($"uid={myId.Value}");
-#endif
                 }
             }
             else if (update is UpdateRecentStickers updateRecentStickers)
@@ -1676,7 +1689,7 @@ namespace Unigram.Services
             {
                 _secretChats[updateSecretChat.SecretChat.Id] = updateSecretChat.SecretChat;
             }
-            else if (update is UpdateSelectedBackground updateSelectedBackground)
+            else if (update is UpdateDefaultBackground updateSelectedBackground)
             {
                 if (updateSelectedBackground.ForDarkTheme)
                 {

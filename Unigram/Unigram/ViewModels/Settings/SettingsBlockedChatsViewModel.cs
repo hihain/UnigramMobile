@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -62,12 +62,12 @@ namespace Unigram.ViewModels.Settings
             if (selected.Type is ChatTypePrivate privata)
             {
                 Items.Insert(0, new MessageSenderUser(privata.UserId));
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(privata.UserId), true));
+                ProtoService.Send(new SetMessageSenderBlockList(new MessageSenderUser(privata.UserId), new BlockListMain()));
             }
             else
             {
                 Items.Insert(0, new MessageSenderChat(selected.Id));
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderChat(selected.Id), true));
+                ProtoService.Send(new SetMessageSenderBlockList(new MessageSenderChat(selected.Id), new BlockListMain()));
             }
         }
 
@@ -78,7 +78,7 @@ namespace Unigram.ViewModels.Settings
             if (confirm == ContentDialogResult.Primary)
             {
                 Items.Remove(sender);
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(sender, false));
+                ProtoService.Send(new SetMessageSenderBlockList(sender, null));
             }
         }
 
@@ -95,7 +95,7 @@ namespace Unigram.ViewModels.Settings
             {
                 return AsyncInfo.Run(async task =>
                 {
-                    var response = await _protoService.SendAsync(new GetBlockedMessageSenders(Count, 20));
+                    var response = await _protoService.SendAsync(new GetBlockedMessageSenders(new BlockListMain(), Count, 20));
                     if (response is MessageSenders chats)
                     {
                         foreach (var sender in chats.Senders)

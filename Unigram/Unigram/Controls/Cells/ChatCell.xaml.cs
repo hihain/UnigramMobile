@@ -333,7 +333,12 @@ namespace Unigram.Controls.Cells
         public void UpdateChatUnreadMentionCount(Chat chat, ChatPosition position = null)
         {
             UpdateChatReadInbox(chat, position);
-            UnreadMentionsBadge.Visibility = chat.UnreadMentionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            var mentions = chat.UnreadMentionCount > 0;
+
+            UnreadMentionsBadge.Visibility = mentions || chat.UnreadReactionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+            UnreadMentionsLabel.Visibility = mentions ? Visibility.Visible : Visibility.Collapsed;
+            UnreadReactionsLabel.Visibility = mentions ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public void UpdateNotificationSettings(Chat chat)
@@ -434,7 +439,7 @@ namespace Unigram.Controls.Cells
 
             var position = chat.GetPosition(chatList);
 
-            //UpdateViewState(chat, ChatFilterMode.None, false, false);
+            //UpdateViewState(chat, ChatFolderMode.None, false, false);
 
             UpdateChatTitle(chat);
             UpdateChatPhoto(chat);
@@ -590,20 +595,20 @@ namespace Unigram.Controls.Cells
             switch (value.Content)
             {
                 case MessageAnimation animation:
-                    return animation.Caption.Text.Replace('\n', ' ');
+                    return animation.Caption.ReplaceSpoilers();
                 case MessageAudio audio:
-                    return audio.Caption.Text.Replace('\n', ' ');
+                    return audio.Caption.ReplaceSpoilers();
                 case MessageDocument document:
-                    return document.Caption.Text.Replace('\n', ' ');
+                    return document.Caption.ReplaceSpoilers();
                 case MessagePhoto photo:
-                    return photo.Caption.Text.Replace('\n', ' ');
+                    return photo.Caption.ReplaceSpoilers();
                 case MessageVideo video:
-                    return video.Caption.Text.Replace('\n', ' ');
+                    return video.Caption.ReplaceSpoilers();
                 case MessageVoiceNote voiceNote:
-                    return voiceNote.Caption.Text.Replace('\n', ' ');
+                    return voiceNote.Caption.ReplaceSpoilers();
 
                 case MessageText text:
-                    return text.Text.Text.Replace('\n', ' ');
+                    return text.Text.ReplaceSpoilers();
 
                 case MessageDice dice:
                     return dice.Emoji;
@@ -683,9 +688,9 @@ namespace Unigram.Controls.Cells
                     {
                         result = string.Format(format, fromUser.LastName.Trim());
                     }
-                    else if (!string.IsNullOrEmpty(fromUser.Username))
+                    else if (!string.IsNullOrEmpty(fromUser.ActiveUsername()))
                     {
-                        result = string.Format(format, fromUser.Username.Trim());
+                        result = string.Format(format, fromUser.ActiveUsername().Trim());
                     }
                     else if (fromUser.Type is UserTypeDeleted)
                     {

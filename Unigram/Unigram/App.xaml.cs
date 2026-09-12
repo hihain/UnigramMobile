@@ -22,7 +22,6 @@ using Windows.Foundation;
 using Windows.Media;
 using Windows.Networking.PushNotifications;
 using Windows.Storage;
-using Windows.System.Profile;
 using Windows.UI.Core;
 using Windows.UI.Notifications;
 using Windows.UI.ViewManagement;
@@ -90,10 +89,6 @@ namespace Unigram
                     Client.Execute(new AddLogMessage(1, "Unhandled exception:\n" + args.Exception.ToString()));
                 }
 
-#if !DEBUG
-                Microsoft.AppCenter.Crashes.Crashes.TrackError(args.Exception);
-#endif
-
                 //try
                 //{
                 //    await new MessagePopup(args.Exception?.ToString() ?? string.Empty, "Unhandled exception").ShowQueuedAsync();
@@ -102,19 +97,6 @@ namespace Unigram
             };
 
 #if !DEBUG
-            Microsoft.AppCenter.AppCenter.Start(Constants.AppCenterId,
-                typeof(Microsoft.AppCenter.Analytics.Analytics),
-                typeof(Microsoft.AppCenter.Crashes.Crashes));
-
-            string deviceFamilyVersion = AnalyticsInfo.VersionInfo.DeviceFamilyVersion;
-            ulong version = ulong.Parse(deviceFamilyVersion);
-            ulong major = (version & 0xFFFF000000000000L) >> 48;
-            ulong minor = (version & 0x0000FFFF00000000L) >> 32;
-            ulong build = (version & 0x00000000FFFF0000L) >> 16;
-
-            Microsoft.AppCenter.Analytics.Analytics.TrackEvent($"{major}.{minor}.{build}");
-            Microsoft.AppCenter.Analytics.Analytics.TrackEvent(AnalyticsInfo.VersionInfo.DeviceFamily);
-
             TaskScheduler.UnobservedTaskException += OnUnobservedException;
             UnhandledException += OnUnhandledException;
 #endif
@@ -514,15 +496,19 @@ namespace Unigram
         }
 
 #if !DEBUG
+        // Both of these keep the app alive, which is the point of them in a release build.
+        // They used to hand the exception to AppCenter on the way past; with that gone they
+        // were swallowing it whole, and a crash that leaves no trace is worse than one that
+        // does. The TDLib log is where the rest of the app writes, so it goes there too.
         private void OnUnobservedException(object sender, UnobservedTaskExceptionEventArgs e)
         {
-            Microsoft.AppCenter.Crashes.Crashes.TrackError(e.Exception);
+            Client.Execute(new AddLogMessage(1, "Unobserved task exception:\n" + e.Exception));
             e.SetObserved();
         }
 
         private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            Microsoft.AppCenter.Crashes.Crashes.TrackError(e.Exception);
+            Client.Execute(new AddLogMessage(1, "Unhandled exception:\n" + e.Exception));
             e.Handled = true;
         }
 #endif

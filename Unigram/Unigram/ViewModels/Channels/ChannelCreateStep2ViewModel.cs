@@ -32,7 +32,7 @@ namespace Unigram.ViewModels.Channels
 
                 var username = _isPublic ? _username?.Trim() ?? string.Empty : string.Empty;
 
-                if (!string.Equals(username, item.Username))
+                if (!string.Equals(username, item.ActiveUsername()))
                 {
                     var response = await ProtoService.SendAsync(new SetSupergroupUsername(item.Id, username));
                     if (response is Error error)

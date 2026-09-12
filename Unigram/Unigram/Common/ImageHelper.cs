@@ -27,8 +27,8 @@ namespace Unigram.Common
 
             if (editState?.Rectangle is Rect crop)
             {
-                width = (uint)(crop.Width * props.Width);
-                height = (uint)(crop.Height * props.Height);
+                width = (uint)(crop.Width * width);
+                height = (uint)(crop.Height * height);
             }
 
             if (width > requestedMinSide || height > requestedMinSide)
@@ -269,10 +269,32 @@ namespace Unigram.Common
             using (var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite))
             {
                 var decoder = await BitmapDecoder.CreateAsync(fileStream);
-                var cropWidth = (double)decoder.PixelWidth;
-                var cropHeight = (double)decoder.PixelHeight;
 
-                if (decoder.PixelWidth > 1280 || decoder.PixelHeight > 1280)
+                // BitmapTransform crops last. Measured on 10.0.19045: the decoder
+                // scales, then flips, then rotates, and only then reads Bounds out of
+                // the result, with the EXIF orientation folded in ahead of all of it.
+                //
+                // So the rectangle the editor hands over is already in the space Bounds
+                // is measured in -- the editor decodes through the very same transform,
+                // and its rectangle is a fraction of what came out -- and turning it a
+                // second time only turns it away from what the user picked. What the
+                // rectangle does need is the size of that final image to be measured
+                // against, which is the oriented size laid on its side when the user
+                // asked for a quarter turn.
+                //
+                // ScaledWidth and ScaledHeight are the exception: they are read before
+                // any of it, in the file's own space, so both turns have to be taken
+                // back out of them further down.
+                var quarterTurn = rotation == BitmapRotation.Clockwise90Degrees
+                    || rotation == BitmapRotation.Clockwise270Degrees;
+
+                var displayWidth = quarterTurn ? (double)decoder.OrientedPixelHeight : decoder.OrientedPixelWidth;
+                var displayHeight = quarterTurn ? (double)decoder.OrientedPixelWidth : decoder.OrientedPixelHeight;
+
+                var cropWidth = displayWidth;
+                var cropHeight = displayHeight;
+
+                if (displayWidth > 1280 || displayHeight > 1280)
                 {
                     double ratioX = (double)1280 / cropWidth;
                     double ratioY = (double)1280 / cropHeight;
@@ -283,12 +305,12 @@ namespace Unigram.Common
                 }
 
                 cropRectangle = new Rect(
-                    cropRectangle.X * decoder.PixelWidth,
-                    cropRectangle.Y * decoder.PixelHeight,
-                    cropRectangle.Width * decoder.PixelWidth,
-                    cropRectangle.Height * decoder.PixelHeight);
+                    cropRectangle.X * displayWidth,
+                    cropRectangle.Y * displayHeight,
+                    cropRectangle.Width * displayWidth,
+                    cropRectangle.Height * displayHeight);
 
-                var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(decoder.PixelWidth, decoder.PixelHeight), new Size(cropWidth, cropHeight), min, max);
+                var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(displayWidth, displayHeight), new Size(cropWidth, cropHeight), min, max);
 
                 var bounds = new BitmapBounds();
                 bounds.X = (uint)scaledCrop.X;
@@ -297,8 +319,10 @@ namespace Unigram.Common
                 bounds.Height = (uint)scaledCrop.Height;
 
                 var transform = new BitmapTransform();
-                transform.ScaledWidth = (uint)scaledSize.Width;
-                transform.ScaledHeight = (uint)scaledSize.Height;
+                var (sourceWidth, sourceHeight) = ToSourceSize(decoder, scaledSize, quarterTurn);
+
+                transform.ScaledWidth = (uint)sourceWidth;
+                transform.ScaledHeight = (uint)sourceHeight;
                 transform.Bounds = bounds;
                 transform.InterpolationMode = BitmapInterpolationMode.Linear;
                 transform.Rotation = rotation;
@@ -316,6 +340,23 @@ namespace Unigram.Common
             }
 
             return file;
+        }
+
+        /// <summary>
+        /// Takes a size measured on the finished image back to the space the file is
+        /// stored in, which is where BitmapTransform.ScaledWidth and ScaledHeight are
+        /// read -- before the flip, the rotation and the EXIF orientation, not after.
+        ///
+        /// Two quarter turns can stand between the two: the one the user asked for, and
+        /// the one the EXIF tag asks for. Each swaps the sides, so two of them cancel.
+        /// </summary>
+        private static (double, double) ToSourceSize(BitmapDecoder decoder, Size size, bool quarterTurn)
+        {
+            var exifTurn = decoder.OrientedPixelWidth != decoder.PixelWidth;
+
+            return quarterTurn == exifTurn
+                ? (size.Width, size.Height)
+                : (size.Height, size.Width);
         }
 
         private static (Rect, Size) Scale(Rect rect, Size start, Size size, int min, int max)
@@ -379,10 +420,19 @@ namespace Unigram.Common
         public static async Task<ImageSource> CropAndPreviewAsync(IRandomAccessStream imageStream, BitmapEditState editState)
         {
             var decoder = await BitmapDecoder.CreateAsync(imageStream);
-            var cropWidth = (double)decoder.PixelWidth;
-            var cropHeight = (double)decoder.PixelHeight;
 
-            if (decoder.PixelWidth > 1280 || decoder.PixelHeight > 1280)
+            // The preview and the file that gets sent have to be cut out of the same
+            // place, so this is the same reckoning CropAsync explains at length.
+            var quarterTurn = editState.Rotation == BitmapRotation.Clockwise90Degrees
+                || editState.Rotation == BitmapRotation.Clockwise270Degrees;
+
+            var displayWidth = quarterTurn ? (double)decoder.OrientedPixelHeight : decoder.OrientedPixelWidth;
+            var displayHeight = quarterTurn ? (double)decoder.OrientedPixelWidth : decoder.OrientedPixelHeight;
+
+            var cropWidth = displayWidth;
+            var cropHeight = displayHeight;
+
+            if (displayWidth > 1280 || displayHeight > 1280)
             {
                 double ratioX = (double)1280 / cropWidth;
                 double ratioY = (double)1280 / cropHeight;
@@ -393,12 +443,12 @@ namespace Unigram.Common
             }
 
             var cropRectangle = new Rect(
-                editState.Rectangle.X * decoder.PixelWidth,
-                editState.Rectangle.Y * decoder.PixelHeight,
-                editState.Rectangle.Width * decoder.PixelWidth,
-                editState.Rectangle.Height * decoder.PixelHeight);
+                editState.Rectangle.X * displayWidth,
+                editState.Rectangle.Y * displayHeight,
+                editState.Rectangle.Width * displayWidth,
+                editState.Rectangle.Height * displayHeight);
 
-            var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(decoder.PixelWidth, decoder.PixelHeight), new Size(cropWidth, cropHeight), 1280, 0);
+            var (scaledCrop, scaledSize) = Scale(cropRectangle, new Size(displayWidth, displayHeight), new Size(cropWidth, cropHeight), 1280, 0);
 
             var bounds = new BitmapBounds();
             bounds.X = (uint)scaledCrop.X;
@@ -407,8 +457,10 @@ namespace Unigram.Common
             bounds.Height = (uint)scaledCrop.Height;
 
             var transform = new BitmapTransform();
-            transform.ScaledWidth = (uint)scaledSize.Width;
-            transform.ScaledHeight = (uint)scaledSize.Height;
+            var (sourceWidth, sourceHeight) = ToSourceSize(decoder, scaledSize, quarterTurn);
+
+            transform.ScaledWidth = (uint)sourceWidth;
+            transform.ScaledHeight = (uint)sourceHeight;
             transform.Bounds = bounds;
             transform.InterpolationMode = BitmapInterpolationMode.Linear;
             transform.Rotation = editState.Rotation;
@@ -543,6 +595,10 @@ namespace Unigram.Common
                         break;
                 }
 
+                // Scale first, then translate. Matrix3x2 multiplies row vectors, so
+                // the matrix multiplied in last is the one applied last: putting the
+                // translation in first would send the crop offset through the scale as
+                // well, and the strokes would slide whenever a crop is active.
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateScale(scaleX, scaleY));
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateTranslation(-(offsetX * size.X), -(offsetY * size.Y)));
 
@@ -644,6 +700,10 @@ namespace Unigram.Common
                         break;
                 }
 
+                // Scale first, then translate. Matrix3x2 multiplies row vectors, so
+                // the matrix multiplied in last is the one applied last: putting the
+                // translation in first would send the crop offset through the scale as
+                // well, and the strokes would slide whenever a crop is active.
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateScale(scaleX, scaleY));
                 session.Transform = Matrix3x2.Multiply(session.Transform, Matrix3x2.CreateTranslation(-(offsetX * size.X), -(offsetY * size.Y)));
 

@@ -264,6 +264,16 @@ _Pvt_Extensions
 /Unigram/Unigram/Microsoft.UI.Xaml/Libraries/ARM
 /Unigram/Telegram.Api.Native/Telegram.Api.Native_p.h
 /Unigram/Unigram/Constants.Secret.cs
+
+# Written by UpdateManifest.ps1 on every build, and true only of the machine that built it.
+/Unigram/Unigram/BuildInfo.cs
+
+# The package signing key. Make your own -- Documentation/Building.md says how.
+/Unigram/Unigram/Unigram_DevKey.pfx
+
 /Unigram/Libraries/fluent-xaml-theme-editor/FluentEditorShared
 /Unigram/Libraries/ffmpeg/runtimes/ARM
 Unigram/Unigram/Unigram_StoreKey.pfx
+
+# The Extension SDK is a release asset, not a repository file -- Dependencies/README.md.
+/Dependencies/*.vsix

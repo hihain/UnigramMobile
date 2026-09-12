@@ -124,15 +124,15 @@ namespace Unigram.ViewModels
 
             if (content is Animation animation)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), animation.AnimationValue.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)animation.AnimationValue.Size);
             }
             else if (content is Audio audio)
             {
-                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), audio.AudioValue.Size);
+                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), (int)audio.AudioValue.Size);
             }
             else if (content is Document document)
             {
-                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), document.DocumentValue.Size);
+                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), (int)document.DocumentValue.Size);
             }
             else if (content is Photo photo)
             {
@@ -151,11 +151,11 @@ namespace Unigram.ViewModels
             }
             else if (content is Video video)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), video.VideoValue.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)video.VideoValue.Size);
             }
             else if (content is VideoNote videoNote)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), videoNote.Video.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)videoNote.Video.Size);
             }
             else if (content is VoiceNote voiceNote)
             {
@@ -426,8 +426,8 @@ namespace Unigram.ViewModels
             var user = ProtoService.GetUser(viaBotUserId);
             if (user != null)
             {
-                SetText($"@{user.Username} ");
-                ResolveInlineBot(user.Username);
+                SetText($"@{user.ActiveUsername()} ");
+                ResolveInlineBot(user.ActiveUsername());
             }
         }
 

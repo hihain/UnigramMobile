@@ -277,4 +277,28 @@
     <value>वॉयस संदेश ऑटो-डाउनलोड करें</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>उद्धरण</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>उद्धरण के साथ उत्तर दें</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>उद्धरण चुनें</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>संदेश का वह भाग चुनें जिसे आप उद्धृत करना चाहते हैं।</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>चयन उद्धृत करने के लिए बहुत लंबा है।</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>अगली प्रतिक्रिया पर जाएँ</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>नई पंक्ति डालें</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>संग्रहीत चैट छिपाएँ</value>
+  </data>
 </root>

@@ -277,4 +277,28 @@
     <value>自动下载语音消息</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>引用</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>引用回复</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>选择引用</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>选择你想引用的消息部分。</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>所选内容太长，无法引用。</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>转到下一个回应</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>插入新行</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>隐藏已归档的对话</value>
+  </data>
 </root>

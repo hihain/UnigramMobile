@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -109,7 +109,7 @@ namespace Unigram.ViewModels.Settings
                     Logs.Logger.Error(Logs.Target.API, "auth.resetWebAuthotization error " + error);
                 }
 
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(session.BotUserId), true));
+                ProtoService.Send(new SetMessageSenderBlockList(new MessageSenderUser(session.BotUserId), new BlockListMain()));
             }
         }
 

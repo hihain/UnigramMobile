@@ -37,6 +37,23 @@ namespace Unigram.Common
 {
     public static class Extensions
     {
+        /// <summary>
+        /// A wash of a brush: its colour, mostly transparent. The box behind a quote is made
+        /// this way rather than from a fixed grey, which would disappear in one theme or the
+        /// other, and out of the brush the bar beside it uses, so the two are plainly one
+        /// object.
+        /// </summary>
+        public static Brush Tint(this Brush brush, double opacity)
+        {
+            var solid = brush as SolidColorBrush;
+            if (solid == null)
+            {
+                return null;
+            }
+
+            return new SolidColorBrush(solid.Color) { Opacity = opacity };
+        }
+
         public static async Task<StorageMedia> PickSingleMediaAsync(this FileOpenPicker picker)
         {
             var file = await picker.PickSingleFileAsync();
@@ -51,6 +68,38 @@ namespace Unigram.Common
         public static Version ToVersion(this PackageVersion version)
         {
             return new Version(version.Major, version.Minor, version.Build, version.Revision);
+        }
+
+        // Colors the "@query" prefix of a search result subtitle. Uses TextHighlighters
+        // where the runtime supports them and falls back to inline Runs on W10M 15254
+        // (which reports UniversalApiContract 5 but does not implement ITextBlock/IRichTextBlock5).
+        public static void HighlightSearchQuery(this TextBlock subtitle, string query)
+        {
+            if (!string.IsNullOrEmpty(query) && subtitle.Text.StartsWith($"@{query}", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ApiInfo.CanUseTextHighlighters)
+                {
+                    var highligher = new TextHighlighter();
+                    highligher.Foreground = new SolidColorBrush(Colors.Red);
+                    highligher.Background = new SolidColorBrush(Colors.Transparent);
+                    highligher.Ranges.Add(new Windows.UI.Xaml.Documents.TextRange { StartIndex = 1, Length = query.Length });
+
+                    subtitle.TextHighlighters.Add(highligher);
+                }
+                else
+                {
+                    var text = subtitle.Text;
+
+                    subtitle.Inlines.Clear();
+                    subtitle.Inlines.Add(new Run { Text = "@" });
+                    subtitle.Inlines.Add(new Run { Text = text.Substring(1, query.Length), Foreground = new SolidColorBrush(Colors.Red) });
+                    subtitle.Inlines.Add(new Run { Text = text.Substring(1 + query.Length) });
+                }
+            }
+            else if (ApiInfo.CanUseTextHighlighters)
+            {
+                subtitle.TextHighlighters.Clear();
+            }
         }
 
         public static string ToQuery(this Dictionary<string, string> dictionary)
@@ -196,17 +245,16 @@ namespace Unigram.Common
 
         public static uint GetHeight(this ImageProperties props)
         {
+            // ImageProperties.Width/Height already report the EXIF-oriented dimensions
+            // (verified: raw 1600x900 + EXIF orientation 6 -> Width=900, Height=1600),
+            // so no swap is needed here.
             return props.Height;
-            //return props.Orientation == PhotoOrientation.Rotate180 ? props.Height : props.Width;
         }
 
         public static uint GetWidth(this ImageProperties props)
         {
             return props.Width;
-            //return props.Orientation == PhotoOrientation.Rotate180 ? props.Width : props.Height;
         }
-
-
 
         public static uint GetHeight(this VideoProperties props)
         {

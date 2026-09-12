@@ -66,6 +66,7 @@
     <x:Double x:Key="TelegramToolBarHeight">48</x:Double>
 
     <FontFamily x:Key="TelegramThemeFontFamily">ms-appx:///Assets/Fonts/Telegram.ttf#Telegram</FontFamily>
+    <FontFamily x:Key="TelegramIconsFontFamily">ms-appx:///Assets/Fonts/TelegramIcons.ttf#TgIcons2</FontFamily>
 
 
 

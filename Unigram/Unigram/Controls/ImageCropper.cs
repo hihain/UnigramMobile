@@ -680,6 +680,14 @@ namespace Unigram.Controls
         {
             _proportions = value;
 
+            // The image size is not known yet (e.g. when called from the constructor
+            // before SetSourceAsync): the proportions math would produce NaN values
+            // that corrupt the crop rectangle.
+            if (m_imageSize.Width <= 0 || m_imageSize.Height <= 0)
+            {
+                return;
+            }
+
             var cropScale = (m_rectangle.Width * m_imageSize.Width) / (m_rectangle.Height * m_imageSize.Height);
             var proportionalCropScale = GetProportionsFactor(value, cropScale);
 
@@ -859,8 +867,11 @@ namespace Unigram.Controls
 
             if (cropRectangle is Rect rectangle)
             {
-                SetProportions(proportions, false);
+                // Apply the rectangle first, then the proportions: SetProportions
+                // derives the crop rectangle from the current one, so it must run
+                // after the stored rectangle has been restored.
                 SetRectangle(rectangle, false);
+                SetProportions(proportions, false);
             }
             else
             {

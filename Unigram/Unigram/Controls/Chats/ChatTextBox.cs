@@ -110,6 +110,8 @@ namespace Unigram.Controls.Chats
                         var entity = new TextEntity { Offset = reader.ReadInt32(), Length = reader.ReadInt32() };
                         var type = reader.ReadByte();
 
+                        // The numbers come from TdExtensions.ClipboardTag, which is the only
+                        // thing that writes them.
                         switch (type)
                         {
                             case 1:
@@ -125,8 +127,31 @@ namespace Unigram.Controls.Chats
                                 entity.Type = new TextEntityTypeTextUrl { Url = reader.ReadString(reader.ReadUInt32()) };
                                 break;
                             case 5:
-                                entity.Type = new TextEntityTypeMentionName { UserId = reader.ReadInt32() };
+                                // Eight bytes. A user id has not fitted in four since TDLib
+                                // widened it, and reading four left the four that were left
+                                // over to be read as the next entity's offset.
+                                entity.Type = new TextEntityTypeMentionName { UserId = reader.ReadInt64() };
                                 break;
+                            case 6:
+                                entity.Type = new TextEntityTypeUnderline();
+                                break;
+                            case 7:
+                                entity.Type = new TextEntityTypeStrikethrough();
+                                break;
+                            case 8:
+                                entity.Type = new TextEntityTypeSpoiler();
+                                break;
+                            case 9:
+                                entity.Type = new TextEntityTypeBlockQuote();
+                                break;
+                        }
+
+                        // A tag this build does not know may be followed by however many
+                        // bytes of its own, so there is no way to find the next entity and
+                        // the rest of the stream has to be left alone.
+                        if (entity.Type == null)
+                        {
+                            break;
                         }
 
                         entities.Add(entity);
@@ -556,7 +581,7 @@ namespace Unigram.Controls.Chats
                             foreach (var id in chats.ChatIds)
                             {
                                 var user = _protoService.GetUser(_protoService.GetChat(id));
-                                if (user != null && user.Username.StartsWith(_query, StringComparison.OrdinalIgnoreCase))
+                                if (user != null && user.ActiveUsername().StartsWith(_query, StringComparison.OrdinalIgnoreCase))
                                 {
                                     Add(user);
                                     count++;
@@ -626,10 +651,10 @@ namespace Unigram.Controls.Chats
                     }
                     else
                     {
-                        var response = await _protoService.SendAsync(new SearchEmojis(_query, false, new[] { _inputLanguage }));
-                        if (response is Emojis emojis)
+                        var response = await _protoService.SendAsync(new SearchEmojis(_query, new[] { _inputLanguage }));
+                        if (response is EmojiKeywords emojis)
                         {
-                            var results = emojis.EmojisValue.Reverse();
+                            var results = emojis.EmojiKeywordsValue.Select(x => x.Emoji).Distinct().Reverse();
                             results = results.OrderBy(x =>
                             {
                                 var index = SettingsService.Current.Emoji.RecentEmoji.IndexOf(x);
@@ -713,7 +738,7 @@ namespace Unigram.Controls.Chats
 
             Sending?.Invoke(this, EventArgs.Empty);
 
-            var options = new MessageSendOptions(disableNotification, false, false, null);
+            var options = new MessageSendOptions(disableNotification, false, false, false, null, 0, false);
 
             var text = GetFormattedText(true);
             await ViewModel.SendMessageAsync(text, options);
@@ -1015,7 +1040,7 @@ namespace Unigram.Controls.Chats
 
             if (ViewModel.CurrentInlineBot != null)
             {
-                var username = ViewModel.CurrentInlineBot.Username;
+                var username = ViewModel.CurrentInlineBot.ActiveUsername();
                 if (text != null && text.TrimStart().StartsWith("@" + username, StringComparison.OrdinalIgnoreCase))
                 {
                     searchText = ReplaceFirst(text.TrimStart(), "@" + username, string.Empty);

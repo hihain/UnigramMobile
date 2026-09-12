@@ -49,9 +49,9 @@ namespace Unigram.Controls.Messages
             {
                 DateLabel.Text = string.Empty;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport)
+            else if (message.ImportInfo != null)
             {
-                var original = Utils.UnixTimestampToDateTime(message.ForwardInfo.Date);
+                var original = Utils.UnixTimestampToDateTime(message.ImportInfo.Date);
                 var date = BindConvert.Current.ShortDate.Format(original);
                 var time = BindConvert.Current.ShortTime.Format(original);
 
@@ -94,7 +94,7 @@ namespace Unigram.Controls.Messages
             {
                 views += $"{message.AuthorSignature}, ";
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel && !string.IsNullOrEmpty(fromChannel.AuthorSignature))
+            else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel && !string.IsNullOrEmpty(fromChannel.AuthorSignature))
             {
                 views += $"{fromChannel.AuthorSignature}, ";
             }

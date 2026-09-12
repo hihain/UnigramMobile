@@ -507,6 +507,27 @@
                     </ScrollViewer>
 
                     <Rectangle Fill="{ThemeResource TelegramSeparatorMediumBrush}" Height="1" Margin="12,0,0,0"/>
+
+                </controls:HeaderedControl>
+
+                <!--
+                    On this page rather than anywhere else because it decides what the chat
+                    list looks like, which is what the group above it decides too.
+
+                    The switch is the whole of it: the way to the archive is its own row in
+                    the chat list, so turning it on is how you get there. There was an entry
+                    here that opened the archive directly, and it kept landing in a folder
+                    panel that back would not close. Three goes at it and it never held, for
+                    the plain reason that opening a folder of the chat list from a settings
+                    page means driving a tab change, a frame going back and a slide animation
+                    from outside all three. Not worth what it was buying.
+                -->
+                <controls:HeaderedControl
+                    Header="{CustomResource ArchivedChats}">
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.HideArchivedChats, Mode=TwoWay}"
+                        Header="{CustomResource Additional.SettingHideArchivedChats}"
+                        Style="{StaticResource CheckButtonStyle}"/>
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl

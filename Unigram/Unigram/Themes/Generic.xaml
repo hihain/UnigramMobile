@@ -6,6 +6,7 @@
     xmlns:chats="using:Unigram.Controls.Chats"
     xmlns:gallery="using:Unigram.Controls.Gallery"
     xmlns:local="using:Unigram.Controls"
+    xmlns:messages="using:Unigram.Controls.Messages"
     xmlns:common="using:Unigram.Common"
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:microsoft="using:Microsoft.UI.Xaml.Controls">
@@ -209,6 +210,149 @@
                                Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"
                                Style="{StaticResource CaptionTextBlockStyle}"
                                Margin="{TemplateBinding Padding}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="local:MenuFlyoutReactionsBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="local:MenuFlyoutReactionsBar">
+                    <ScrollViewer HorizontalScrollMode="Auto"
+                                  HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollMode="Disabled"
+                                  VerticalScrollBarVisibility="Disabled"
+                                  HorizontalAlignment="Left"
+                                  Padding="4,4,4,4">
+                        <StackPanel x:Name="Presenter"
+                                    Orientation="Horizontal">
+                            <StackPanel.Resources>
+                                <Style TargetType="Button">
+                                    <Setter Property="FontFamily"
+                                            Value="{ThemeResource EmojiThemeFontFamily}" />
+                                    <Setter Property="FontSize"
+                                            Value="24" />
+                                    <Setter Property="Background"
+                                            Value="Transparent" />
+                                    <Setter Property="Padding"
+                                            Value="4,0,4,0" />
+                                    <Setter Property="MinWidth"
+                                            Value="40" />
+                                    <Setter Property="Height"
+                                            Value="40" />
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Center" />
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center" />
+                                    <Setter Property="UseSystemFocusVisuals"
+                                            Value="False" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="LayoutRoot"
+                                                        Background="{TemplateBinding Background}"
+                                                        CornerRadius="8">
+                                                    <VisualStateManager.VisualStateGroups>
+                                                        <VisualStateGroup x:Name="CommonStates">
+                                                            <VisualState x:Name="Normal" />
+                                                            <VisualState x:Name="PointerOver">
+                                                                <VisualState.Setters>
+                                                                    <Setter Target="LayoutRoot.Background"
+                                                                            Value="{ThemeResource SystemControlHighlightListLowBrush}" />
+                                                                </VisualState.Setters>
+                                                            </VisualState>
+                                                            <VisualState x:Name="Pressed">
+                                                                <VisualState.Setters>
+                                                                    <Setter Target="LayoutRoot.Background"
+                                                                            Value="{ThemeResource SystemControlHighlightListMediumBrush}" />
+                                                                </VisualState.Setters>
+                                                            </VisualState>
+                                                            <VisualState x:Name="Disabled" />
+                                                        </VisualStateGroup>
+                                                    </VisualStateManager.VisualStateGroups>
+                                                    <ContentPresenter x:Name="ContentPresenter"
+                                                                      Content="{TemplateBinding Content}"
+                                                                      Padding="{TemplateBinding Padding}"
+                                                                      FontFamily="{TemplateBinding FontFamily}"
+                                                                      FontSize="{TemplateBinding FontSize}"
+                                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                                      AutomationProperties.AccessibilityView="Raw" />
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </StackPanel.Resources>
+                        </StackPanel>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="messages:ReactionButton">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="messages:ReactionButton">
+                    <Border x:Name="LayoutRoot"
+                            Background="{ThemeResource MessageReactionBackgroundBrush}"
+                            CornerRadius="12"
+                            Padding="6,1,8,1">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver" />
+                                <VisualState x:Name="Pressed" />
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="LayoutRoot.Background"
+                                                Value="{ThemeResource MessageReactionChosenBackgroundBrush}" />
+                                        <Setter Target="Count.Foreground"
+                                                Value="{ThemeResource MessageReactionChosenForegroundBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="LayoutRoot.Background"
+                                                Value="{ThemeResource MessageReactionChosenBackgroundBrush}" />
+                                        <Setter Target="Count.Foreground"
+                                                Value="{ThemeResource MessageReactionChosenForegroundBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="LayoutRoot.Background"
+                                                Value="{ThemeResource MessageReactionChosenBackgroundBrush}" />
+                                        <Setter Target="Count.Foreground"
+                                                Value="{ThemeResource MessageReactionChosenForegroundBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="Presenter"
+                                       FontFamily="{ThemeResource EmojiThemeFontFamily}"
+                                       FontSize="16"
+                                       IsTextSelectionEnabled="False"
+                                       VerticalAlignment="Center" />
+                            <TextBlock x:Name="Count"
+                                       Foreground="{ThemeResource MessageReactionForegroundBrush}"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       IsTextSelectionEnabled="False"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,0,0" />
+                            <!-- Filled in by ReactionButton, which also decides whether
+                                 this or the count above is the one on show. -->
+                            <StackPanel x:Name="Recent"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Margin="4,0,0,0"
+                                        Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

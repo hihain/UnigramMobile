@@ -51,7 +51,15 @@ namespace Unigram.Views.Popups
         }
 
         public bool IsMediaOnly => Items.All(x => x is StoragePhoto || x is StorageVideo);
-        public bool IsAlbumAvailable => IsMediaSelected && Items.Count > 1 && Items.Count <= 10 && Items.All(x => (x is StoragePhoto || x is StorageVideo) && x.Ttl == 0);
+
+        // Whether the album panel is the one that lays the selection out. It also draws a
+        // single item -- that is the only place a lone photo gets sized to its own aspect
+        // instead of sitting in a list row.
+        public bool IsAlbumAvailable => IsMediaSelected && Items.Count > 0 && Items.Count <= 10 && Items.All(x => (x is StoragePhoto || x is StorageVideo) && x.Ttl == 0);
+
+        // Whether grouping is a choice worth offering. One item is one message either way,
+        // so the toggle would say nothing.
+        public bool IsGroupingAvailable => IsAlbumAvailable && Items.Count > 1;
         public bool IsTtlAvailable { get; }
 
         private bool _isMediaSelected;
@@ -178,20 +186,20 @@ namespace Unigram.Views.Popups
                 var insert = string.Empty;
                 var adjust = 0;
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     insert = string.IsNullOrEmpty(user.FirstName) ? user.LastName : user.FirstName;
                     adjust = 1;
                 }
                 else
                 {
-                    insert = user.Username;
+                    insert = user.ActiveUsername();
                 }
 
                 var range = CaptionInput.Document.GetRange(CaptionInput.Document.Selection.StartPosition - username.Length - adjust, CaptionInput.Document.Selection.StartPosition);
                 range.SetText(TextSetOptions.None, insert);
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     range.Link = $"\"tg-user://{user.Id}\"";
                 }
@@ -232,7 +240,7 @@ namespace Unigram.Views.Popups
                 var username = title.Inlines[1] as Run;
 
                 name.Text = user.GetFullName();
-                username.Text = string.IsNullOrEmpty(user.Username) ? string.Empty : $" @{user.Username}";
+                username.Text = string.IsNullOrEmpty(user.ActiveUsername()) ? string.Empty : $" @{user.ActiveUsername()}";
 
                 photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 36);
             }
@@ -421,6 +429,7 @@ namespace Unigram.Views.Popups
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsMediaOnly"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsAlbumAvailable"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsGroupingAvailable"));
 
             if (IsMediaSelected && !IsMediaOnly)
             {
@@ -739,9 +748,30 @@ namespace Unigram.Views.Popups
         protected override Size MeasureOverride(Size availableSize)
         {
             var sizes = Sizes;
-            if (sizes == null || sizes.Count == 1)
+            if (sizes == null || sizes.Count == 0)
             {
                 return base.MeasureOverride(availableSize);
+            }
+
+            if (sizes.Count == 1)
+            {
+                // A single item is laid out like a mosaic cell: fit the image aspect
+                // within the max bounds so the image fills the panel instead of
+                // leaving empty space below it (the mosaic layout only handles 2+).
+                var size = sizes[0];
+                var scale = Math.Min(MAX_WIDTH / size.Width, MAX_HEIGHT / size.Height);
+                var width = size.Width * scale;
+                var height = size.Height * scale;
+
+                if (Children.Count > 0)
+                {
+                    Children[0].Measure(new Size(width, height));
+                }
+
+                _positions = (new[] { new Rect(0, 0, width, height) }, new Size(width, height));
+                // Return the full available width so the panel spans the whole
+                // preview area and the single item can be centered within it.
+                return new Size(availableSize.Width, height);
             }
 
             var positions = GetPositionsForWidth(availableSize.Width);
@@ -758,9 +788,19 @@ namespace Unigram.Views.Popups
         protected override Size ArrangeOverride(Size finalSize)
         {
             var positions = _positions;
-            if (positions.Item1 == null || positions.Item1.Length == 1)
+            if (positions.Item1 == null)
             {
                 return base.ArrangeOverride(finalSize);
+            }
+
+            if (positions.Item1.Length == 1 && Children.Count > 0)
+            {
+                // Center the single item horizontally so the preview looks
+                // intentional instead of hugging the left edge.
+                var rect = positions.Item1[0];
+                var x = Math.Max(0, (finalSize.Width - rect.Width) / 2);
+                Children[0].Arrange(new Rect(x, rect.Y, rect.Width, rect.Height));
+                return new Size(finalSize.Width, rect.Height);
             }
 
             for (int i = 0; i < Math.Min(positions.Item1.Length, Children.Count); i++)

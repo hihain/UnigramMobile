@@ -61,7 +61,7 @@ namespace Unigram.Controls.Messages
                     return UpdateChatDeletePhoto(message, chatDeletePhoto, active);
                 case MessageChatJoinByLink chatJoinByLink:
                     return UpdateChatJoinByLink(message, chatJoinByLink, active);
-                case MessageChatSetTtl chatSetTtl:
+                case MessageChatSetMessageAutoDeleteTime chatSetTtl:
                     return UpdateChatSetTtl(message, chatSetTtl, active);
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                     return UpdateChatUpgradeFrom(message, chatUpgradeFrom, active);
@@ -85,8 +85,8 @@ namespace Unigram.Controls.Messages
                     return UpdateScreenshotTaken(message, screenshotTaken, active);
                 case MessageSupergroupChatCreate supergroupChatCreate:
                     return UpdateSupergroupChatCreate(message, supergroupChatCreate, active);
-                case MessageWebsiteConnected websiteConnected:
-                    return UpdateWebsiteConnected(message, websiteConnected, active);
+                case MessageBotWriteAccessAllowed botWriteAccessAllowed:
+                    return UpdateBotWriteAccessAllowed(message, botWriteAccessAllowed, active);
                 case MessageExpiredPhoto expiredPhoto:
                     return UpdateExpiredPhoto(message, expiredPhoto, active);
                 case MessageExpiredVideo expiredVideo:
@@ -113,7 +113,7 @@ namespace Unigram.Controls.Messages
                             return UpdateMessageDeleted(message, messageDeleted, active);
                         case ChatEventMessageEdited messageEdited:
                             return UpdateMessageEdited(message, messageEdited, active);
-                        case ChatEventMessageTtlChanged messageTtlChanged:
+                        case ChatEventMessageAutoDeleteTimeChanged messageTtlChanged:
                             return UpdateMessageTtlChanged(message, messageTtlChanged, active);
                         case ChatEventDescriptionChanged descriptionChanged:
                             return UpdateDescriptionChanged(message, descriptionChanged, active);
@@ -376,16 +376,16 @@ namespace Unigram.Controls.Messages
             return (content, entities);
         }
 
-        private static (string Text, IList<TextEntity> Entities) UpdateMessageTtlChanged(MessageViewModel message, ChatEventMessageTtlChanged messageTtlChanged, bool active)
+        private static (string Text, IList<TextEntity> Entities) UpdateMessageTtlChanged(MessageViewModel message, ChatEventMessageAutoDeleteTimeChanged messageTtlChanged, bool active)
         {
             var content = string.Empty;
             var entities = active ? new List<TextEntity>() : null;
 
             var fromUser = message.GetSender();
 
-            if (messageTtlChanged.NewMessageTtl > 0)
+            if (messageTtlChanged.NewMessageAutoDeleteTime > 0)
             {
-                content = ReplaceWithLink(string.Format(Strings.Resources.ActionTTLChanged, Locale.FormatTtl(messageTtlChanged.NewMessageTtl)), "un1", fromUser, ref entities);
+                content = ReplaceWithLink(string.Format(Strings.Resources.ActionTTLChanged, Locale.FormatTtl(messageTtlChanged.NewMessageAutoDeleteTime)), "un1", fromUser, ref entities);
             }
             else
             {
@@ -862,7 +862,7 @@ namespace Unigram.Controls.Messages
             return (content, entities);
         }
 
-        private static (string, IList<TextEntity>) UpdateChatSetTtl(MessageViewModel message, MessageChatSetTtl chatSetTtl, bool active)
+        private static (string, IList<TextEntity>) UpdateChatSetTtl(MessageViewModel message, MessageChatSetMessageAutoDeleteTime chatSetTtl, bool active)
         {
             var content = string.Empty;
             var entities = active ? new List<TextEntity>() : null;
@@ -870,15 +870,15 @@ namespace Unigram.Controls.Messages
             var chat = message.GetChat();
             if (chat.Type is ChatTypeSecret)
             {
-                if (chatSetTtl.Ttl != 0)
+                if (chatSetTtl.MessageAutoDeleteTime != 0)
                 {
                     if (message.IsOutgoing)
                     {
-                        content = string.Format(Strings.Resources.MessageLifetimeChangedOutgoing, Locale.FormatTtl(chatSetTtl.Ttl));
+                        content = string.Format(Strings.Resources.MessageLifetimeChangedOutgoing, Locale.FormatTtl(chatSetTtl.MessageAutoDeleteTime));
                     }
                     else
                     {
-                        content = ReplaceWithLink(string.Format(Strings.Resources.MessageLifetimeChanged, "un1", Locale.FormatTtl(chatSetTtl.Ttl)), "un1", message.GetSender(), ref entities);
+                        content = ReplaceWithLink(string.Format(Strings.Resources.MessageLifetimeChanged, "un1", Locale.FormatTtl(chatSetTtl.MessageAutoDeleteTime)), "un1", message.GetSender(), ref entities);
                     }
                 }
                 else
@@ -895,9 +895,9 @@ namespace Unigram.Controls.Messages
             }
             else if (chat.Type is ChatTypeSupergroup super && super.IsChannel)
             {
-                if (chatSetTtl.Ttl != 0)
+                if (chatSetTtl.MessageAutoDeleteTime != 0)
                 {
-                    content = string.Format(Strings.Resources.ActionTTLChannelChanged, Locale.FormatTtl(chatSetTtl.Ttl));
+                    content = string.Format(Strings.Resources.ActionTTLChannelChanged, Locale.FormatTtl(chatSetTtl.MessageAutoDeleteTime));
                 }
                 else
                 {
@@ -906,15 +906,15 @@ namespace Unigram.Controls.Messages
             }
             else
             {
-                if (chatSetTtl.Ttl != 0)
+                if (chatSetTtl.MessageAutoDeleteTime != 0)
                 {
                     if (message.IsOutgoing)
                     {
-                        content = string.Format(Strings.Resources.ActionTTLYouChanged, Locale.FormatTtl(chatSetTtl.Ttl));
+                        content = string.Format(Strings.Resources.ActionTTLYouChanged, Locale.FormatTtl(chatSetTtl.MessageAutoDeleteTime));
                     }
                     else
                     {
-                        content = ReplaceWithLink(string.Format(Strings.Resources.ActionTTLChanged, "un1", Locale.FormatTtl(chatSetTtl.Ttl)), "un1", message.GetSender(), ref entities);
+                        content = ReplaceWithLink(string.Format(Strings.Resources.ActionTTLChanged, "un1", Locale.FormatTtl(chatSetTtl.MessageAutoDeleteTime)), "un1", message.GetSender(), ref entities);
                     }
                 }
                 else
@@ -1255,17 +1255,23 @@ namespace Unigram.Controls.Messages
             return (content, null);
         }
 
-        private static (string Text, IList<TextEntity> Entities) UpdateWebsiteConnected(MessageViewModel message, MessageWebsiteConnected websiteConnected, bool active)
+        private static (string Text, IList<TextEntity> Entities) UpdateBotWriteAccessAllowed(MessageViewModel message, MessageBotWriteAccessAllowed botWriteAccessAllowed, bool active)
         {
+            if (!(botWriteAccessAllowed.Reason is BotWriteAccessAllowReasonConnectedWebsite connectedWebsite))
+            {
+                // Attachment menu / web app reasons don't exist in this UI generation
+                return ("You allowed this bot to message you.", null);
+            }
+
             var content = Strings.Resources.ActionBotAllowed;
             var entities = active ? new List<TextEntity>() : null;
 
             var start = content.IndexOf("{0}");
-            content = string.Format(content, websiteConnected.DomainName);
+            content = string.Format(content, connectedWebsite.DomainName);
 
             if (start >= 0 && active)
             {
-                entities.Add(new TextEntity(start, websiteConnected.DomainName.Length, new TextEntityTypeUrl()));
+                entities.Add(new TextEntity(start, connectedWebsite.DomainName.Length, new TextEntityTypeUrl()));
             }
 
             return (content, entities);

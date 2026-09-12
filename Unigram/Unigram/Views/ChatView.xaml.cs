@@ -238,6 +238,10 @@ namespace Unigram.Views
             visual.Size = new Vector2(36, 36);
             visual.Offset = new Vector3(0, 1, 0);
 
+            visual = DropShadowEx.Attach(ArrowReactionsShadow, 2, 0.25f, null);
+            visual.Size = new Vector2(36, 36);
+            visual.Offset = new Vector3(0, 1, 0);
+
             //if (ApiInformation.IsMethodPresent("Windows.UI.Xaml.Hosting.ElementCompositionPreview", "SetImplicitShowAnimation"))
             //{
             //    var showShowAnimation = Window.Current.Compositor.CreateSpringScalarAnimation();
@@ -1381,7 +1385,7 @@ namespace Unigram.Views
                         }
                         else
                         {
-                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, WebPagePreview = webPage, WebPageUrl = webPage.Url };
+                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, ReplyToQuote = embedded.ReplyToQuote, WebPagePreview = webPage, WebPageUrl = webPage.Url };
                         }
                     }
                     else if (embedded != null)
@@ -1392,7 +1396,7 @@ namespace Unigram.Views
                         }
                         else if (embedded.WebPagePreview != null)
                         {
-                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, WebPagePreview = null };
+                            viewModel.ComposerHeader = new MessageComposerHeader { EditingMessage = embedded.EditingMessage, ReplyToMessage = embedded.ReplyToMessage, ReplyToQuote = embedded.ReplyToQuote, WebPagePreview = null };
                         }
                     }
                 });
@@ -1433,7 +1437,7 @@ namespace Unigram.Views
                         return;
                     }
 
-                    protoService.Send(new GetWebPagePreview(new FormattedText(urls, new TextEntity[0])), result);
+                    protoService.Send(new GetWebPagePreview(new FormattedText(urls, new TextEntity[0]), null), result);
                 }
                 else
                 {
@@ -1442,7 +1446,7 @@ namespace Unigram.Views
             }
             else
             {
-                protoService.Send(new GetWebPagePreview(new FormattedText(text.Format(), new TextEntity[0])), result);
+                protoService.Send(new GetWebPagePreview(new FormattedText(text.Format(), new TextEntity[0]), null), result);
             }
         }
 
@@ -1453,6 +1457,13 @@ namespace Unigram.Views
 
         private async void btnSendMessage_Click(object sender, RoutedEventArgs e)
         {
+            // Releasing a long press fires Click after the context menu has
+            // already opened; that release must not send the message.
+            if (_sendFlyoutOpen)
+            {
+                return;
+            }
+
             await TextField.SendAsync();
         }
 
@@ -1786,20 +1797,20 @@ namespace Unigram.Views
 
             if (message.IsSaved())
             {
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                 {
                     ViewModel.OpenUser(fromUser.SenderUserId);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                 {
                     ViewModel.OpenChat(fromChat.SenderChatId, true);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     // TODO: verify if this is sufficient
                     ViewModel.OpenChat(fromChannel.ChatId);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser)
+                else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser)
                 {
                     Window.Current.ShowTeachingTip(sender as FrameworkElement, Strings.Resources.HidAccount);
                     //await MessagePopup.ShowAsync(Strings.Resources.HidAccount, Strings.Resources.AppName, Strings.Resources.OK);
@@ -1834,11 +1845,11 @@ namespace Unigram.Views
 
             if (message.IsSaved())
             {
-                if (message.ForwardInfo?.Origin is MessageForwardOriginUser || message.ForwardInfo?.Origin is MessageForwardOriginChat)
+                if (message.ForwardInfo?.Origin is MessageOriginUser || message.ForwardInfo?.Origin is MessageOriginChat)
                 {
-                    ViewModel.NavigationService.NavigateToChat(message.ForwardInfo.FromChatId, message.ForwardInfo.FromMessageId);
+                    ViewModel.NavigationService.NavigateToChat(message.ForwardInfo.Source?.ChatId ?? 0, message.ForwardInfo.Source?.MessageId ?? 0);
                 }
-                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                 {
                     ViewModel.NavigationService.NavigateToChat(fromChannel.ChatId, fromChannel.MessageId);
                 }
@@ -1894,7 +1905,7 @@ namespace Unigram.Views
 
             flyout.CreateFlyoutItem(ViewModel.SearchCommand, Strings.Resources.Search, new FontIcon { Glyph = Icons.Search }, Windows.System.VirtualKey.F);
 
-            if (supergroup != null && !(supergroup.Status is ChatMemberStatusCreator) && (supergroup.IsChannel || !string.IsNullOrEmpty(supergroup.Username)))
+            if (supergroup != null && !(supergroup.Status is ChatMemberStatusCreator) && (supergroup.IsChannel || !string.IsNullOrEmpty(supergroup.ActiveUsername())))
             {
                 flyout.CreateFlyoutItem(ViewModel.ReportCommand, Strings.Resources.ReportChat, new FontIcon { Glyph = Icons.Report });
             }
@@ -1916,7 +1927,7 @@ namespace Unigram.Views
             {
                 flyout.CreateFlyoutItem(ViewModel.SetTimerCommand, Strings.Resources.SetTimer, new FontIcon { Glyph = Icons.Timer });
             }
-            if (user != null || basicGroup != null || (supergroup != null && !supergroup.IsChannel && string.IsNullOrEmpty(supergroup.Username)))
+            if (user != null || basicGroup != null || (supergroup != null && !supergroup.IsChannel && string.IsNullOrEmpty(supergroup.ActiveUsername())))
             {
                 flyout.CreateFlyoutItem(ViewModel.ChatClearCommand, Strings.Resources.ClearHistory, new FontIcon { Glyph = Icons.Clear });
             }
@@ -1950,12 +1961,12 @@ namespace Unigram.Views
                 var fullInfo = ViewModel.ProtoService.GetUserFull(user.Id);
                 if (fullInfo != null)
                 {
-                    if (fullInfo.Commands.Any(x => x.Command.Equals("Settings")))
+                    if (fullInfo.BotInfo?.Commands.Any(x => x.Command.Equals("Settings")) == true)
                     {
                         flyout.CreateFlyoutItem(null, Strings.Resources.BotSettings);
                     }
 
-                    if (fullInfo.Commands.Any(x => x.Command.Equals("help")))
+                    if (fullInfo.BotInfo?.Commands.Any(x => x.Command.Equals("help")) == true)
                     {
                         flyout.CreateFlyoutItem(null, Strings.Resources.BotHelp);
                     }
@@ -1979,6 +1990,8 @@ namespace Unigram.Views
             }
         }
 
+        private bool _sendFlyoutOpen;
+
         private void Send_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
             var chat = ViewModel.Chat;
@@ -1997,6 +2010,21 @@ namespace Unigram.Views
             var flyout = new MenuFlyout();
             flyout.CreateFlyoutItem(new RelayCommand(async () => await TextField.SendAsync(true)), Strings.Resources.SendWithoutSound, new FontIcon { Glyph = Icons.Mute });
             flyout.CreateFlyoutItem(new RelayCommand(async () => await TextField.ScheduleAsync()), self ? Strings.Resources.SetReminder : Strings.Resources.ScheduleMessage, new FontIcon { Glyph = Icons.Schedule });
+
+            if (ViewModel.Settings.IsSendByEnterEnabled)
+            {
+                // With send-by-enter there is no way to type a line break on the
+                // touch keyboard (it reports no key repeat and no modifiers), so
+                // offer one here.
+                flyout.CreateFlyoutItem(new RelayCommand(() =>
+                {
+                    TextField.Document.Selection.TypeText("\r");
+                    TextField.Focus(FocusState.Programmatic);
+                }), Strings.Additional.InsertNewLine, new FontIcon { Glyph = "\uE751" });
+            }
+
+            _sendFlyoutOpen = true;
+            flyout.Closed += (s, e) => _sendFlyoutOpen = false;
 
             if (ApiInfo.CanUseNewFlyoutPlacementMode)
             {
@@ -2101,8 +2129,18 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessageSendNow_Loaded, ViewModel.MessageSendNowCommand, message, Strings.Resources.MessageScheduleSend, new FontIcon { Glyph = Icons.Send, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
                 flyout.CreateFlyoutItem(MessageReschedule_Loaded, ViewModel.MessageRescheduleCommand, message, Strings.Resources.MessageScheduleEditTime, new FontIcon { Glyph = Icons.Schedule });
 
+                if (MessageViewers_Loaded(message))
+                {
+                    LoadMessageViewers(message, flyout);
+                }
+                else if (MessageReactions_Loaded(message))
+                {
+                    LoadMessageReactions(message, flyout);
+                }
+
                 // Generic
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
+                flyout.CreateFlyoutItem(MessageQuote_Loaded, ViewModel.MessageQuoteCommand, message, Strings.Additional.QuoteReply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageEdit_Loaded, ViewModel.MessageEditCommand, message, Strings.Resources.Edit, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(MessageThread_Loaded, ViewModel.MessageThreadCommand, message, message.InteractionInfo?.ReplyInfo?.ReplyCount > 0 ? Locale.Declension("ViewReplies", message.InteractionInfo.ReplyInfo.ReplyCount) : Strings.Resources.ViewThread, new FontIcon { Glyph = Icons.Thread, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
 
@@ -2185,7 +2223,268 @@ namespace Unigram.Views
                 flyout.Items.RemoveAt(flyout.Items.Count - 1);
             }
 
+            if (ViewModel.SelectedItems.Count < 2)
+            {
+                var reactions = await GetAvailableReactionsAsync(message);
+                if (reactions != null && reactions.Count > 0)
+                {
+                    var target = message;
+                    var bar = new MenuFlyoutReactionsBar();
+                    bar.SetReactions(reactions);
+                    bar.ReactionSelected += (s, reaction) =>
+                    {
+                        flyout.Hide();
+                        ViewModel.ProtoService.Send(new AddMessageReaction(target.ChatId, target.Id, reaction, false, true));
+                    };
+
+                    flyout.Items.Insert(0, bar);
+                }
+            }
+
             args.ShowAt(flyout, sender as FrameworkElement);
+        }
+
+        private async Task<IList<ReactionType>> GetAvailableReactionsAsync(MessageViewModel message)
+        {
+            var chat = ViewModel.CacheService.GetChat(message.ChatId);
+            if (chat == null || ViewModel.CacheService.IsSavedMessages(chat))
+            {
+                // Reactions in the chat with yourself are saved-messages tags,
+                // which the server rejects for non-premium accounts.
+                return null;
+            }
+
+            var response = await ViewModel.ProtoService.SendAsync(new GetMessageAvailableReactions(message.ChatId, message.Id, 7));
+            if (response is AvailableReactions available && available.UnavailabilityReason == null && !available.AreTags)
+            {
+                var result = new List<ReactionType>();
+                var added = new HashSet<string>();
+
+                AppendAvailableReactions(result, added, available.TopReactions);
+                AppendAvailableReactions(result, added, available.RecentReactions);
+
+                return result;
+            }
+
+            return null;
+        }
+
+        private void AppendAvailableReactions(IList<ReactionType> result, HashSet<string> added, IList<AvailableReaction> reactions)
+        {
+            if (reactions == null)
+            {
+                return;
+            }
+
+            foreach (var item in reactions)
+            {
+                if (result.Count >= 16)
+                {
+                    return;
+                }
+
+                if (item.NeedsPremium || item.Type is ReactionTypeEmoji == false)
+                {
+                    continue;
+                }
+
+                if (added.Add(item.Type.ToKey()))
+                {
+                    result.Add(item.Type);
+                }
+            }
+        }
+
+        private bool MessageViewers_Loaded(MessageViewModel message)
+        {
+            if (message.SchedulingState != null || !message.IsOutgoing)
+            {
+                return false;
+            }
+
+            var chat = message.GetChat();
+            if (chat == null || (chat.Type is ChatTypeBasicGroup == false && chat.Type is ChatTypeSupergroup == false))
+            {
+                return false;
+            }
+
+            return message.CanGetViewers;
+        }
+
+        /// <summary>
+        /// The people who reacted first, each with what they reacted with, then the people
+        /// who only read it. Somebody who did both appears once, up with the reactions,
+        /// which is how the web client puts it and is the reason the two requests are worth
+        /// merging rather than showing one after the other: the same face twice, once with
+        /// an emoji and once without, reads as two people.
+        /// </summary>
+        private List<MessageViewerItem> BuildViewers(BaseObject viewers, BaseObject reactions)
+        {
+            var items = new List<MessageViewerItem>();
+            var reacted = new HashSet<long>();
+
+            if (reactions is AddedReactions added)
+            {
+                foreach (var reaction in added.Reactions)
+                {
+                    items.Add(new MessageViewerItem(reaction.SenderId, reaction.Date, reaction.Type));
+
+                    if (reaction.SenderId is MessageSenderUser senderUser)
+                    {
+                        reacted.Add(senderUser.UserId);
+                    }
+                }
+            }
+
+            if (viewers is MessageViewers messageViewers)
+            {
+                foreach (var viewer in messageViewers.Viewers)
+                {
+                    if (reacted.Contains(viewer.UserId))
+                    {
+                        continue;
+                    }
+
+                    items.Add(new MessageViewerItem(new MessageSenderUser(viewer.UserId), viewer.ViewDate));
+                }
+            }
+
+            return items;
+        }
+
+        // Only where the readers entry is not, which is what carries the reactions for a
+        // message of one's own. The two say the same thing in different words, and a menu
+        // this long on a phone does not need both.
+        private bool MessageReactions_Loaded(MessageViewModel message)
+        {
+            if (message.SchedulingState != null || !message.CanGetAddedReactions)
+            {
+                return false;
+            }
+
+            var reactions = message.InteractionInfo?.Reactions;
+            return reactions != null && reactions.Reactions.Count > 0;
+        }
+
+        // Same shape as the viewers above, and for the same reason: the answer arrives after
+        // the menu is on screen, so the entry is filled in rather than added.
+        private async void LoadMessageReactions(MessageViewModel message, MenuFlyout flyout)
+        {
+            var placeholder = new MenuFlyoutItem();
+            placeholder.Text = "\u2026";
+            placeholder.IsEnabled = false;
+            placeholder.Icon = new FontIcon { Glyph = Icons.Reactions };
+
+            flyout.Items.Insert(0, placeholder);
+            flyout.Items.Insert(1, new MenuFlyoutSeparator());
+
+            try
+            {
+                // Fifty is where the official clients stop as well. Past that the list stops
+                // being something anybody reads and the count above it is the real answer.
+                var response = await message.ProtoService.SendAsync(
+                    new GetMessageAddedReactions(message.ChatId, message.Id, null, string.Empty, 50));
+
+                if (response is Error error)
+                {
+                    placeholder.Text = error.Message;
+                    return;
+                }
+
+                if (!(response is AddedReactions added) || added.Reactions.Count == 0)
+                {
+                    placeholder.Text = Strings.Resources.NobodyViewed;
+                    return;
+                }
+
+                // TotalCount rather than what came back: the request is capped, and a group
+                // where sixty people reacted should not be told that fifty did.
+                var title = Locale.Declension("ReactionsCount", added.TotalCount);
+
+                placeholder.Text = title;
+                placeholder.CommandParameter = new MessageViewersArgs { Items = BuildViewers(null, added), Title = title };
+                placeholder.Command = ViewModel.MessageViewersCommand;
+                placeholder.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                placeholder.Text = ex.Message;
+            }
+        }
+
+        private FontIcon MessageViewersIcon(bool played)
+        {
+            if (played)
+            {
+                return new FontIcon { Glyph = Icons.Play };
+            }
+
+            return new FontIcon { Glyph = Icons.MarkAsRead, FontFamily = App.Current.Resources["TelegramThemeFontFamily"] as FontFamily };
+        }
+
+        // The viewers arrive after the menu is already on screen, so the entry is only
+        // ever updated in place. Swapping items of an open flyout fails on 15254.
+        private async void LoadMessageViewers(MessageViewModel message, MenuFlyout flyout)
+        {
+            var played = message.Content is MessageVoiceNote || message.Content is MessageVideoNote;
+
+            var placeholder = new MenuFlyoutItem();
+            placeholder.Text = "…";
+            placeholder.IsEnabled = false;
+            placeholder.Icon = MessageViewersIcon(played);
+
+            flyout.Items.Insert(0, placeholder);
+            flyout.Items.Insert(1, new MenuFlyoutSeparator());
+
+            try
+            {
+                // Asked for together, because to the reader they are one list. Reacting to a
+                // message means having seen it, so the two answers overlap, and the overlap
+                // is what the merge below is about.
+                var viewersTask = message.ProtoService.SendAsync(new GetMessageViewers(message.ChatId, message.Id));
+                var reactionsTask = message.CanGetAddedReactions
+                    ? message.ProtoService.SendAsync(new GetMessageAddedReactions(message.ChatId, message.Id, null, string.Empty, 100))
+                    : Task.FromResult<BaseObject>(null);
+
+                await Task.WhenAll(viewersTask, reactionsTask);
+
+                var items = BuildViewers(viewersTask.Result, reactionsTask.Result);
+
+                if (items.Count == 0)
+                {
+                    placeholder.Text = viewersTask.Result is Error error ? error.Message : Strings.Resources.NobodyViewed;
+                    return;
+                }
+
+                // One person and nothing beside their name to show: the entry is the answer
+                // rather than the way to one, and a popup holding a single row is a step for
+                // its own sake.
+                if (items.Count == 1 && items[0].Reaction == null && items[0].Sender is MessageSenderUser only)
+                {
+                    var user = message.ProtoService.GetUser(only.UserId);
+                    if (user != null)
+                    {
+                        placeholder.Text = user.GetFullName();
+                        placeholder.CommandParameter = user.Id;
+                        placeholder.Command = ViewModel.OpenUserCommand;
+                        placeholder.IsEnabled = true;
+                        return;
+                    }
+                }
+
+                // Everybody on the list has seen it, the ones who reacted included, so the
+                // count is of the merged list rather than of the viewers alone.
+                var title = Locale.Declension(played ? "MessagePlayed" : "MessageSeen", items.Count);
+
+                placeholder.Text = title;
+                placeholder.CommandParameter = new MessageViewersArgs { Items = items, Title = title };
+                placeholder.Command = ViewModel.MessageViewersCommand;
+                placeholder.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                placeholder.Text = ex.Message;
+            }
         }
 
         private bool MessageSendNow_Loaded(MessageViewModel message)
@@ -2215,7 +2514,7 @@ namespace Unigram.Views
                 }
                 else if (supergroup.Status is ChatMemberStatusRestricted restricted)
                 {
-                    return restricted.Permissions.CanSendMessages;
+                    return restricted.Permissions.CanSendBasicMessages;
                 }
             }
             else if (chat != null && chat.Id == ViewModel.CacheService.Options.RepliesBotChatId)
@@ -2224,6 +2523,29 @@ namespace Unigram.Views
             }
 
             return true;
+        }
+
+        private bool MessageQuote_Loaded(MessageViewModel message)
+        {
+            if (!MessageReply_Loaded(message) || !message.CanBeSaved)
+            {
+                return false;
+            }
+
+            var chat = message.GetChat();
+            if (chat == null || chat.Type is ChatTypeSecret)
+            {
+                return false;
+            }
+
+            var content = message.GeneratedContent ?? message.Content;
+            if (content is MessageVenue || content is MessageUnsupported)
+            {
+                return false;
+            }
+
+            var caption = content.GetCaption();
+            return caption != null && caption.Text.Length > 0;
         }
 
         private bool MessagePin_Loaded(MessageViewModel message)
@@ -2247,7 +2569,7 @@ namespace Unigram.Views
                     return false;
                 }
 
-                if (supergroup.Status is ChatMemberStatusCreator || (supergroup.Status is ChatMemberStatusAdministrator admin && (admin.CanPinMessages || supergroup.IsChannel && admin.CanEditMessages)))
+                if (supergroup.Status is ChatMemberStatusCreator || (supergroup.Status is ChatMemberStatusAdministrator admin && (admin.Rights.CanPinMessages || supergroup.IsChannel && admin.Rights.CanEditMessages)))
                 {
                     return true;
                 }
@@ -2264,7 +2586,7 @@ namespace Unigram.Views
                     return false;
                 }
 
-                if (basicGroup.Status is ChatMemberStatusCreator || (basicGroup.Status is ChatMemberStatusAdministrator admin && admin.CanPinMessages))
+                if (basicGroup.Status is ChatMemberStatusCreator || (basicGroup.Status is ChatMemberStatusAdministrator admin && admin.Rights.CanPinMessages))
                 {
                     return true;
                 }
@@ -2850,20 +3172,20 @@ namespace Unigram.Views
                 var adjust = 0;
 
                 string insert;
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     insert = string.IsNullOrEmpty(user.FirstName) ? user.LastName : user.FirstName;
                     adjust = 1;
                 }
                 else
                 {
-                    insert = user.Username;
+                    insert = user.ActiveUsername();
                 }
 
                 var range = TextField.Document.GetRange(TextField.Document.Selection.StartPosition - username.Length - adjust, TextField.Document.Selection.StartPosition);
                 range.SetText(TextSetOptions.None, insert);
 
-                if (string.IsNullOrEmpty(user.Username))
+                if (string.IsNullOrEmpty(user.ActiveUsername()))
                 {
                     range.Link = $"\"tg-user://{user.Id}\"";
                 }
@@ -2873,7 +3195,7 @@ namespace Unigram.Views
 
                 if (index == 0 && user.Type is UserTypeBot bot && bot.IsInline)
                 {
-                    ViewModel.ResolveInlineBot(user.Username);
+                    ViewModel.ResolveInlineBot(user.ActiveUsername());
                 }
             }
             else if (e.ClickedItem is UserCommand command)
@@ -2890,9 +3212,9 @@ namespace Unigram.Views
                     if (chat.Type is ChatTypeSupergroup || chat.Type is ChatTypeBasicGroup)
                     {
                         var bot = ViewModel.ProtoService.GetUser(command.UserId);
-                        if (bot != null && bot.Username.Length > 0)
+                        if (bot != null && bot.ActiveUsername().Length > 0)
                         {
-                            insert += $"@{bot.Username}";
+                            insert += $"@{bot.ActiveUsername()}";
                         }
                     }
 
@@ -3140,6 +3462,11 @@ namespace Unigram.Views
             ViewModel.ReadMentionsCommand.Execute();
         }
 
+        private void Reactions_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            ViewModel.ReadReactionsCommand.Execute();
+        }
+
         private void ItemsStackPanel_Loading(FrameworkElement sender, object args)
         {
             sender.MaxWidth = SettingsService.Current.IsAdaptiveWideEnabled ? 664 : double.PositiveInfinity;
@@ -3212,7 +3539,7 @@ namespace Unigram.Views
                 var username = title.Inlines[1] as Run;
 
                 name.Text = user.GetFullName();
-                username.Text = string.IsNullOrEmpty(user.Username) ? string.Empty : $" @{user.Username}";
+                username.Text = string.IsNullOrEmpty(user.ActiveUsername()) ? string.Empty : $" @{user.ActiveUsername()}";
 
                 photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 36);
             }
@@ -3292,6 +3619,7 @@ namespace Unigram.Views
             UpdateChatActionBar(chat);
 
             UpdateChatUnreadMentionCount(chat, chat.UnreadMentionCount);
+            UpdateChatUnreadReactionCount(chat, chat.UnreadReactionCount);
             UpdateChatDefaultDisableNotification(chat, chat.DefaultDisableNotification);
 
             TypeIcon.Text = chat.Type is ChatTypeSecret ? Icons.Secret : string.Empty;
@@ -3435,12 +3763,12 @@ namespace Unigram.Views
                 }
                 else
                 {
-                    ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamAndLeave, ViewModel.ReportSpamCommand, new ChatReportReasonSpam()));
+                    ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamAndLeave, ViewModel.ReportSpamCommand, new ReportReasonSpam()));
                 }
             }
             else if (chat.ActionBar is ChatActionBarReportUnrelatedLocation)
             {
-                ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamLocation, ViewModel.ReportSpamCommand, new ChatReportReasonUnrelatedLocation()));
+                ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamLocation, ViewModel.ReportSpamCommand, new ReportReasonUnrelatedLocation()));
             }
             else if (chat.ActionBar is ChatActionBarSharePhoneNumber)
             {
@@ -3503,7 +3831,7 @@ namespace Unigram.Views
                     return;
                 }
 
-                if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages)
+                if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPostMessages)
                 {
                 }
                 else if (group.Status is ChatMemberStatusLeft)
@@ -3531,6 +3859,19 @@ namespace Unigram.Views
             }
         }
 
+        public void UpdateChatUnreadReactionCount(Chat chat, int count)
+        {
+            if (ViewModel.Type == DialogType.History && count > 0)
+            {
+                UnreadReactionsPanel.Visibility = Visibility.Visible;
+                UnreadReactions.Text = count.ToString();
+            }
+            else
+            {
+                UnreadReactionsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
         public void UpdateChatReplyMarkup(Chat chat, MessageViewModel message)
         {
             if (message?.ReplyMarkup is ReplyMarkupForceReply forceReply && forceReply.IsPersonal)
@@ -3555,7 +3896,7 @@ namespace Unigram.Views
                                 ? Strings.Resources.ChannelSilentBroadcast
                                 : Strings.Resources.ChannelBroadcast;
                         }
-                        else if (supergroup.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.IsAnonymous)
+                        else if (supergroup.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.IsAnonymous)
                         {
                             return Strings.Resources.SendAnonymously;
                         }
@@ -3621,7 +3962,7 @@ namespace Unigram.Views
                 //AttachMedia.Command = ViewModel.SendMediaCommand;
                 //AttachDocument.Command = ViewModel.SendDocumentCommand;
 
-                var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
+                var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages(), Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
                 var pollsRights = ViewModel.VerifyRights(chat, x => x.CanSendPolls, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string pollsLabel);
 
                 var pollsAllowed = chat.Type is ChatTypeSupergroup || chat.Type is ChatTypeBasicGroup;
@@ -3705,7 +4046,7 @@ namespace Unigram.Views
                     //AttachMedia.Command = ViewModel.SendMediaCommand;
                     //AttachDocument.Command = ViewModel.SendDocumentCommand;
 
-                    var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
+                    var rights = ViewModel.VerifyRights(chat, x => x.CanSendMediaMessages(), Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string label);
                     var pollsRights = ViewModel.VerifyRights(chat, x => x.CanSendPolls, Strings.Resources.GlobalAttachMediaRestricted, Strings.Resources.AttachMediaRestrictedForever, Strings.Resources.AttachMediaRestricted, out string pollsLabel);
 
                     AttachRestriction.Text = label ?? string.Empty;
@@ -4187,7 +4528,7 @@ namespace Unigram.Views
             {
                 ShowAction(ViewModel.CacheService.GetNotificationSettingsMuteFor(chat) > 0 ? Strings.Resources.ChannelUnmute : Strings.Resources.ChannelMute, true);
             }
-            else if (chat.IsBlocked)
+            else if (chat.IsBlocked())
             {
                 ShowAction(user.Type is UserTypeBot ? Strings.Resources.BotUnblock : Strings.Resources.Unblock, true);
             }
@@ -4200,9 +4541,9 @@ namespace Unigram.Views
                 ShowArea();
             }
 
-            if (fullInfo.Commands.Count > 0)
+            if (fullInfo.BotInfo?.Commands.Count > 0)
             {
-                ViewModel.BotCommands = fullInfo.Commands.Select(x => new UserCommand(user.Id, x)).ToList();
+                ViewModel.BotCommands = fullInfo.BotInfo.Commands.Select(x => new UserCommand(user.Id, x)).ToList();
                 ViewModel.HasBotCommands = false;
                 ShowHideBotCommands(true);
             }
@@ -4334,11 +4675,11 @@ namespace Unigram.Views
             }
             else if (group.IsChannel || group.IsBroadcastGroup)
             {
-                if ((group.Status is ChatMemberStatusLeft && (group.Username.Length > 0 || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
+                if ((group.Status is ChatMemberStatusLeft && (group.ActiveUsername().Length > 0 || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
                 {
                     ShowAction(Strings.Resources.ChannelJoin, true);
                 }
-                else if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages)
+                else if (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPostMessages)
                 {
                     ShowArea();
                 }
@@ -4353,7 +4694,7 @@ namespace Unigram.Views
             }
             else
             {
-                if ((group.Status is ChatMemberStatusLeft && (group.Username.Length > 0 || group.HasLocation || group.HasLinkedChat || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
+                if ((group.Status is ChatMemberStatusLeft && (group.ActiveUsername().Length > 0 || group.HasLocation || group.HasLinkedChat || ViewModel.CacheService.IsChatAccessible(chat))) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
                 {
                     if (ViewModel.Type == DialogType.Thread)
                     {
@@ -4370,11 +4711,11 @@ namespace Unigram.Views
                 }
                 else if (group.Status is ChatMemberStatusRestricted restrictedSend)
                 {
-                    if (!restrictedSend.IsMember && group.Username.Length > 0)
+                    if (!restrictedSend.IsMember && group.ActiveUsername().Length > 0)
                     {
                         ShowAction(Strings.Resources.ChannelJoin, true);
                     }
-                    else if (!restrictedSend.Permissions.CanSendMessages)
+                    else if (!restrictedSend.Permissions.CanSendBasicMessages)
                     {
                         if (restrictedSend.IsForever())
                         {
@@ -4394,7 +4735,7 @@ namespace Unigram.Views
                 {
                     ShowAction(Strings.Resources.DeleteChat, true);
                 }
-                else if (!chat.Permissions.CanSendMessages)
+                else if (!chat.Permissions.CanSendBasicMessages)
                 {
                     ShowAction(Strings.Resources.GlobalSendMessageRestricted, false);
                 }
@@ -4410,7 +4751,7 @@ namespace Unigram.Views
                     ? Strings.Resources.ChannelSilentBroadcast
                     : Strings.Resources.ChannelBroadcast;
             }
-            else if (group.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || group.Status is ChatMemberStatusAdministrator administrator && administrator.IsAnonymous)
+            else if (group.Status is ChatMemberStatusCreator creator && creator.IsAnonymous || group.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.IsAnonymous)
             {
                 TextField.PlaceholderText = Strings.Resources.SendAnonymously;
             }
@@ -4518,7 +4859,7 @@ namespace Unigram.Views
                     {
                         ViewVisibleMessages(false);
                     }
-                    else if (content is MessageSticker sticker && (sticker.Sticker.Type is StickerTypeAnimated || sticker.Sticker.Type is StickerTypeVideo) && sticker.Sticker.StickerValue.Id == file.Id && file.Local.IsDownloadingCompleted)
+                    else if (content is MessageSticker sticker && (sticker.Sticker.Format is StickerFormatTgs || sticker.Sticker.Format is StickerFormatWebm) && sticker.Sticker.StickerValue.Id == file.Id && file.Local.IsDownloadingCompleted)
                     {
                         ViewVisibleMessages(false);
                     }
@@ -4532,7 +4873,7 @@ namespace Unigram.Views
                         {
                             ViewVisibleMessages(false);
                         }
-                        else if (text.WebPage.Sticker?.StickerValue.Id == file.Id && (text.WebPage.Sticker.Type is StickerTypeAnimated || text.WebPage.Sticker.Type is StickerTypeVideo))
+                        else if (text.WebPage.Sticker?.StickerValue.Id == file.Id && (text.WebPage.Sticker.Format is StickerFormatTgs || text.WebPage.Sticker.Format is StickerFormatWebm))
                         {
                             ViewVisibleMessages(false);
                         }
@@ -4563,7 +4904,7 @@ namespace Unigram.Views
                         {
                             if (message.IsSaved())
                             {
-                                if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                                if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                                 {
                                     var user = message.ProtoService.GetUser(fromUser.SenderUserId);
                                     if (user != null)
@@ -4571,7 +4912,7 @@ namespace Unigram.Views
                                         photo.Source = PlaceholderHelper.GetUser(null, user, 32);
                                     }
                                 }
-                                else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                                else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                                 {
                                     var originChat = message.ProtoService.GetChat(fromChat.SenderChatId);
                                     if (originChat != null)
@@ -4579,7 +4920,7 @@ namespace Unigram.Views
                                         photo.Source = PlaceholderHelper.GetChat(null, originChat, 32);
                                     }
                                 }
-                                else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                                else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                                 {
                                     var originChannel = message.ProtoService.GetChat(fromChannel.ChatId);
                                     if (originChannel != null)

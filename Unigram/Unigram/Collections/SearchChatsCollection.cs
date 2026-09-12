@@ -264,17 +264,24 @@ namespace Unigram.Collections
                     Function function;
                     if (chat != null)
                     {
-                        function = new SearchChatMessages(chat.Id, _query, null, 0, 0, 100, content?.Filter, 0);
+                        function = new SearchChatMessages(chat.Id, _query, null, 0, 0, 100, content?.Filter, 0, null);
                     }
                     else
                     {
-                        function = new SearchMessages(_chatList, _query, int.MaxValue, 0, 0, 100, content?.Filter, minDate, maxDate);
+                        function = new SearchMessages(_chatList, _query, string.Empty, 100, content?.Filter, minDate, maxDate);
                     }
 
                     var response = await _protoService.SendAsync(function);
-                    if (response is Messages messages)
+                    if (response is FoundChatMessages chatMessages)
                     {
-                        foreach (var message in messages.MessagesValue)
+                        foreach (var message in chatMessages.Messages)
+                        {
+                            _messages.Add(message);
+                        }
+                    }
+                    else if (response is FoundMessages found)
+                    {
+                        foreach (var message in found.Messages)
                         {
                             _messages.Add(message);
                         }

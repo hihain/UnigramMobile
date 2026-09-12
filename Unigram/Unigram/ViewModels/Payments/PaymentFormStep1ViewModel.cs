@@ -121,7 +121,7 @@ namespace Unigram.ViewModels.Payments
                 info.ShippingAddress.CountryCode = _selectedCountry?.Code?.ToUpper();
             }
 
-            var response = await ProtoService.SendAsync(new ValidateOrderInfo(0, 0, info, save));
+            var response = await ProtoService.SendAsync(new ValidateOrderInfo(new InputInvoiceMessage(0, 0), info, save));
             if (response is ValidatedOrderInfo validated)
             {
                 IsLoading = false;

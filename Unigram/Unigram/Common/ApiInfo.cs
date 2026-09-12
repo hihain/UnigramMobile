@@ -37,8 +37,20 @@ namespace Unigram.Common
         //private static bool? _canUsePreviewKeyDownEvent;
         public static bool CanUsePreviewKeyDownEvent => IsUniversalApiContract5Present;// (_canUsePreviewKeyDownEvent = _canUsePreviewKeyDownEvent ?? ApiInformation.IsEventPresent("Windows.UI.Xaml.UIElement", "PreviewKeyDown")) ?? false; //Note: 16299, UniversalApiContract v5
 
-        //private static bool? _canUseTextHighlighters;
-        public static bool CanUseTextHighlighters => IsUniversalApiContract5Present;// (_canUseTextHighlighters = _canUseTextHighlighters ?? ApiInformation.IsPropertyPresent("Windows.UI.Xaml.Controls.TextBlock", "TextHighlighters")) ?? false; //Note: 16299, UniversalApiContract v5
+        private static bool? _canUseTextHighlighters;
+        public static bool CanUseTextHighlighters => (_canUseTextHighlighters = _canUseTextHighlighters ?? CheckTextHighlighters()) ?? false; //Note: 16299, UniversalApiContract v5 — but W10M 15254 reports contract 5 without implementing IRichTextBlock5/ITextBlock, so probe the actual runtime
+
+        private static bool CheckTextHighlighters()
+        {
+            try
+            {
+                return new Windows.UI.Xaml.Controls.RichTextBlock().TextHighlighters != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         //private static bool? _canUseSplitViewPaneOpeningEvent;
         public static bool CanUseSplitViewPaneOpeningEvent => IsUniversalApiContract5Present;// (_canUseSplitViewPaneOpeningEvent = _canUseSplitViewPaneOpeningEvent ?? ApiInformation.IsEventPresent("Windows.UI.Xaml.Controls.SplitView", "PaneOpening")) ?? false; //Note: 16299, UniversalApiContract v5

@@ -307,4 +307,35 @@
     <value>Show in Folder</value>
     <comment>DiagnosticsPage</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Quote</value>
+    <comment>Text formatting menu</comment>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Reply with Quote</value>
+    <comment>Message context menu</comment>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Select Quote</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Select the part of the message you want to quote.</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>The selection is too long to be quoted.</value>
+    <comment>QuotePopup</comment>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Insert New Line</value>
+    <comment>Send button context menu</comment>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Go to next reaction</value>
+    <comment>ChatView</comment>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Hide archived chats</value>
+  </data>
 </root>

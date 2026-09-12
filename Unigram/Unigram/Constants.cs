@@ -7,9 +7,6 @@
 
         public static readonly string AppChannel;
 
-        public static readonly string AppCenterId;
-
-
         public const int TypingTimeout = 300;
         public const int HoldingThrottle = 500;
         public const int AnimatedThrottle = 200;

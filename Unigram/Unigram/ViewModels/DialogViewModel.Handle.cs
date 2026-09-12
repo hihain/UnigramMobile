@@ -18,6 +18,7 @@ namespace Unigram.ViewModels
         IHandle<UpdateChatPermissions>,
         IHandle<UpdateChatReplyMarkup>,
         IHandle<UpdateChatUnreadMentionCount>,
+        IHandle<UpdateChatUnreadReactionCount>,
         IHandle<UpdateChatReadOutbox>,
         IHandle<UpdateChatReadInbox>,
         IHandle<UpdateChatDraftMessage>,
@@ -35,6 +36,7 @@ namespace Unigram.ViewModels
         IHandle<UpdateMessageContent>,
         IHandle<UpdateMessageContentOpened>,
         IHandle<UpdateMessageMentionRead>,
+        IHandle<UpdateMessageUnreadReactions>,
         IHandle<UpdateMessageEdited>,
         IHandle<UpdateMessageInteractionInfo>,
         IHandle<UpdateMessageIsPinned>,
@@ -277,6 +279,14 @@ namespace Unigram.ViewModels
             if (update.ChatId == _chat?.Id)
             {
                 BeginOnUIThread(() => Delegate?.UpdateChatUnreadMentionCount(_chat, update.UnreadMentionCount));
+            }
+        }
+
+        public void Handle(UpdateChatUnreadReactionCount update)
+        {
+            if (update.ChatId == _chat?.Id)
+            {
+                BeginOnUIThread(() => Delegate?.UpdateChatUnreadReactionCount(_chat, update.UnreadReactionCount));
             }
         }
 
@@ -595,6 +605,24 @@ namespace Unigram.ViewModels
                 });
 
                 BeginOnUIThread(() => Delegate?.UpdateChatUnreadMentionCount(_chat, update.UnreadMentionCount));
+            }
+        }
+
+        public void Handle(UpdateMessageUnreadReactions update)
+        {
+            if (update.ChatId == _chat?.Id)
+            {
+                if (_reactions != null && _reactions.Contains(update.MessageId))
+                {
+                    _reactions.Remove(update.MessageId);
+                }
+
+                Handle(update.MessageId, message =>
+                {
+                    message.UpdateUnreadReactions(update.UnreadReactions);
+                });
+
+                BeginOnUIThread(() => Delegate?.UpdateChatUnreadReactionCount(_chat, update.UnreadReactionCount));
             }
         }
 

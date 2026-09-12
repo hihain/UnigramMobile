@@ -50,7 +50,19 @@ namespace Unigram.Views
         private string GetVersion()
         {
             PackageVersion version = Services.SettingsService.GetAppVersion();
-            return $"{version.Major}.{version.Minor}.{version.Build}";
+            var text = $"{version.Major}.{version.Minor}.{version.Build}";
+
+            // Which build this is, as opposed to where it sits in the order. The number
+            // above is what the phone compares to decide whether an update is newer, and
+            // it is the wrong shape for saying anything else -- two builds of different
+            // work can carry the same one, and after a branch is rewritten the same work
+            // carries a different one.
+            if (BuildInfo.Commit != "unknown")
+            {
+                text += $" ({BuildInfo.Commit})";
+            }
+
+            return text;
         }
 
         private MasterDetailView _masterDetail;
@@ -127,7 +139,7 @@ namespace Unigram.Views
                     return;
                 }
 
-                var dialog = new EditYourAboutPopup(user.Bio);
+                var dialog = new EditYourAboutPopup(user.Bio?.Text ?? string.Empty);
 
                 var confirm = await dialog.ShowQueuedAsync();
                 if (confirm == ContentDialogResult.Primary)
@@ -293,12 +305,12 @@ namespace Unigram.Views
             }
 #endif
 
-            Username.Badge = string.IsNullOrEmpty(user.Username) ? Strings.Resources.UsernameEmpty : $"{user.Username}";
+            Username.Badge = string.IsNullOrEmpty(user.ActiveUsername()) ? Strings.Resources.UsernameEmpty : $"{user.ActiveUsername()}";
         }
 
         public void UpdateUserFullInfo(Chat chat, User user, UserFullInfo fullInfo, bool secret, bool accessToken)
         {
-            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio) ? Strings.Resources.UserBioDetail : fullInfo.Bio;
+            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio?.Text) ? Strings.Resources.UserBioDetail : fullInfo.Bio.Text;
         }
 
         public void UpdateUserStatus(Chat chat, User user)

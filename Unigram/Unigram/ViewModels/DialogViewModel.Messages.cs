@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -88,6 +88,100 @@ namespace Unigram.ViewModels
 
             ComposerHeader = new MessageComposerHeader { ReplyToMessage = message };
             TextField?.Focus(FocusState.Keyboard);
+        }
+
+        public RelayCommand<MessageViewersArgs> MessageViewersCommand { get; }
+        private async void MessageViewersExecute(MessageViewersArgs args)
+        {
+            if (args == null || args.Items == null || args.Items.Count == 0)
+            {
+                return;
+            }
+
+            await new MessageViewersPopup(ProtoService, this, args.Items, args.Title).ShowQueuedAsync();
+        }
+
+        public RelayCommand<MessageViewModel> MessageQuoteCommand { get; }
+        private async void MessageQuoteExecute(MessageViewModel message)
+        {
+            DisposeSearch();
+
+            if (message == null)
+            {
+                return;
+            }
+
+            if (message.Content is MessageAlbum album)
+            {
+                message = album.Messages.FirstOrDefault();
+            }
+
+            if (message == null)
+            {
+                return;
+            }
+
+            var caption = (message.GeneratedContent ?? message.Content).GetCaption();
+            if (caption == null || caption.Text.Length == 0)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            long maxLength;
+            if (!CacheService.Options.TryGetValue("message_reply_quote_length_max", out maxLength) || maxLength <= 0)
+            {
+                maxLength = 1024;
+            }
+
+            var popup = new QuotePopup(caption.Text, (int)maxLength);
+
+            var confirm = await popup.OpenAsync();
+            if (confirm != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            var position = popup.Position;
+            var length = popup.Length;
+
+            var quote = caption.ToQuote(ref position, ref length);
+            if (quote.Text.Length == 0)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            quote = ValidateQuote(caption, quote, ref position);
+            if (quote == null)
+            {
+                MessageReplyExecute(message);
+                return;
+            }
+
+            ComposerHeader = new MessageComposerHeader { ReplyToMessage = message, ReplyToQuote = new InputTextQuote(quote, position) };
+            TextField?.Focus(FocusState.Keyboard);
+        }
+
+        private FormattedText ValidateQuote(FormattedText caption, FormattedText quote, ref int position)
+        {
+            var response = ProtoService.Execute(new SearchQuote(caption, quote, position));
+            if (response is FoundPosition found)
+            {
+                position = found.Position;
+                return quote;
+            }
+
+            var plain = new FormattedText(quote.Text, new TextEntity[0]);
+
+            response = ProtoService.Execute(new SearchQuote(caption, plain, position));
+            if (response is FoundPosition foundPlain)
+            {
+                position = foundPlain.Position;
+                return plain;
+            }
+
+            return null;
         }
 
         #endregion
@@ -300,30 +394,30 @@ namespace Unigram.ViewModels
                     var date = BindConvert.Current.DateTime(message.Date);
                     builder.AppendLine(string.Format("{0}, [{1} {2}]", title, BindConvert.Current.ShortDate.Format(date), BindConvert.Current.ShortTime.Format(date)));
 
-                    if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                    if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                     {
                         var from = ProtoService.GetChat(fromChat.SenderChatId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {ProtoService.GetTitle(from)}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel forwardedPost)
+                    else if (message.ForwardInfo?.Origin is MessageOriginChannel forwardedPost)
                     {
                         var from = ProtoService.GetChat(forwardedPost.ChatId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {ProtoService.GetTitle(from)}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginUser forwardedFromUser)
+                    else if (message.ForwardInfo?.Origin is MessageOriginUser forwardedFromUser)
                     {
                         var from = ProtoService.GetUser(forwardedFromUser.SenderUserId);
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {from.GetFullName()}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport forwardedFromImport)
+                    else if (message.ImportInfo != null)
                     {
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
-                        builder.AppendLine($"[{Strings.Resources.From} {forwardedFromImport.SenderName}]");
+                        builder.AppendLine($"[{Strings.Resources.From} {message.ImportInfo.SenderName}]");
                     }
-                    else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser forwardedFromHiddenUser)
+                    else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser forwardedFromHiddenUser)
                     {
                         builder.AppendLine($"[{Strings.Resources.ForwardedMessage}]");
                         builder.AppendLine($"[{Strings.Resources.From} {forwardedFromHiddenUser.SenderName}]");
@@ -479,11 +573,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -497,7 +591,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -565,7 +659,7 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageRetryCommand { get; }
         private void MessageRetryExecute(MessageViewModel message)
         {
-            ProtoService.Send(new ResendMessages(message.ChatId, new[] { message.Id }));
+            ProtoService.Send(new ResendMessages(message.ChatId, new[] { message.Id }, null));
         }
 
         #endregion
@@ -595,40 +689,44 @@ namespace Unigram.ViewModels
                 var dataPackage = new DataPackage();
                 dataPackage.SetText(input.Text);
 
-                if (input.Entities.Count > 0)
+                // Tagged before anything is written, because the count goes in first: an
+                // entity this format has no tag for has to be left out then, not discovered
+                // halfway through and skipped, which would leave the reader counting one
+                // entity too many.
+                var tagged = new List<Tuple<TextEntity, byte>>();
+
+                foreach (var entity in input.Entities)
+                {
+                    var tag = entity.Type.ClipboardTag();
+                    if (tag != 0)
+                    {
+                        tagged.Add(Tuple.Create(entity, tag));
+                    }
+                }
+
+                if (tagged.Count > 0)
                 {
                     var stream = new InMemoryRandomAccessStream();
                     using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
                     {
-                        writer.WriteInt32(input.Entities.Count(x => x.IsEditable()));
+                        writer.WriteInt32(tagged.Count);
 
-                        foreach (var entity in input.Entities.Where(x => x.IsEditable()))
+                        foreach (var item in tagged)
                         {
-                            writer.WriteInt32(entity.Offset);
-                            writer.WriteInt32(entity.Length);
+                            writer.WriteInt32(item.Item1.Offset);
+                            writer.WriteInt32(item.Item1.Length);
+                            writer.WriteByte(item.Item2);
 
-                            switch (entity.Type)
+                            if (item.Item1.Type is TextEntityTypeTextUrl textUrl)
                             {
-                                case TextEntityTypeBold bold:
-                                    writer.WriteByte(1);
-                                    break;
-                                case TextEntityTypeItalic italic:
-                                    writer.WriteByte(2);
-                                    break;
-                                case TextEntityTypeCode code:
-                                case TextEntityTypePre pre:
-                                case TextEntityTypePreCode preCode:
-                                    writer.WriteByte(3);
-                                    break;
-                                case TextEntityTypeTextUrl textUrl:
-                                    writer.WriteByte(4);
-                                    writer.WriteInt32(textUrl.Url.Length);
-                                    writer.WriteString(textUrl.Url);
-                                    break;
-                                case TextEntityTypeMentionName mentionName:
-                                    writer.WriteByte(5);
-                                    writer.WriteInt64(mentionName.UserId);
-                                    break;
+                                // Bytes rather than characters: that is what the reader asks
+                                // the stream for, and a url is not always ascii.
+                                writer.WriteInt32((int)writer.MeasureString(textUrl.Url));
+                                writer.WriteString(textUrl.Url);
+                            }
+                            else if (item.Item1.Type is TextEntityTypeMentionName mentionName)
+                            {
+                                writer.WriteInt64(mentionName.UserId);
                             }
                         }
 
@@ -889,11 +987,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -907,7 +1005,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -1005,7 +1103,7 @@ namespace Unigram.ViewModels
                     var response = await ProtoService.SendAsync(new GetLoginUrlInfo(chat.Id, message.Id, loginUrl.Id));
                     if (response is LoginUrlInfoOpen infoOpen)
                     {
-                        OpenUrl(infoOpen.Url, !infoOpen.SkipConfirm);
+                        OpenUrl(infoOpen.Url, !infoOpen.SkipConfirmation);
                     }
                     else if (response is LoginUrlInfoRequestConfirmation requestConfirmation)
                     {
@@ -1041,10 +1139,10 @@ namespace Unigram.ViewModels
                         return;
                     }
 
-                    if (switchInline.InCurrentChat)
+                    if (switchInline.TargetChat is TargetChatCurrent)
                     {
-                        SetText(string.Format("@{0} {1}", bot.Username, switchInline.Query), focus: true);
-                        ResolveInlineBot(bot.Username, switchInline.Query);
+                        SetText(string.Format("@{0} {1}", bot.ActiveUsername(), switchInline.Query), focus: true);
+                        ResolveInlineBot(bot.ActiveUsername(), switchInline.Query);
                     }
                     else
                     {
@@ -1076,7 +1174,7 @@ namespace Unigram.ViewModels
                     var bot = message.GetViaBotUser();
                     if (bot != null)
                     {
-                        InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null), null));
+                        InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null, null), null));
                     }
 
                     var response = await ProtoService.SendAsync(new GetCallbackQueryAnswer(chat.Id, message.Id, new CallbackQueryPayloadData(callback.Data)));
@@ -1097,7 +1195,7 @@ namespace Unigram.ViewModels
                                     return;
                                 }
 
-                                InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(answer.Text, new TextEntity[0]), null), null));
+                                InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, null, null, 0, null, null, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(answer.Text, new TextEntity[0]), null, null), null));
                             }
                         }
                         else if (!string.IsNullOrEmpty(answer.Url))
@@ -1146,7 +1244,7 @@ namespace Unigram.ViewModels
                         var viaBot = message.GetViaBotUser();
                         if (viaBot != null)
                         {
-                            bundle.Add("username", viaBot.Username);
+                            bundle.Add("username", viaBot.ActiveUsername());
                         }
 
                         ChatActionManager.SetTyping(new ChatActionStartPlayingGame());
@@ -1198,7 +1296,7 @@ namespace Unigram.ViewModels
                                 return;
                             }
 
-                            await SendMessageAsync(chat, 0, new InputMessageLocation(location, 0, 0, 0), null);
+                            await SendMessageAsync(chat, null, new InputMessageLocation(location, 0, 0, 0), null);
                         }
                     }
                 }
@@ -1457,7 +1555,26 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageServiceCommand { get; }
         private async void MessageServiceExecute(MessageViewModel message)
         {
-            if (message.Content is MessageHeaderDate)
+            // Reachable whenever the older history is not attached above this notice, which
+            // is the state it is shown in. Opening the old group as a chat of its own is
+            // what the desktop and Telegram X clients do in every case.
+            if (message.Content is MessageChatUpgradeFrom chatUpgradeFrom)
+            {
+                var response = await ProtoService.SendAsync(new CreateBasicGroupChat(chatUpgradeFrom.BasicGroupId, false));
+                if (response is Chat migrated)
+                {
+                    NavigationService.NavigateToChat(migrated);
+                }
+            }
+            else if (message.Content is MessageChatUpgradeTo chatUpgradeTo)
+            {
+                var response = await ProtoService.SendAsync(new CreateSupergroupChat(chatUpgradeTo.SupergroupId, false));
+                if (response is Chat migrated)
+                {
+                    NavigationService.NavigateToChat(migrated);
+                }
+            }
+            else if (message.Content is MessageHeaderDate)
             {
                 var date = BindConvert.Current.DateTime(message.Date);
 
@@ -1523,5 +1640,11 @@ namespace Unigram.ViewModels
         }
 
         #endregion
+    }
+
+    public class MessageViewersArgs
+    {
+        public IList<MessageViewerItem> Items { get; set; }
+        public string Title { get; set; }
     }
 }

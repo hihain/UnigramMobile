@@ -281,4 +281,28 @@
     <value>Automatycznie pobieraj wiadomości głosowe</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="QuoteBlock" xml:space="preserve">
+    <value>Cytat</value>
+  </data>
+  <data name="QuoteReply" xml:space="preserve">
+    <value>Odpowiedz z cytatem</value>
+  </data>
+  <data name="QuoteSelectTitle" xml:space="preserve">
+    <value>Wybierz cytat</value>
+  </data>
+  <data name="QuoteSelectHint" xml:space="preserve">
+    <value>Zaznacz część wiadomości, którą chcesz zacytować.</value>
+  </data>
+  <data name="QuoteTooLong" xml:space="preserve">
+    <value>Zaznaczenie jest za długie, aby je zacytować.</value>
+  </data>
+  <data name="AccDescrReactionDown" xml:space="preserve">
+    <value>Przejdź do następnej reakcji</value>
+  </data>
+  <data name="InsertNewLine" xml:space="preserve">
+    <value>Wstaw nowy wiersz</value>
+  </data>
+  <data name="SettingHideArchivedChats" xml:space="preserve">
+    <value>Ukryj zarchiwizowane czaty</value>
+  </data>
 </root>

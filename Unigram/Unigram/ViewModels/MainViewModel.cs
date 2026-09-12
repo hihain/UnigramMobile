@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml.Controls;
+﻿using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -26,7 +26,7 @@ namespace Unigram.ViewModels
         IHandle<UpdateServiceNotification>,
         IHandle<UpdateUnreadMessageCount>,
         IHandle<UpdateUnreadChatCount>,
-        IHandle<UpdateChatFilters>,
+        IHandle<UpdateChatFolders>,
 #if CLOUDUPDATES
         IHandle<UpdateAppVersion>,
         IHandle<UpdateWindowActivated>,
@@ -71,7 +71,7 @@ namespace Unigram.ViewModels
             _playbackService = playbackService;
             _shortcutService = shortcutService;
 
-            Filters = new ChatFilterCollection();
+            Filters = new ChatFolderCollection();
 
             Chats = new ChatsViewModel(protoService, cacheService, settingsService, aggregator, pushService, new ChatListMain());
             ArchivedChats = new ChatsViewModel(protoService, cacheService, settingsService, aggregator, pushService, new ChatListArchive());
@@ -101,10 +101,10 @@ namespace Unigram.ViewModels
 #if CLOUDUPDATES
             UpdateAppCommand = new RelayCommand(UpdateAppExecute);
 #endif
-            FilterEditCommand = new RelayCommand<ChatFilterViewModel>(FilterEditExecute);
-            FilterAddCommand = new RelayCommand<ChatFilterViewModel>(FilterAddExecute);
-            FilterMarkAsReadCommand = new RelayCommand<ChatFilterViewModel>(FilterMarkAsReadExecute);
-            FilterDeleteCommand = new RelayCommand<ChatFilterViewModel>(FilterDeleteExecute);
+            FilterEditCommand = new RelayCommand<ChatFolderViewModel>(FilterEditExecute);
+            FilterAddCommand = new RelayCommand<ChatFolderViewModel>(FilterAddExecute);
+            FilterMarkAsReadCommand = new RelayCommand<ChatFolderViewModel>(FilterMarkAsReadExecute);
+            FilterDeleteCommand = new RelayCommand<ChatFolderViewModel>(FilterDeleteExecute);
         }
 
         public void Dispose()
@@ -232,7 +232,7 @@ namespace Unigram.ViewModels
             {
                 foreach (var filter in _filters)
                 {
-                    if (filter.ChatList is ChatListFilter && filter.ChatList.ListEquals(update.ChatList))
+                    if (filter.ChatList is ChatListFolder && filter.ChatList.ListEquals(update.ChatList))
                     {
                         filter.UpdateCount(update);
                     }
@@ -240,21 +240,21 @@ namespace Unigram.ViewModels
             });
         }
 
-        public void Handle(UpdateChatFilters update)
+        public void Handle(UpdateChatFolders update)
         {
-            BeginOnUIThread(() => UpdateChatFilters(update.ChatFilters));
+            BeginOnUIThread(() => UpdateChatFolders(update.ChatFolders));
         }
 
-        private void UpdateChatFilters(IList<ChatFilterInfo> chatFilters)
+        private void UpdateChatFolders(IList<ChatFolderInfo> chatFolders)
         {
-            if (chatFilters.Count > 0)
+            if (chatFolders.Count > 0)
             {
-                var selected = SelectedFilter?.ChatFilterId ?? Constants.ChatListMain;
-                //var origin = chatFilters.Select(x => Filters.FirstOrDefault(y => y.ChatFilterId == x.ChatFilterId));
+                var selected = SelectedFilter?.ChatFolderId ?? Constants.ChatListMain;
+                //var origin = chatFolders.Select(x => Filters.FirstOrDefault(y => y.ChatFolderId == x.ChatFolderId));
 
-                Merge(Filters, new[] { new ChatFilterInfo { Id = Constants.ChatListMain, Title = Strings.Resources.FilterAllChats, IconName = "All" } }.Union(chatFilters).ToArray());
+                Merge(Filters, new[] { new ChatFolderInfo { Id = Constants.ChatListMain, Title = Strings.Resources.FilterAllChats, Icon = new ChatFolderIcon("All") } }.Union(chatFolders).ToArray());
 
-                if (Chats.Items.ChatList is ChatListFilter already && already.ChatFilterId != selected)
+                if (Chats.Items.ChatList is ChatListFolder already && already.ChatFolderId != selected)
                 {
                     SelectedFilter = Filters[0];
                 }
@@ -282,11 +282,11 @@ namespace Unigram.ViewModels
             else
             {
                 Filters.Clear();
-                SelectedFilter = ChatFilterViewModel.Main;
+                SelectedFilter = ChatFolderViewModel.Main;
             }
         }
 
-        private void Merge(IList<ChatFilterViewModel> destination, IList<ChatFilterInfo> origin)
+        private void Merge(IList<ChatFolderViewModel> destination, IList<ChatFolderInfo> origin)
         {
             if (destination.Count > 0)
             {
@@ -297,7 +297,7 @@ namespace Unigram.ViewModels
 
                     for (int j = 0; j < origin.Count; j++)
                     {
-                        if (origin[j].Id == user.ChatFilterId)
+                        if (origin[j].Id == user.ChatFolderId)
                         {
                             index = j;
                             break;
@@ -318,7 +318,7 @@ namespace Unigram.ViewModels
 
                     for (int j = 0; j < destination.Count; j++)
                     {
-                        if (destination[j].ChatFilterId == filter.Id)
+                        if (destination[j].ChatFolderId == filter.Id)
                         {
                             destination[j].Update(filter);
 
@@ -330,35 +330,35 @@ namespace Unigram.ViewModels
                     if (index > -1 && index != i)
                     {
                         destination.RemoveAt(index);
-                        destination.Insert(Math.Min(i, destination.Count), new ChatFilterViewModel(filter));
+                        destination.Insert(Math.Min(i, destination.Count), new ChatFolderViewModel(filter));
                     }
                     else if (index == -1)
                     {
-                        destination.Insert(Math.Min(i, destination.Count), new ChatFilterViewModel(filter));
+                        destination.Insert(Math.Min(i, destination.Count), new ChatFolderViewModel(filter));
                     }
                 }
             }
             else
             {
                 destination.Clear();
-                destination.AddRange(origin.Select(x => new ChatFilterViewModel(x)));
+                destination.AddRange(origin.Select(x => new ChatFolderViewModel(x)));
             }
         }
 
-        private ChatFilterCollection _filters;
-        public ChatFilterCollection Filters
+        private ChatFolderCollection _filters;
+        public ChatFolderCollection Filters
         {
             get => _filters;
             set => Set(ref _filters, value);
         }
 
-        public ChatFilterViewModel SelectedFilter
+        public ChatFolderViewModel SelectedFilter
         {
             get
             {
-                if (Chats.Items.ChatList is ChatListFilter filter && _filters != null)
+                if (Chats.Items.ChatList is ChatListFolder filter && _filters != null)
                 {
-                    return _filters.FirstOrDefault(x => x.ChatFilterId == filter.ChatFilterId);
+                    return _filters.FirstOrDefault(x => x.ChatFolderId == filter.ChatFolderId);
                 }
 
                 return _filters?.FirstOrDefault();
@@ -385,7 +385,7 @@ namespace Unigram.ViewModels
 #if CLOUDUPDATES
             UpdateAppVersion(_cloudUpdateService.NextUpdate);
 #endif
-            UpdateChatFilters(CacheService.ChatFilters);
+            UpdateChatFolders(CacheService.ChatFolders);
 
             var unreadCount = CacheService.GetUnreadCount(new ChatListMain());
             UnreadCount = unreadCount.UnreadMessageCount.UnreadCount;
@@ -462,30 +462,30 @@ namespace Unigram.ViewModels
             }
         }
 
-        public RelayCommand<ChatFilterViewModel> FilterAddCommand { get; }
-        private void FilterEditExecute(ChatFilterViewModel filter)
+        public RelayCommand<ChatFolderViewModel> FilterAddCommand { get; }
+        private void FilterEditExecute(ChatFolderViewModel filter)
         {
-            if (filter.ChatFilterId == Constants.ChatListMain)
+            if (filter.ChatFolderId == Constants.ChatListMain)
             {
                 NavigationService.Navigate(typeof(FoldersPage));
             }
             else
             {
-                NavigationService.Navigate(typeof(FolderPage), filter.ChatFilterId);
+                NavigationService.Navigate(typeof(FolderPage), filter.ChatFolderId);
             }
         }
 
-        public RelayCommand<ChatFilterViewModel> FilterEditCommand { get; }
-        private async void FilterAddExecute(ChatFilterViewModel filter)
+        public RelayCommand<ChatFolderViewModel> FilterEditCommand { get; }
+        private async void FilterAddExecute(ChatFolderViewModel filter)
         {
             var viewModel = TLContainer.Current.Resolve<FolderViewModel>();
-            await viewModel.OnNavigatedToAsync(filter.ChatFilterId, NavigationMode.New, null);
+            await viewModel.OnNavigatedToAsync(filter.ChatFolderId, NavigationMode.New, null);
             await viewModel.AddIncludeAsync();
             await viewModel.SendAsync();
         }
 
-        public RelayCommand<ChatFilterViewModel> FilterMarkAsReadCommand { get; }
-        private async void FilterMarkAsReadExecute(ChatFilterViewModel filter)
+        public RelayCommand<ChatFolderViewModel> FilterMarkAsReadCommand { get; }
+        private async void FilterMarkAsReadExecute(ChatFolderViewModel filter)
         {
             var confirm = await MessagePopup.ShowAsync(Strings.Resources.AreYouSure, Strings.Resources.AppName, Strings.Resources.MarkAsRead, Strings.Resources.Cancel);
             if (confirm != ContentDialogResult.Primary)
@@ -507,12 +507,12 @@ namespace Unigram.ViewModels
                     continue;
                 }
 
-                ProtoService.Send(new ViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
+                ProtoService.Send(new ViewMessages(chat.Id, new[] { chat.LastMessage.Id }, null, true));
             }
         }
 
-        public RelayCommand<ChatFilterViewModel> FilterDeleteCommand { get; }
-        private async void FilterDeleteExecute(ChatFilterViewModel filter)
+        public RelayCommand<ChatFolderViewModel> FilterDeleteCommand { get; }
+        private async void FilterDeleteExecute(ChatFolderViewModel filter)
         {
             var confirm = await MessagePopup.ShowAsync(Strings.Resources.FilterDeleteAlert, Strings.Resources.FilterDelete, Strings.Resources.Delete, Strings.Resources.Cancel);
             if (confirm != ContentDialogResult.Primary)
@@ -520,19 +520,19 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            ProtoService.Send(new DeleteChatFilter(filter.ChatFilterId));
+            ProtoService.Send(new DeleteChatFolder(filter.ChatFolderId, new long[0]));
         }
     }
 
-    public class ChatFilterViewModel : BindableBase
+    public class ChatFolderViewModel : BindableBase
     {
-        public static ChatFilterViewModel Main => new ChatFilterViewModel
+        public static ChatFolderViewModel Main => new ChatFolderViewModel
         {
-            ChatFilterId = Constants.ChatListMain,
+            ChatFolderId = Constants.ChatListMain,
             Title = Strings.Resources.FilterAllChats
         };
 
-        public ChatFilterViewModel(ChatFilterInfo info)
+        public ChatFolderViewModel(ChatFolderInfo info)
         {
             if (info.Id == Constants.ChatListMain)
             {
@@ -540,31 +540,31 @@ namespace Unigram.ViewModels
             }
             else
             {
-                ChatList = new ChatListFilter(info.Id);
+                ChatList = new ChatListFolder(info.Id);
             }
 
-            ChatFilterId = info.Id;
+            ChatFolderId = info.Id;
 
             _title = info.Title;
-            _icon = Icons.ParseFilter(info.IconName);
+            _icon = Icons.ParseFilter(info.Icon?.Name);
             _iconUri = new Uri($"ms-appx:///Assets/Filters/{_icon}.png");
         }
 
-        private ChatFilterViewModel()
+        private ChatFolderViewModel()
         {
             ChatList = new ChatListMain();
         }
 
-        public void Update(ChatFilterInfo info)
+        public void Update(ChatFolderInfo info)
         {
             Title = info.Title;
-            Icon = Icons.ParseFilter(info.IconName);
+            Icon = Icons.ParseFilter(info.Icon?.Name);
             IconUri = new Uri($"ms-appx:///Assets/Filters/{_icon}.png");
         }
 
         public ChatList ChatList { get; }
 
-        public int ChatFilterId { get; set; }
+        public int ChatFolderId { get; set; }
 
         private string _title;
         public string Title
@@ -573,8 +573,8 @@ namespace Unigram.ViewModels
             set => Set(ref _title, value);
         }
 
-        private ChatFilterIcon _icon;
-        public ChatFilterIcon Icon
+        private ChatFolderIconKind _icon;
+        public ChatFolderIconKind Icon
         {
             get => _icon;
             set => Set(ref _icon, value);
@@ -622,7 +622,7 @@ namespace Unigram.ViewModels
         }
     }
 
-    public enum ChatFilterIcon
+    public enum ChatFolderIconKind
     {
         Custom,
         All,
@@ -649,14 +649,14 @@ namespace Unigram.ViewModels
         Work
     }
 
-    public class ChatFilterCollection : ObservableCollection<ChatFilterViewModel>, IKeyIndexMapping
+    public class ChatFolderCollection : ObservableCollection<ChatFolderViewModel>, IKeyIndexMapping
     {
-        public ChatFilterCollection()
+        public ChatFolderCollection()
         {
 
         }
 
-        public ChatFilterCollection(IEnumerable<ChatFilterViewModel> source)
+        public ChatFolderCollection(IEnumerable<ChatFolderViewModel> source)
             : base(source)
         {
 
@@ -664,12 +664,12 @@ namespace Unigram.ViewModels
 
         public string KeyFromIndex(int index)
         {
-            return this[index].ChatFilterId.ToString();
+            return this[index].ChatFolderId.ToString();
         }
 
         public int IndexFromKey(string key)
         {
-            return IndexOf(this.FirstOrDefault(x => key == x.ChatFilterId.ToString()));
+            return IndexOf(this.FirstOrDefault(x => key == x.ChatFolderId.ToString()));
         }
     }
 }

@@ -140,7 +140,7 @@ namespace Unigram.ViewModels.Drawers
 
         public void Handle(UpdateInstalledStickerSets update)
         {
-            if (update.IsMasks)
+            if (update.StickerType is StickerTypeMask)
             {
                 return;
             }
@@ -371,7 +371,7 @@ namespace Unigram.ViewModels.Drawers
             {
                 ProtoService.Send(new GetRecentStickers(), result2 =>
                 {
-                    ProtoService.Send(new GetInstalledStickerSets(false), result3 =>
+                    ProtoService.Send(new GetInstalledStickerSets(new StickerTypeRegular()), result3 =>
                     {
                         if (result1 is Stickers favorite && result2 is Stickers recent && result3 is StickerSets sets)
                         {
@@ -671,7 +671,7 @@ namespace Unigram.ViewModels.Drawers
         //public IList<StickerEmojis> Emojis { get => _set?.Emojis; set => _set?.Emojis = value; }
         //public IList<Sticker> Stickers { get; set; }
         public bool IsViewed => _set?.IsViewed ?? _info.IsViewed;
-        public bool IsAnimated => _set?.StickerType is StickerTypeAnimated || _set?.StickerType is StickerTypeVideo || _info.StickerType is StickerTypeAnimated || _info.StickerType is StickerTypeVideo;
+        public bool IsAnimated => _set?.StickerType is StickerFormatTgs || _set?.StickerType is StickerFormatWebm || _info.StickerType is StickerFormatTgs || _info.StickerType is StickerFormatWebm;
         public bool IsMasks => _set?.StickerType is StickerTypeMask || _info.StickerType is StickerTypeMask;
         public bool IsOfficial => _set?.IsOfficial ?? _info.IsOfficial;
         public bool IsArchived => _set?.IsArchived ?? _info.IsArchived;
@@ -735,8 +735,8 @@ namespace Unigram.ViewModels.Drawers
         public File StickerValue => _sticker?.StickerValue;
         public Thumbnail Thumbnail => _sticker?.Thumbnail;
         //public MaskPosition MaskPosition => _sticker?.MaskPosition;
-        public bool IsAnimated => _sticker?.Type is StickerTypeAnimated || _sticker?.Type is StickerTypeVideo;
-        public bool IsMask => _sticker?.Type is StickerTypeMask;
+        public bool IsAnimated => _sticker?.Format is StickerFormatTgs || _sticker?.Format is StickerFormatWebm;
+        public bool IsMask => _sticker?.Format is StickerTypeMask;
         public string Emoji => _sticker?.Emoji;
         public int Height => _sticker?.Height ?? 0;
         public int Width => _sticker?.Width ?? 0;
@@ -820,7 +820,7 @@ namespace Unigram.ViewModels.Drawers
             {
                 if (phase == 0)
                 {
-                    var response = await _protoService.SendAsync(new SearchInstalledStickerSets(_masks, _query, 100));
+                    var response = await _protoService.SendAsync(new SearchInstalledStickerSets(_masks ? (StickerType)new StickerTypeMask() : new StickerTypeRegular(), _query, 100));
                     if (response is StickerSets sets)
                     {
                         foreach (var item in sets.Sets.Select(x => new StickerSetViewModel(_protoService, _aggregator, x)))
@@ -835,27 +835,29 @@ namespace Unigram.ViewModels.Drawers
                 {
                     if (Emoji.ContainsSingleEmoji(_query))
                     {
-                        var response = await _protoService.SendAsync(new GetStickers(_query, 100));
+                        var response = await _protoService.SendAsync(new GetStickers(new StickerTypeRegular(), _query, 100, 0));
                         if (response is Stickers stickers && stickers.StickersValue.Count > 0)
                         {
                             Add(new StickerSetViewModel(_protoService, _aggregator,
-                                new StickerSetInfo(0, _query, "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerTypeStatic(), false, stickers.StickersValue.Count, stickers.StickersValue),
-                                new StickerSet(0, _query, "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerTypeStatic(), false, stickers.StickersValue, new Emojis[0])));
+                                new StickerSetInfo(0, _query, "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerFormatWebp(), new StickerTypeRegular(), false, false, true, stickers.StickersValue.Count, stickers.StickersValue),
+                                new StickerSet(0, _query, "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerFormatWebp(), new StickerTypeRegular(), false, false, true, stickers.StickersValue, new Emojis[0])));
                         }
                     }
                     else
                     {
-                        var emojis = await _protoService.SendAsync(new SearchEmojis(_query, false, new[] { _inputLanguage })) as Emojis;
-                        if (emojis != null)
+                        var keywords = await _protoService.SendAsync(new SearchEmojis(_query, new[] { _inputLanguage })) as EmojiKeywords;
+                        if (keywords != null)
                         {
-                            for (int i = 0; i < Math.Min(10, emojis.EmojisValue.Count); i++)
+                            var emojis = keywords.EmojiKeywordsValue.Select(x => x.Emoji).Distinct().ToList();
+
+                            for (int i = 0; i < Math.Min(10, emojis.Count); i++)
                             {
-                                var response = await _protoService.SendAsync(new GetStickers(emojis.EmojisValue[i], 100));
+                                var response = await _protoService.SendAsync(new GetStickers(new StickerTypeRegular(), emojis[i], 100, 0));
                                 if (response is Stickers stickers && stickers.StickersValue.Count > 0)
                                 {
                                     Add(new StickerSetViewModel(_protoService, _aggregator,
-                                        new StickerSetInfo(0, emojis.EmojisValue[i], "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerTypeStatic(), false, stickers.StickersValue.Count, stickers.StickersValue),
-                                        new StickerSet(0, emojis.EmojisValue[i], "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerTypeStatic(), false, stickers.StickersValue, new Emojis[0])));
+                                        new StickerSetInfo(0, emojis[i], "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerFormatWebp(), new StickerTypeRegular(), false, false, true, stickers.StickersValue.Count, stickers.StickersValue),
+                                        new StickerSet(0, emojis[i], "emoji", null, new ClosedVectorPath[0], false, false, false, new StickerFormatWebp(), new StickerTypeRegular(), false, false, true, stickers.StickersValue, new Emojis[0])));
                                 }
                             }
                         }
@@ -863,7 +865,7 @@ namespace Unigram.ViewModels.Drawers
                 }
                 else if (phase == 2)
                 {
-                    var response = await _protoService.SendAsync(new SearchStickerSets(_query));
+                    var response = await _protoService.SendAsync(new SearchStickerSets(new StickerTypeRegular(), _query));
                     if (response is StickerSets sets)
                     {
                         foreach (var item in sets.Sets.Select(x => new StickerSetViewModel(_protoService, _aggregator, x, x.Covers)))

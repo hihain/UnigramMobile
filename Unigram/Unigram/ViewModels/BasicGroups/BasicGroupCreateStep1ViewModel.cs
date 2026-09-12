@@ -72,7 +72,7 @@ namespace Unigram.ViewModels.BasicGroups
             if (peers.Length <= maxSize)
             {
                 // Classic chat
-                var response = await ProtoService.SendAsync(new CreateNewBasicGroupChat(peers, _title));
+                var response = await ProtoService.SendAsync(new CreateNewBasicGroupChat(peers, _title, 0));
                 if (response is Chat chat)
                 {
                     // TODO: photo

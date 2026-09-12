@@ -96,6 +96,11 @@ namespace Unigram.Views
                     ViewModel.SetLastViewedMention(message.Id);
                 }
 
+                if (message.UnreadReactions.Count > 0)
+                {
+                    ViewModel.SetLastViewedReaction(message.Id);
+                }
+
                 if (message.Content is MessageAlbum album)
                 {
                     messages.AddRange(album.Messages.Keys);
@@ -109,7 +114,7 @@ namespace Unigram.Views
 
             if (messages.Count > 0 && _windowContext.ActivationMode == CoreWindowActivationMode.ActivatedInForeground)
             {
-                ViewModel.ProtoService.Send(new ViewMessages(chat.Id, ViewModel.ThreadId, messages, false));
+                ViewModel.ProtoService.Send(new ViewMessages(chat.Id, messages, null, false));
             }
 
             if (animations.Count > 0 && !intermediate)
@@ -982,7 +987,7 @@ namespace Unigram.Views
 
                     if (message.IsSaved())
                     {
-                        if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+                        if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
                         {
                             var user = message.ProtoService.GetUser(fromUser.SenderUserId);
                             if (user != null)
@@ -990,7 +995,7 @@ namespace Unigram.Views
                                 photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 30);
                             }
                         }
-                        else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+                        else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
                         {
                             var chat = message.ProtoService.GetChat(fromChat.SenderChatId);
                             if (chat != null)
@@ -998,7 +1003,7 @@ namespace Unigram.Views
                                 photo.Source = PlaceholderHelper.GetChat(ViewModel.ProtoService, chat, 30);
                             }
                         }
-                        else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+                        else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
                         {
                             var chat = message.ProtoService.GetChat(fromChannel.ChatId);
                             if (chat != null)
@@ -1006,11 +1011,11 @@ namespace Unigram.Views
                                 photo.Source = PlaceholderHelper.GetChat(ViewModel.ProtoService, chat, 30);
                             }
                         }
-                        else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
+                        else if (message.ImportInfo != null)
                         {
-                            photo.Source = PlaceholderHelper.GetNameForUser(fromImport.SenderName, 30);
+                            photo.Source = PlaceholderHelper.GetNameForUser(message.ImportInfo.SenderName, 30);
                         }
-                        else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+                        else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
                         {
                             photo.Source = PlaceholderHelper.GetNameForUser(fromHiddenUser.SenderName, 30);
                         }
@@ -1033,7 +1038,7 @@ namespace Unigram.Views
 
                     if (message.IsSaved())
                     {
-                        if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport || message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser)
+                        if (message.ImportInfo != null || message.ForwardInfo?.Origin is MessageOriginHiddenUser)
                         {
                             action.Visibility = Visibility.Collapsed;
                         }
@@ -1094,7 +1099,13 @@ namespace Unigram.Views
             }
             else if (content is MessageService service)
             {
-                if (args.Item is MessageViewModel viewModel && (viewModel.Content is MessageChatUpgradeFrom || viewModel.Content is MessageChatUpgradeTo))
+                // The upgrade notice is hidden only while the older history sits right
+                // above it, where it would be a seam drawn across a conversation that no
+                // longer has one. With nothing above it, it is the only thing saying the
+                // group did not begin here, and tapping it opens the rest.
+                if (args.Item is MessageViewModel viewModel
+                    && (viewModel.Content is MessageChatUpgradeFrom || viewModel.Content is MessageChatUpgradeTo)
+                    && ViewModel.MigratedChat != null)
                 {
                     service.Visibility = Visibility.Collapsed;
                 }

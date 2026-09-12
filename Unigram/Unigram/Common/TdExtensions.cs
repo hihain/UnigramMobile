@@ -200,6 +200,55 @@ namespace Unigram.Common
 
     public static class TdExtensions
     {
+        #region TDLib 1.8.24 compatibility helpers
+
+        public static string ActiveUsername(this User user)
+        {
+            return user.Usernames?.ActiveUsernames.FirstOrDefault() ?? string.Empty;
+        }
+
+        public static string ActiveUsername(this Supergroup supergroup)
+        {
+            return supergroup.Usernames?.ActiveUsernames.FirstOrDefault() ?? string.Empty;
+        }
+
+        public static bool HasActiveUsername(this User user)
+        {
+            return !string.IsNullOrEmpty(user.ActiveUsername());
+        }
+
+        public static bool HasActiveUsername(this Supergroup supergroup)
+        {
+            return !string.IsNullOrEmpty(supergroup.ActiveUsername());
+        }
+
+        public static bool CanSendMediaMessages(this ChatPermissions permissions)
+        {
+            return permissions.CanSendAudios
+                || permissions.CanSendDocuments
+                || permissions.CanSendPhotos
+                || permissions.CanSendVideos
+                || permissions.CanSendVideoNotes
+                || permissions.CanSendVoiceNotes;
+        }
+
+        public static bool IsBlocked(this Chat chat)
+        {
+            return chat.BlockList is BlockListMain;
+        }
+
+        public static string ToKey(this ReactionType type)
+        {
+            if (type is ReactionTypeEmoji emoji)
+            {
+                return emoji.Emoji;
+            }
+
+            return string.Empty;
+        }
+
+        #endregion
+
         public static File InvalidFile()
         {
             return new File(0, 0, 0, new LocalFile(string.Empty, false, false, false, false, 0, 0, 0), new RemoteFile(string.Empty, string.Empty, false, false, 0));
@@ -215,9 +264,9 @@ namespace Unigram.Common
             {
                 return 1;
             }
-            else if (chatList is ChatListFilter filter)
+            else if (chatList is ChatListFolder filter)
             {
-                return filter.ChatFilterId;
+                return filter.ChatFolderId;
             }
 
             return -1;
@@ -346,9 +395,9 @@ namespace Unigram.Common
             {
                 return true;
             }
-            else if (x is ChatListFilter filterX && y is ChatListFilter filterY)
+            else if (x is ChatListFolder filterX && y is ChatListFolder filterY)
             {
-                return filterX.ChatFilterId == filterY.ChatFilterId;
+                return filterX.ChatFolderId == filterY.ChatFolderId;
             }
 
             return false;
@@ -403,45 +452,92 @@ namespace Unigram.Common
 
         public static FormattedText Substring(this FormattedText text, long startIndex, long length)
         {
-            if (text.Text.Length < length)
+            if (startIndex >= text.Text.Length)
             {
-                return text;
+                return new FormattedText(string.Empty, new List<TextEntity>());
             }
 
-            var message = text.Text.Substring((int)startIndex, Math.Min(text.Text.Length - (int)startIndex, (int)length));
+            var offset = (int)startIndex;
+            var message = text.Text.Substring(offset, Math.Min(text.Text.Length - offset, (int)length));
             var sub = new List<TextEntity>();
 
-            foreach (var entity in text.Entities)
+            if (text.Entities != null)
             {
-                // Included, Included
-                if (entity.Offset >= startIndex && entity.Offset + entity.Length <= startIndex + length)
+                foreach (var entity in text.Entities)
                 {
-                    var replace = new TextEntity { Offset = entity.Offset - (int)startIndex, Length = entity.Length };
-                    sub.Add(replace);
-                }
-                // Before, Included
-                else if (entity.Offset < startIndex && entity.Offset + entity.Length > startIndex && entity.Offset + entity.Length <= startIndex + length)
-                {
-                    var replace = new TextEntity { Offset = 0, Length = entity.Length - ((int)startIndex - entity.Offset) };
-                    sub.Add(replace);
-                }
-                // Included, After
-                else if (entity.Offset >= startIndex && entity.Offset < startIndex + length && entity.Offset + entity.Length > startIndex + length)
-                {
-                    var difference = entity.Offset + entity.Length - startIndex + length;
+                    var start = Math.Max(entity.Offset, offset);
+                    var end = Math.Min(entity.Offset + entity.Length, offset + message.Length);
 
-                    var replace = new TextEntity { Offset = entity.Offset - (int)startIndex, Length = entity.Length - (int)difference };
-                    sub.Add(replace);
-                }
-                // Before, After
-                else if (entity.Offset < startIndex && entity.Offset + entity.Length > startIndex + length)
-                {
-                    var replace = new TextEntity { Offset = 0, Length = message.Length };
-                    sub.Add(replace);
+                    if (end > start)
+                    {
+                        sub.Add(new TextEntity(start - offset, end - start, entity.Type));
+                    }
                 }
             }
 
             return new FormattedText(message, sub);
+        }
+
+        private static bool IsQuotable(TextEntityType type)
+        {
+            return type is TextEntityTypeBold
+                || type is TextEntityTypeItalic
+                || type is TextEntityTypeUnderline
+                || type is TextEntityTypeStrikethrough
+                || type is TextEntityTypeSpoiler
+                || type is TextEntityTypeCustomEmoji;
+        }
+
+        public static FormattedText ToQuote(this FormattedText text, ref int offset, ref int length)
+        {
+            if (offset < 0)
+            {
+                offset = 0;
+            }
+
+            if (offset > text.Text.Length)
+            {
+                offset = text.Text.Length;
+            }
+
+            if (length > text.Text.Length - offset)
+            {
+                length = text.Text.Length - offset;
+            }
+
+            if (offset > 0 && offset < text.Text.Length && char.IsLowSurrogate(text.Text[offset]))
+            {
+                offset--;
+                length++;
+            }
+
+            if (length > 0 && offset + length < text.Text.Length && char.IsHighSurrogate(text.Text[offset + length - 1]))
+            {
+                length++;
+            }
+
+            var sub = new List<TextEntity>();
+
+            if (text.Entities != null)
+            {
+                foreach (var entity in text.Entities)
+                {
+                    if (!IsQuotable(entity.Type))
+                    {
+                        continue;
+                    }
+
+                    var start = Math.Max(entity.Offset, offset);
+                    var end = Math.Min(entity.Offset + entity.Length, offset + length);
+
+                    if (end > start)
+                    {
+                        sub.Add(new TextEntity(start - offset, end - start, entity.Type));
+                    }
+                }
+            }
+
+            return new FormattedText(text.Text.Substring(offset, length), sub);
         }
 
         public static string ToPlainText(this PageBlockCaption caption)
@@ -491,20 +587,39 @@ namespace Unigram.Common
             return string.IsNullOrEmpty(text.ToPlainText());
         }
 
-        public static bool IsEditable(this TextEntity entity)
+        /// <summary>
+        /// The tag this app writes for an entity in its own clipboard format, or 0 for one
+        /// the format cannot carry and the copy therefore leaves behind.
+        ///
+        /// ChatTextBox.OnPaste reads these numbers back. The two ends have to agree on every
+        /// one of them, so a type added here has to be added there in the same breath.
+        /// </summary>
+        public static byte ClipboardTag(this TextEntityType type)
         {
-            switch (entity.Type)
+            switch (type)
             {
                 case TextEntityTypeBold bold:
+                    return 1;
                 case TextEntityTypeItalic italic:
+                    return 2;
                 case TextEntityTypeCode code:
                 case TextEntityTypePre pre:
                 case TextEntityTypePreCode preCode:
+                    return 3;
                 case TextEntityTypeTextUrl textUrl:
+                    return 4;
                 case TextEntityTypeMentionName mentionName:
-                    return true;
+                    return 5;
+                case TextEntityTypeUnderline underline:
+                    return 6;
+                case TextEntityTypeStrikethrough strikethrough:
+                    return 7;
+                case TextEntityTypeSpoiler spoiler:
+                    return 8;
+                case TextEntityTypeBlockQuote blockQuote:
+                    return 9;
                 default:
-                    return false;
+                    return 0;
             }
         }
 
@@ -832,9 +947,9 @@ namespace Unigram.Common
             switch (content)
             {
                 case MessageSticker sticker:
-                    return (sticker.Sticker.Type is StickerTypeAnimated || sticker.Sticker.Type is StickerTypeVideo) ? sticker.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
+                    return (sticker.Sticker.Format is StickerFormatTgs || sticker.Sticker.Format is StickerFormatWebm) ? sticker.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
                 case MessageText text:
-                    return (text.WebPage?.Sticker is Sticker myStick && (myStick.Type is StickerTypeAnimated || myStick.Type is StickerTypeVideo)) ? text.WebPage.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
+                    return (text.WebPage?.Sticker is Sticker myStick && (myStick.Format is StickerFormatTgs || myStick.Format is StickerFormatWebm)) ? text.WebPage.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
                 case MessageDice dice:
                     var state = dice.InitialState;
                     if (state is DiceStickersRegular regular)
@@ -912,9 +1027,9 @@ namespace Unigram.Common
             switch (message.Content)
             {
                 case MessageSticker sticker:
-                    return (sticker.Sticker.Type is StickerTypeAnimated || sticker.Sticker.Type is StickerTypeVideo) ? sticker.Sticker.StickerValue : null;
+                    return (sticker.Sticker.Format is StickerFormatTgs || sticker.Sticker.Format is StickerFormatWebm) ? sticker.Sticker.StickerValue : null;
                 case MessageText text:
-                    return (text.WebPage?.Sticker is Sticker myStick && (myStick.Type is StickerTypeAnimated || myStick.Type is StickerTypeVideo)) ? text.WebPage?.Sticker?.StickerValue : null;
+                    return (text.WebPage?.Sticker is Sticker myStick && (myStick.Format is StickerFormatTgs || myStick.Format is StickerFormatWebm)) ? text.WebPage?.Sticker?.StickerValue : null;
                 default:
                     return null;
             }
@@ -1052,6 +1167,33 @@ namespace Unigram.Common
             return null;
         }
 
+        public static string ReplaceSpoilers(this FormattedText text, bool singleLine = true)
+        {
+            var rep = new StringBuilder(text.Text);
+            var chars = "⠁⠂⠄⠈⠐⠠⡀⢀⠃⠅⠆⠉⠊⠌⠑⠒⠔⠘⠡⠢⠤⠨⠰⡁⡂⡄⡈⡐⡠⢁⢂⢄⢈⢐⢠⣀⠇⠋⠍⠎⠓⠕⠖⠙⠚⠜⠣⠥⠦⠩⠪⠬⠱⠲⠴⠸⡃⡅⡆⡉⡊⡌⡑⡒⡔⡘⡡⡢⡤⡨⡰⢃⢅⢆⢉⢊⢌⢑⢒⢔⢘⢡⢢⢤⢨⢰⣁⣂⣄⣈⣐⣠⠏⠗⠛⠝⠞⠧⠫⠭⠮⠳⠵⠶⠹⠺⠼⡇⡋⡍⡎⡓⡕⡖⡙⡚⡜⡣⡥⡦⡩⡪⡬⡱⡲⡴⡸⢇⢋⢍⢎⢓⢕⢖⢙⢚⢜⢣⢥⢦⢩⢪⢬⢱⢲⢴⢸⣃⣅⣆⣉⣊⣌⣑⣒⣔⣘⣡⣢⣤⣨⣰⠟⠯⠷⠻⠽⠾⡏⡗⡛⡝⡞⡧⡫⡭⡮⡳⡵⡶⡹⡺⡼⢏⢗⢛⢝⢞⢧⢫⢭⢮⢳⢵⢶⢹⢺⢼⣇⣋⣍⣎⣓⣕⣖⣙⣚⣜⣣⣥⣦⣩⣪⣬⣱⣲⣴⣸⠿⡟⡯⡷⡻⡽⡾⢟⢯⢷⢻⢽⢾⣏⣗⣛⣝⣞⣧⣫⣭⣮⣳⣵⣶⣹⣺⣼⡿⢿⣟⣯⣷⣻⣽⣾⣿";
+
+            if (text.Entities != null)
+            {
+                foreach (var entity in text.Entities)
+                {
+                    if (entity.Type is TextEntityTypeSpoiler)
+                    {
+                        for (int i = 0; i < entity.Length; i++)
+                        {
+                            rep[entity.Offset + i] = chars[text.Text[entity.Offset + i] % chars.Length];
+                        }
+                    }
+                }
+            }
+
+            if (singleLine)
+            {
+                return rep.Replace('\n', ' ').ToString();
+            }
+
+            return rep.ToString();
+        }
+
         public static bool HasCaption(this MessageContent content)
         {
             var caption = content.GetCaption();
@@ -1143,7 +1285,7 @@ namespace Unigram.Common
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
-                case MessageChatSetTtl chatSetTtl:
+                case MessageChatSetMessageAutoDeleteTime chatSetTtl:
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:
@@ -1159,7 +1301,7 @@ namespace Unigram.Common
                 case MessageVideoChatEnded newTodo1:
                 case MessageVideoChatScheduled newTodo2:
                 case MessageVideoChatStarted newTodo3:
-                case MessageWebsiteConnected websiteConnected:
+                case MessageBotWriteAccessAllowed botWriteAccessAllowed:
                     return true;
                 case MessageExpiredPhoto expiredPhoto:
                 case MessageExpiredVideo expiredVideo:
@@ -1402,23 +1544,23 @@ namespace Unigram.Common
 
         public static bool IsSaved(this Message message, long savedMessagesId)
         {
-            if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
+            if (message.ForwardInfo?.Origin is MessageOriginUser fromUser)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return (message.ForwardInfo.Source?.ChatId ?? 0) != 0;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
+            else if (message.ForwardInfo?.Origin is MessageOriginChat fromChat)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return (message.ForwardInfo.Source?.ChatId ?? 0) != 0;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
+            else if (message.ForwardInfo?.Origin is MessageOriginChannel fromChannel)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return (message.ForwardInfo.Source?.ChatId ?? 0) != 0;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
+            else if (message.ImportInfo != null)
             {
                 return true;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginHiddenUser fromHiddenUser)
+            else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser fromHiddenUser)
             {
                 return message.ChatId == savedMessagesId;
             }
@@ -1691,11 +1833,11 @@ namespace Unigram.Common
             {
                 count++;
             }
-            if (permissions.CanSendMediaMessages)
+            if (permissions.CanSendMediaMessages())
             {
                 count++;
             }
-            if (permissions.CanSendMessages)
+            if (permissions.CanSendBasicMessages)
             {
                 count++;
             }
@@ -1723,7 +1865,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPinMessages;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPinMessages;
         }
 
         public static bool CanDeleteMessages(this Supergroup supergroup)
@@ -1733,7 +1875,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanDeleteMessages;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanDeleteMessages;
         }
 
         public static bool CanPinMessages(this BasicGroup basicGroup)
@@ -1743,7 +1885,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPinMessages;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPinMessages;
         }
 
         public static bool CanDeleteMessages(this BasicGroup basicGroup)
@@ -1753,7 +1895,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanDeleteMessages;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanDeleteMessages;
         }
 
         public static bool CanChangeInfo(this Supergroup supergroup)
@@ -1763,7 +1905,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanChangeInfo;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanChangeInfo;
         }
 
         public static bool CanPostMessages(this Supergroup supergroup)
@@ -1775,7 +1917,7 @@ namespace Unigram.Common
 
             if (supergroup.IsChannel)
             {
-                return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages;
+                return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPostMessages;
             }
             else
             {
@@ -1790,7 +1932,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanRestrictMembers;
         }
 
         public static bool CanPromoteMembers(this Supergroup supergroup)
@@ -1800,7 +1942,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPromoteMembers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanPromoteMembers;
         }
 
         public static bool CanPromoteMembers(this BasicGroup basicGroup)
@@ -1830,7 +1972,7 @@ namespace Unigram.Common
             //    return true;
             //}
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanInviteUsers;
         }
 
         public static bool CanInviteUsers(this BasicGroup basicGroup)
@@ -1845,7 +1987,7 @@ namespace Unigram.Common
             //    return true;
             //}
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.Rights.CanInviteUsers;
         }
 
         public static bool CanPostMessages(this BasicGroup basicGroup)

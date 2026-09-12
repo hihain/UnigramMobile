@@ -1,4 +1,5 @@
 ﻿using System;
+using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Native;
 using Unigram.ViewModels.Payments;
@@ -55,7 +56,7 @@ namespace Unigram.Views.Payments
 
             if (e.PropertyName.Equals("Navigate"))
             {
-                View.Navigate(new Uri(ViewModel.PaymentForm.Url));
+                View.Navigate(new Uri((ViewModel.PaymentForm.PaymentProvider as PaymentProviderOther)?.Url ?? string.Empty));
             }
         }
 

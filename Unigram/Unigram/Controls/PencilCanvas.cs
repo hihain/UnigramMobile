@@ -185,7 +185,10 @@ namespace Unigram.Controls
             _builders[point.PointerId] = new SmoothPathBuilder(point.Position.ToVector2() / _canvas.Size.ToVector2())
             {
                 Stroke = erasing ? ERASING_STROKE : Stroke,
-                StrokeThickness = erasing ? ERASING_STROKE_THICKNESS : StrokeThickness
+                // Normalize the thickness by the canvas width so that strokes stay
+                // proportional to the image when they are rendered onto the output
+                // bitmap (which has a different pixel size than the editor canvas).
+                StrokeThickness = (float)((erasing ? ERASING_STROKE_THICKNESS : StrokeThickness) / _canvas.Size.Width)
             };
         }
 
@@ -253,7 +256,7 @@ namespace Unigram.Controls
             style.LineJoin = CanvasLineJoin.Round;
 
             canvas.Blend = builder.Stroke == null ? CanvasBlend.Copy : CanvasBlend.SourceOver;
-            canvas.DrawGeometry(geometry, builder.Stroke ?? Colors.Transparent, builder.StrokeThickness, style);
+            canvas.DrawGeometry(geometry, builder.Stroke ?? Colors.Transparent, builder.StrokeThickness * canvasSize.X, style);
         }
 
         #endregion

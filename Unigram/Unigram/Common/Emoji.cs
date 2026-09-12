@@ -220,10 +220,10 @@ namespace Unigram.Common
         {
             var result = new List<EmojiData>();
 
-            var response = await protoService.SendAsync(new SearchEmojis(query, false, new[] { inputLanguage }));
-            if (response is Emojis suggestions)
+            var response = await protoService.SendAsync(new SearchEmojis(query, new[] { inputLanguage }));
+            if (response is EmojiKeywords suggestions)
             {
-                foreach (var item in suggestions.EmojisValue)
+                foreach (var item in suggestions.EmojiKeywordsValue.Select(x => x.Emoji).Distinct())
                 {
                     var emoji = item;
                     if (EmojiGroupInternal._skinEmojis.Contains(emoji) || EmojiGroupInternal._skinEmojis.Contains(emoji.TrimEnd('\uFE0F')))

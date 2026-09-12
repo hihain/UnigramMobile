@@ -327,7 +327,7 @@ namespace Unigram.Common
             }
             else if (args is VoiceCommandActivatedEventArgs voice)
             {
-                SpeechRecognitionResult speechResult = voice.Result;
+                Windows.Media.SpeechRecognition.SpeechRecognitionResult speechResult = voice.Result;
                 string command = speechResult.RulePath[0];
 
                 if (command == "ShowAllDialogs")

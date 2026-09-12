@@ -163,7 +163,7 @@ namespace Unigram.Controls.Messages.Content
 
             RecentVoters.Children.Clear();
 
-            foreach (var id in poll.Poll.RecentVoterUserIds)
+            foreach (var id in poll.Poll.RecentVoterIds.OfType<MessageSenderUser>().Select(x => x.UserId))
             {
                 var user = message.ProtoService.GetUser(id);
                 if (user == null)
