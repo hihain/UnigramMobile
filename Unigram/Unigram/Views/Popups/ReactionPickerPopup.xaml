@@ -48,6 +48,7 @@
                     <ItemsWrapGrid
                         ItemWidth="44"
                         ItemHeight="44"
+                        MaximumRowsOrColumns="5"
                         Orientation="Horizontal"/>
                 </ItemsPanelTemplate>
             </GridView.ItemsPanel>
