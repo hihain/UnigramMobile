@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <StoreAssociation xmlns="http://schemas.microsoft.com/appx/2010/storeassociation">
-  <Publisher>CN=DC409D7A-979D-42E5-AAA5-E9A0F674260F</Publisher>
-  <PublisherDisplayName>abaculi</PublisherDisplayName>
+  <Publisher>CN=3ED86B18-5F5F-4AE0-AA9C-697B841F55A7</Publisher>
+  <PublisherDisplayName>ZuneTracks</PublisherDisplayName>
   <DeveloperAccountType>MSA</DeveloperAccountType>
   <GeneratePackageHash>http://www.w3.org/2001/04/xmlenc#sha256</GeneratePackageHash>
   <SupportedLocales>
@@ -361,123 +361,20 @@
     <Language Code="zu-za" InMinimumRequirementSet="true" />
   </SupportedLocales>
   <ProductReservedInfo>
-    <MainPackageIdentityName>49197Wirdschon.UnigramMobileTdlibExperimental</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.UnigramMobileMessengerBETA</MainPackageIdentityName>
     <ReservedNames>
-      <ReservedName>Unigram Mobile</ReservedName>
-      <ReservedName>Unigram Mobile Messenger</ReservedName>
-      <ReservedName>Unigram Mobile Messenger (Telegram Client for Windows Mobile)</ReservedName>
-      <ReservedName>Unigram Mobile Messenger (Telegram Client für Windows Mobile)</ReservedName>
-      <ReservedName>Unigram Mobile Messenger (Telegram Client)</ReservedName>
+      <ReservedName>Unigram Mobile Messenger BETA</ReservedName>
+      <ReservedName>Unigram Mobile Messenger UWP - BETA</ReservedName>
+      <ReservedName>Unigram Mobile UWP BETA</ReservedName>
     </ReservedNames>
   </ProductReservedInfo>
-  <AccountPackageIdentityNames />
-  <PackageInfoList LandingUrl="https://developer.microsoft.com/dashboard/Application?appId=9NSD4T15QLFX">
-    <BundleInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Arm</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-      <PackageInfo>
-        <OsMinVersion>0.0.0.0</OsMinVersion>
-        <PackageArchitecture>Neutral</PackageArchitecture>
-        <PackageMaxArchitectureVersion>19.12.2649.0</PackageMaxArchitectureVersion>
-      </PackageInfo>
-    </BundleInfo>
-  </PackageInfoList>
+  <AccountPackageIdentityNames>
+    <MainPackageIdentityName>ZuneTracks.BluSkyUWP</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.LiveDriveUWP</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.LiveSync</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.UnigramMobileUWP</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.UniTubeUWP</MainPackageIdentityName>
+    <MainPackageIdentityName>ZuneTracks.WootDailydeals</MainPackageIdentityName>
+  </AccountPackageIdentityNames>
+  <PackageInfoList LandingUrl="https://devcenterapi.dce.mp.microsoft.com/dashboard/Application?appId=9P824F25PHJT" />
 </StoreAssociation>

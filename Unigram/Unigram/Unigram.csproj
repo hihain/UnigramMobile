@@ -16,7 +16,8 @@
     <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <PackageCertificateKeyFile>Unigram_StoreKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateKeyFile>
+    </PackageCertificateKeyFile>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
     <AppxBundle>Always</AppxBundle>
@@ -35,8 +36,8 @@
          native code. Force sideload packaging so BuildNativePackage's ILC output
          is what actually gets packaged. -->
     <UapAppxPackageBuildMode Condition="'$(UseModernTdlib)' == 'true'">SideloadOnly</UapAppxPackageBuildMode>
-    <AppxBundle Condition="'$(UseModernTdlib)' == 'true'">Never</AppxBundle>
-    <PackageCertificateThumbprint>B5E7EBF1650558A9D670BD1C5B9F82E24A213434</PackageCertificateThumbprint>
+    <AppxBundle Condition="'$(UseModernTdlib)' == 'true'">Always</AppxBundle>
+    <PackageCertificateThumbprint>0082CDEF2DF76F40117532597BA1D70B48959738</PackageCertificateThumbprint>
     <BuildAppxSideloadPackageForUap Condition="'$(UseModernTdlib)' == 'true'">True</BuildAppxSideloadPackageForUap>
     <BuildAppxUploadPackageForUap Condition="'$(UseModernTdlib)' == 'true'">False</BuildAppxUploadPackageForUap>
     <BuildAppxSideloadPackageForUap Condition="'$(UseModernTdlib)' != 'true'">False</BuildAppxSideloadPackageForUap>
@@ -60,6 +61,7 @@
     <UseModernTgCalls Condition="'$(UseModernTgCalls)' == ''">false</UseModernTgCalls>
     <ModernTgCallsBridgeRoot Condition="'$(ModernTgCallsBridgeRoot)' == ''">$(ModernTdlibWorkRoot)\bridge-probe</ModernTgCallsBridgeRoot>
     <ModernTgCallsBridgeBuildScript>$(MSBuildThisFileDirectory)..\..\build\tgcalls\Build-ModernCallsBridgeProof.ps1</ModernTgCallsBridgeBuildScript>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -2849,6 +2851,45 @@
   <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|x86'">
+    <OutputPath>bin\x86\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;MOBILE;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|x64'">
+    <OutputPath>bin\x64\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;PREVIEW;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|ARM'">
+    <OutputPath>bin\ARM\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;MOBILE;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>ARM</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
   <Target Name="EnsureModernTdlib" BeforeTargets="ValidateModernTdlib" Inputs="$(ModernTdlibBuildScript);$(MSBuildThisFileDirectory)..\..\build\tdlib\vcpkg.json;@(ModernTdlibBuildInput)" Outputs="$(ModernTdlibBuildManifest)" Condition="'$(UseModernTdlib)' == 'true'">

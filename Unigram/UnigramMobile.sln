@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.1082
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37827.9 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unigram", "Unigram\Unigram.csproj", "{2235E8EE-374A-4E49-8050-9B701467775D}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -30,11 +30,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Unigram.Native.Media", "Unigram.Native.Media\Unigram.Native.Media.vcxproj", "{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}"
 EndProject
 Global
-	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{1b521e77-46bd-4d60-89f6-d68e9bb9abff}*SharedItemsImports = 4
-		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{3adbf08f-0550-4a1c-9794-fea30cf69e3a}*SharedItemsImports = 4
-		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{c50f57b3-33e1-4235-9d02-0c9f1c4176a8}*SharedItemsImports = 9
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
 		Debug|ARM64 = Debug|ARM64
@@ -44,6 +39,10 @@ Global
 		Release|ARM64 = Release|ARM64
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
+		Store|ARM = Store|ARM
+		Store|ARM64 = Store|ARM64
+		Store|x64 = Store|x64
+		Store|x86 = Store|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{2235E8EE-374A-4E49-8050-9B701467775D}.Debug|ARM.ActiveCfg = Debug|ARM
@@ -66,6 +65,18 @@ Global
 		{2235E8EE-374A-4E49-8050-9B701467775D}.Release|x86.ActiveCfg = Release|x86
 		{2235E8EE-374A-4E49-8050-9B701467775D}.Release|x86.Build.0 = Release|x86
 		{2235E8EE-374A-4E49-8050-9B701467775D}.Release|x86.Deploy.0 = Release|x86
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM.ActiveCfg = Store|ARM
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM.Build.0 = Store|ARM
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM.Deploy.0 = Store|ARM
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM64.ActiveCfg = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM64.Build.0 = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|ARM64.Deploy.0 = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x64.ActiveCfg = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x64.Build.0 = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x64.Deploy.0 = Store|x64
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x86.ActiveCfg = Store|x86
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x86.Build.0 = Store|x86
+		{2235E8EE-374A-4E49-8050-9B701467775D}.Store|x86.Deploy.0 = Store|x86
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Debug|ARM.ActiveCfg = Debug|ARM
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Debug|ARM.Build.0 = Debug|ARM
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -80,6 +91,14 @@ Global
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Release|x64.Build.0 = Release|x64
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Release|x86.ActiveCfg = Release|Win32
 		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Release|x86.Build.0 = Release|Win32
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|ARM.ActiveCfg = Store|ARM
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|ARM.Build.0 = Store|ARM
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|ARM64.ActiveCfg = Store|x64
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|ARM64.Build.0 = Store|x64
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|x64.ActiveCfg = Store|x64
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|x64.Build.0 = Store|x64
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|x86.ActiveCfg = Store|Win32
+		{1B521E77-46BD-4D60-89F6-D68E9BB9ABFF}.Store|x86.Build.0 = Store|Win32
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Debug|ARM.ActiveCfg = Debug|ARM
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Debug|ARM.Build.0 = Debug|ARM
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -94,6 +113,14 @@ Global
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Release|x64.Build.0 = Release|x64
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Release|x86.ActiveCfg = Release|Win32
 		{7789C8B7-887C-46B6-BD76-952C590B1853}.Release|x86.Build.0 = Release|Win32
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|ARM.ActiveCfg = Store|ARM
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|ARM.Build.0 = Store|ARM
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|ARM64.ActiveCfg = Store|x64
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|ARM64.Build.0 = Store|x64
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|x64.ActiveCfg = Store|x64
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|x64.Build.0 = Store|x64
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|x86.ActiveCfg = Store|Win32
+		{7789C8B7-887C-46B6-BD76-952C590B1853}.Store|x86.Build.0 = Store|Win32
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Debug|ARM.ActiveCfg = Debug|ARM
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Debug|ARM.Build.0 = Debug|ARM
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -108,6 +135,14 @@ Global
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Release|x64.Build.0 = Release|x64
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Release|x86.ActiveCfg = Release|Win32
 		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Release|x86.Build.0 = Release|Win32
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|ARM.ActiveCfg = Store|ARM
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|ARM.Build.0 = Store|ARM
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|ARM64.ActiveCfg = Store|x64
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|ARM64.Build.0 = Store|x64
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|x64.ActiveCfg = Store|x64
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|x64.Build.0 = Store|x64
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|x86.ActiveCfg = Store|Win32
+		{904AC506-51A0-474E-9F55-EC3FEBBCCCD9}.Store|x86.Build.0 = Store|Win32
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Debug|ARM.ActiveCfg = Debug|ARM
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Debug|ARM.Build.0 = Debug|ARM
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -122,6 +157,14 @@ Global
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Release|x64.Build.0 = Release|x64
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Release|x86.ActiveCfg = Release|Win32
 		{3520C5E6-F0C2-468F-8970-372414C233DC}.Release|x86.Build.0 = Release|Win32
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|ARM.ActiveCfg = Store|ARM
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|ARM.Build.0 = Store|ARM
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|ARM64.ActiveCfg = Store|x64
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|ARM64.Build.0 = Store|x64
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|x64.ActiveCfg = Store|x64
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|x64.Build.0 = Store|x64
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|x86.ActiveCfg = Store|Win32
+		{3520C5E6-F0C2-468F-8970-372414C233DC}.Store|x86.Build.0 = Store|Win32
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Debug|ARM.ActiveCfg = Debug|ARM
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Debug|ARM.Build.0 = Debug|ARM
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -136,6 +179,14 @@ Global
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x64.Build.0 = Release|x64
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x86.ActiveCfg = Release|Win32
 		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Release|x86.Build.0 = Release|Win32
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|ARM.ActiveCfg = Store|ARM
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|ARM.Build.0 = Store|ARM
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|ARM64.ActiveCfg = Store|x64
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|ARM64.Build.0 = Store|x64
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|x64.ActiveCfg = Store|x64
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|x64.Build.0 = Store|x64
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|x86.ActiveCfg = Store|Win32
+		{6766A2C0-AB30-43CC-9EF3-7DDC13736A38}.Store|x86.Build.0 = Store|Win32
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM.ActiveCfg = Debug|ARM
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM.Build.0 = Debug|ARM
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Debug|ARM64.ActiveCfg = Debug|Win32
@@ -150,6 +201,14 @@ Global
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x64.Build.0 = Release|x64
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x86.ActiveCfg = Release|Win32
 		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Release|x86.Build.0 = Release|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|ARM.ActiveCfg = Store|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|ARM.Build.0 = Store|ARM
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|ARM64.ActiveCfg = Store|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|ARM64.Build.0 = Store|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|x64.ActiveCfg = Store|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|x64.Build.0 = Store|x64
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|x86.ActiveCfg = Store|Win32
+		{CA0C2CC0-3D83-4556-A9A3-0923ECE8C1D3}.Store|x86.Build.0 = Store|Win32
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM.ActiveCfg = Debug|ARM
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM.Build.0 = Debug|ARM
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Debug|ARM64.ActiveCfg = Debug|ARM64
@@ -166,6 +225,14 @@ Global
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Release|x64.Build.0 = Release|x64
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Release|x86.ActiveCfg = Release|Win32
 		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Release|x86.Build.0 = Release|Win32
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|ARM.ActiveCfg = Store|ARM
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|ARM.Build.0 = Store|ARM
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|ARM64.ActiveCfg = Store|ARM64
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|ARM64.Build.0 = Store|ARM64
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|x64.ActiveCfg = Store|x64
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|x64.Build.0 = Store|x64
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|x86.ActiveCfg = Store|Win32
+		{3ADBF08F-0550-4A1C-9794-FEA30CF69E3A}.Store|x86.Build.0 = Store|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -178,5 +245,10 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {8D9C79FF-7079-448D-8DA7-7E83CDBCA9AC}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{1b521e77-46bd-4d60-89f6-d68e9bb9abff}*SharedItemsImports = 4
+		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{3adbf08f-0550-4a1c-9794-fea30cf69e3a}*SharedItemsImports = 4
+		Unigram.Native.Shared\Unigram.Native.Shared.vcxitems*{c50f57b3-33e1-4235-9d02-0c9f1c4176a8}*SharedItemsImports = 9
 	EndGlobalSection
 EndGlobal
