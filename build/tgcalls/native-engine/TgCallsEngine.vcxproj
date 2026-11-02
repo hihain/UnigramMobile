@@ -42,6 +42,7 @@
            any such object shared between these sources and the library. -->
       <PreprocessorDefinitions>NDEBUG;WEBRTC_WIN;WINUWP;WINAPI_FAMILY=WINAPI_FAMILY_PC_APP;WIN32_LEAN_AND_MEAN;NOMINMAX;_UNICODE;UNICODE;NTDDI_VERSION=NTDDI_WIN10_RS2;_WIN32_WINNT=0x0A00;WINVER=0x0A00;WEBRTC_ENABLE_PROTOBUF=0;WEBRTC_STRICT_FIELD_TRIALS=0;WEBRTC_HAVE_SCTP;WEBRTC_ARCH_ARM;RTC_DISABLE_METRICS;WEBRTC_VIDEO_CAPTURE_WINRT;WEBRTC_INCLUDE_INTERNAL_AUDIO_DEVICE;WEBRTC_LIBRARY_IMPL;WEBRTC_NON_STATIC_TRACE_EVENT_HANDLERS=0;ABSL_ALLOCATOR_NOTHROW=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <ProgramDataBaseFileName>$(IntDir)%(Filename).pdb</ProgramDataBaseFileName>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
