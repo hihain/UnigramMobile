@@ -19,7 +19,14 @@
 [Pp]roduction/
 x64/
 x86/
-[Aa][Rr][Mm]/
+/Unigram/ARM/
+/Unigram/Libraries/libogg/ARM/
+/Unigram/Libraries/libopus/ARM/
+/Unigram/Libraries/libopusfile/ARM/
+/Unigram/Libraries/libwebp/ARM/
+/Unigram/Unigram.Native.Media/ARM/
+/Unigram/Unigram.Native.Tasks/ARM/
+/Unigram/Unigram.Native/ARM/
 bld/
 [Bb]in/
 [Oo]bj/
