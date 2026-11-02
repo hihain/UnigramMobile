@@ -201,9 +201,8 @@ namespace Unigram.Services
 
         #region App version
 
-        //public const ulong CurrentVersion = (4UL << 48) | (0UL << 32) | (5072UL << 16);
-        //public const string CurrentChangelog = "• Chat folders.\r\n• Stream Videos and Audio files.\r\n• Improved stickers, GIFs and emojis.\r\n\r\nRead more: https://telegra.ph/Unigram-40-05-28";
-        public static readonly string CurrentChangelog = $"• Pinned Messages 2.0: Pin multiple messages in any chat and see them all on a separate page\r\n• Comment on posts in channels that have a discussion group.\r\n• Get notified about replies to your comments via the new \"Replies\" chat (if you are not a member in the discussion group).\r\n• Anonymous group admins: Turn on \"Remain Anonymous\" in an admin's permissions (edit group -> admins -> tap on an admin) to let them post on behalf of the group and become invisible in the list of members.\r\n• Added a context menu button to the chat (in touch mode) for easier access to some context menus\r\n• Added in-app volume control.\r\n• Increased music player slider.\r\n• Send music playlists\r\n• Improved live locations";
+        // Keep this in sync with Package.appxmanifest for every shipped build.
+        public static readonly string CurrentChangelog = "• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.\r\n• Modern TDLib ARM integration and the experimental BETA package remain isolated from the stable app.";
 
         public int Session => _session;
 
@@ -226,17 +225,23 @@ namespace Unigram.Services
 
         public void UpdateVersion()
         {
-            var version = GetAppVersion();
-            VersionLastStart = ((ulong)version.Major << 48) | ((ulong)version.Minor << 32);
+            VersionLastStart = GetVersionMarker(GetAppVersion());
         }
 
         public static ulong CurrentVersion
         {
             get
             {
-                var version = GetAppVersion();
-                return ((ulong)version.Major << 48) | ((ulong)version.Minor << 32);
+                return GetVersionMarker(GetAppVersion());
             }
+        }
+
+        private static ulong GetVersionMarker(Windows.ApplicationModel.PackageVersion version)
+        {
+            return ((ulong)version.Major << 48)
+                | ((ulong)version.Minor << 32)
+                | ((ulong)version.Build << 16)
+                | version.Revision;
         }
 
         public static Windows.ApplicationModel.PackageVersion GetAppVersion()

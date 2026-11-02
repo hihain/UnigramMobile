@@ -587,7 +587,7 @@ namespace Unigram.Services
                 if (response is Chat chat)
                 {
                     Windows.ApplicationModel.PackageVersion version = SettingsService.GetAppVersion();
-                    var title = $"**{Windows.ApplicationModel.Package.Current.DisplayName} Version {version.Major}.{version.Minor}**";
+                    var title = $"**{Windows.ApplicationModel.Package.Current.DisplayName} Version {version.Major}.{version.Minor}.{version.Build}.{version.Revision}**";
                     var message = title + Environment.NewLine + Environment.NewLine + SettingsService.CurrentChangelog;
 
                     var entities = Client.Execute(new GetTextEntities(message)) as TextEntities;
