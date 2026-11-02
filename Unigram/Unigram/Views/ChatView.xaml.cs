@@ -2327,45 +2327,44 @@ namespace Unigram.Views
                 .Select(reaction => reaction.Type as ReactionTypeEmoji)
                 .Where(reaction => !string.IsNullOrEmpty(reaction?.Emoji))
                 .Select(reaction => reaction.Emoji)
-                .Distinct();
+                .Distinct()
+                .ToList();
 
-            var picker = new MenuFlyoutSubItem
-            {
-                Text = Strings.Resources.Emoji1
-            };
-
-            foreach (var emoji in emojis)
-            {
-                var item = new MenuFlyoutItem
-                {
-                    Text = emoji,
-                    Tag = new ReactionPickerItem(message, emoji),
-                    FontFamily = new FontFamily("Segoe UI Emoji")
-                };
-                item.Click += ReactionPickerItem_Click;
-
-                picker.Items.Add(item);
-            }
-
-            if (picker.Items.Count > 0)
-            {
-                flyout.Items.Add(picker);
-            }
-        }
-
-        private void ReactionPickerItem_Click(object sender, RoutedEventArgs e)
-        {
-            if (!(sender is MenuFlyoutItem item) || !(item.Tag is ReactionPickerItem selection) ||
-                selection.Message.Id == 0)
+            if (emojis.Count == 0)
             {
                 return;
             }
 
-            selection.Message.ProtoService.Send(
+            var request = new ReactionPickerRequest(message, emojis);
+            var picker = new MenuFlyoutItem
+            {
+                Text = Strings.Resources.Emoji1
+            };
+            picker.Click += (sender, args) => flyout.Closed += (closedSender, closedArgs) => ShowReactionPicker(request);
+
+            flyout.Items.Add(picker);
+        }
+
+        private async void ShowReactionPicker(ReactionPickerRequest request)
+        {
+            var picker = new ReactionPickerPopup(request.Emojis);
+            picker.ReactionSelected += (sender, emoji) => AddReaction(request.Message, emoji);
+
+            await picker.OpenAsync();
+        }
+
+        private void AddReaction(MessageViewModel message, string emoji)
+        {
+            if (message.Id == 0)
+            {
+                return;
+            }
+
+            message.ProtoService.Send(
                 new AddMessageReaction(
-                    selection.Message.ChatId,
-                    selection.Message.Id,
-                    new ReactionTypeEmoji(selection.Emoji),
+                    message.ChatId,
+                    message.Id,
+                    new ReactionTypeEmoji(emoji),
                     false,
                     true),
                 result =>
@@ -2379,17 +2378,17 @@ namespace Unigram.Views
                 });
         }
 
-        private sealed class ReactionPickerItem
+        private sealed class ReactionPickerRequest
         {
-            public ReactionPickerItem(MessageViewModel message, string emoji)
+            public ReactionPickerRequest(MessageViewModel message, IList<string> emojis)
             {
                 Message = message;
-                Emoji = emoji;
+                Emojis = emojis;
             }
 
             public MessageViewModel Message { get; }
 
-            public string Emoji { get; }
+            public IList<string> Emojis { get; }
         }
 
         private bool MessageSendNow_Loaded(MessageViewModel message)
