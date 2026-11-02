@@ -2221,7 +2221,7 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessageReschedule_Loaded, ViewModel.MessageRescheduleCommand, message, Strings.Resources.MessageScheduleEditTime, new FontIcon { Glyph = Icons.Schedule });
 
                 // Generic
-                AddReactionPicker(flyout, message, availableReactions);
+                AddReactionPicker(flyout, element ?? sender as FrameworkElement, message, availableReactions);
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageEdit_Loaded, ViewModel.MessageEditCommand, message, Strings.Resources.Edit, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(MessageThread_Loaded, ViewModel.MessageThreadCommand, message, message.InteractionInfo?.ReplyInfo?.ReplyCount > 0 ? Locale.Declension("ViewReplies", message.InteractionInfo.ReplyInfo.ReplyCount) : Strings.Resources.ViewThread, new FontIcon { Glyph = Icons.Thread, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
@@ -2307,10 +2307,11 @@ namespace Unigram.Views
 
         private void AddReactionPicker(
             MenuFlyout flyout,
+            FrameworkElement target,
             MessageViewModel message,
             AvailableReactions reactions)
         {
-            if (reactions == null || reactions.UnavailabilityReason != null)
+            if (target == null || reactions == null || reactions.UnavailabilityReason != null)
             {
                 return;
             }
@@ -2340,7 +2341,7 @@ namespace Unigram.Views
             {
                 Text = Strings.Resources.Emoji1
             };
-            picker.Click += (sender, args) => ReactionPicker_Click(flyout.Target as FrameworkElement, request);
+            picker.Click += (sender, args) => ReactionPicker_Click(target, request);
 
             flyout.Items.Add(picker);
         }
