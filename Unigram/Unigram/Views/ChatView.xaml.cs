@@ -2221,7 +2221,7 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessageReschedule_Loaded, ViewModel.MessageRescheduleCommand, message, Strings.Resources.MessageScheduleEditTime, new FontIcon { Glyph = Icons.Schedule });
 
                 // Generic
-                AddReactionPicker(flyout, element ?? sender as FrameworkElement, message, availableReactions);
+                AddReactionPicker(flyout, message, availableReactions);
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageEdit_Loaded, ViewModel.MessageEditCommand, message, Strings.Resources.Edit, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(MessageThread_Loaded, ViewModel.MessageThreadCommand, message, message.InteractionInfo?.ReplyInfo?.ReplyCount > 0 ? Locale.Declension("ViewReplies", message.InteractionInfo.ReplyInfo.ReplyCount) : Strings.Resources.ViewThread, new FontIcon { Glyph = Icons.Thread, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
@@ -2307,11 +2307,10 @@ namespace Unigram.Views
 
         private void AddReactionPicker(
             MenuFlyout flyout,
-            FrameworkElement target,
             MessageViewModel message,
             AvailableReactions reactions)
         {
-            if (target == null || reactions == null || reactions.UnavailabilityReason != null)
+            if (reactions == null || reactions.UnavailabilityReason != null)
             {
                 return;
             }
@@ -2328,61 +2327,45 @@ namespace Unigram.Views
                 .Select(reaction => reaction.Type as ReactionTypeEmoji)
                 .Where(reaction => !string.IsNullOrEmpty(reaction?.Emoji))
                 .Select(reaction => reaction.Emoji)
-                .Distinct()
-                .ToList();
+                .Distinct();
 
-            if (emojis.Count == 0)
-            {
-                return;
-            }
-
-            var request = new ReactionPickerRequest(message, emojis);
-            var picker = new MenuFlyoutItem
+            var picker = new MenuFlyoutSubItem
             {
                 Text = Strings.Resources.Emoji1
             };
-            picker.Click += (sender, args) => ReactionPicker_Click(target, request);
 
-            flyout.Items.Add(picker);
+            foreach (var emoji in emojis)
+            {
+                var item = new MenuFlyoutItem
+                {
+                    Text = emoji,
+                    Tag = new ReactionPickerItem(message, emoji),
+                    FontFamily = new FontFamily("Segoe UI Emoji")
+                };
+                item.Click += ReactionPickerItem_Click;
+
+                picker.Items.Add(item);
+            }
+
+            if (picker.Items.Count > 0)
+            {
+                flyout.Items.Add(picker);
+            }
         }
 
-        private void ReactionPicker_Click(FrameworkElement target, ReactionPickerRequest request)
+        private void ReactionPickerItem_Click(object sender, RoutedEventArgs e)
         {
-            if (target == null)
+            if (!(sender is MenuFlyoutItem item) || !(item.Tag is ReactionPickerItem selection) ||
+                selection.Message.Id == 0)
             {
                 return;
             }
 
-            ReactionPickerList.ItemsSource = request.Emojis;
-            ReactionPickerList.Tag = request;
-            ReactionPickerFlyout.ShowAt(target);
-        }
-
-        private void ReactionPickerList_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            if (!(ReactionPickerList.Tag is ReactionPickerRequest request) ||
-                !(e.ClickedItem is string emoji))
-            {
-                return;
-            }
-
-            ReactionPickerFlyout.Hide();
-            ReactionPickerList.Tag = null;
-            AddReaction(request.Message, emoji);
-        }
-
-        private void AddReaction(MessageViewModel message, string emoji)
-        {
-            if (message.Id == 0)
-            {
-                return;
-            }
-
-            message.ProtoService.Send(
+            selection.Message.ProtoService.Send(
                 new AddMessageReaction(
-                    message.ChatId,
-                    message.Id,
-                    new ReactionTypeEmoji(emoji),
+                    selection.Message.ChatId,
+                    selection.Message.Id,
+                    new ReactionTypeEmoji(selection.Emoji),
                     false,
                     true),
                 result =>
@@ -2396,17 +2379,17 @@ namespace Unigram.Views
                 });
         }
 
-        private sealed class ReactionPickerRequest
+        private sealed class ReactionPickerItem
         {
-            public ReactionPickerRequest(MessageViewModel message, IList<string> emojis)
+            public ReactionPickerItem(MessageViewModel message, string emoji)
             {
                 Message = message;
-                Emojis = emojis;
+                Emoji = emoji;
             }
 
             public MessageViewModel Message { get; }
 
-            public IList<string> Emojis { get; }
+            public string Emoji { get; }
         }
 
         private bool MessageSendNow_Loaded(MessageViewModel message)
