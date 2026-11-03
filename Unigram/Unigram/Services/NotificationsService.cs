@@ -571,18 +571,20 @@ namespace Unigram.Services
 
             WriteForegroundTileDiagnostic("managed.tile.message", $"result=received;type=new_push_message;silent={silent.ToString().ToLowerInvariant()}");
 
+            var isSecretChat = chat.Type is ChatTypeSecret;
+            var showOnLiveTile = !isSecretChat || _settings.Notifications.ShowSecretChatOnLiveTiles;
             var caption = GetCaption(chat);
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = await GetPhotoAsync(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
             var attribution = user?.GetFullName() ?? string.Empty;
 
-            if (chat.Type is ChatTypeSecret || TLContainer.Current.Passcode.IsLockscreenRequired)
+            if (isSecretChat || TLContainer.Current.Passcode.IsLockscreenRequired)
             {
                 caption = Strings.Resources.AppName;
                 content = Strings.Resources.YouHaveNewMessage;
@@ -594,7 +596,14 @@ namespace Unigram.Services
             await UpdateAsync(chat, async () =>
             {
                 await UpdateToast(caption, content, $"{_sessionService.Id}", sound, launch, $"{id}", $"{groupId}", picture, dateTime, canReply);
-                UpdateManagedTile(caption, content, launch, picture);
+                if (showOnLiveTile)
+                {
+                    UpdateManagedTile(caption, content, launch, picture);
+                }
+                else
+                {
+                    WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};result=skipped;reason=secret_chat_setting");
+                }
             });
         }
 
@@ -609,18 +618,20 @@ namespace Unigram.Services
 
             WriteForegroundTileDiagnostic("managed.tile.message", $"result=received;type=new_message;silent={silent.ToString().ToLowerInvariant()}");
 
+            var isSecretChat = chat.Type is ChatTypeSecret;
+            var showOnLiveTile = !isSecretChat || _settings.Notifications.ShowSecretChatOnLiveTiles;
             var caption = GetCaption(chat);
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = await GetPhotoAsync(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
             var attribution = user?.GetFullName() ?? string.Empty;
 
-            if (chat.Type is ChatTypeSecret || TLContainer.Current.Passcode.IsLockscreenRequired)
+            if (isSecretChat || TLContainer.Current.Passcode.IsLockscreenRequired)
             {
                 caption = Strings.Resources.AppName;
                 content = Strings.Resources.YouHaveNewMessage;
@@ -632,7 +643,14 @@ namespace Unigram.Services
             await UpdateAsync(chat, async () =>
             {
                 await UpdateToast(caption, content, $"{_sessionService.Id}", sound, launch, $"{id}", $"{groupId}", picture, dateTime, canReply);
-                UpdateManagedTile(caption, content, launch, picture);
+                if (showOnLiveTile)
+                {
+                    UpdateManagedTile(caption, content, launch, picture);
+                }
+                else
+                {
+                    WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};result=skipped;reason=secret_chat_setting");
+                }
             });
 
             if (App.Connection is AppServiceConnection connection && _settings.Notifications.InAppFlash)

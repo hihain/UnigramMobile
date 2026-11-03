@@ -208,6 +208,19 @@ namespace Unigram.ViewModels.Settings
             }
         }
 
+        public bool ShowSecretChatOnLiveTiles
+        {
+            get
+            {
+                return Settings.Notifications.ShowSecretChatOnLiveTiles;
+            }
+            set
+            {
+                Settings.Notifications.ShowSecretChatOnLiveTiles = value;
+                RaisePropertyChanged();
+            }
+        }
+
         public void Handle(UpdateScopeNotificationSettings update)
         {
             foreach (var scope in Scopes)

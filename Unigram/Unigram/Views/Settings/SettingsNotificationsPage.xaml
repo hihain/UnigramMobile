@@ -109,6 +109,14 @@
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl
+                    Header="{CustomResource SecretChat}">
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.ShowSecretChatOnLiveTiles, Mode=TwoWay}"
+                        Header="{CustomResource SecretChatLiveTile}"
+                        Style="{StaticResource CheckButtonStyle}"/>
+                </controls:HeaderedControl>
+
+                <controls:HeaderedControl
                     Footer="{CustomResource UndoAllCustom}">
                     <controls:BadgeButton
                         Content="{CustomResource ResetAllNotifications}"

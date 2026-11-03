@@ -9533,6 +9533,9 @@ You may need to restart the app for this to take effect.</value>
   <data name="SecretChat" xml:space="preserve">
     <value>Secret chats</value>
   </data>
+  <data name="SecretChatLiveTile" xml:space="preserve">
+    <value>Show Secret Chat Notifications on Live Tiles</value>
+  </data>
   <data name="SecretChatContextBotAlert" xml:space="preserve">
     <value>Please note that inline bots are provided by third-party developers. For the bot to work, the symbols you type after the bot's username are sent to the respective developer.</value>
   </data>

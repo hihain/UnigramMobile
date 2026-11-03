@@ -202,7 +202,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.\r\n• Modern TDLib ARM integration and the experimental BETA package remain isolated from the stable app.";
+        public static readonly string CurrentChangelog = "• Privacy: Secret Chat notifications are excluded from Live Tiles by default. You can enable them in Settings > Notifications; sender profile images are never shown on Secret Chat tiles.\r\n• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.";
 
         public int Session => _session;
 
