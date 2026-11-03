@@ -38,6 +38,8 @@ namespace Unigram
 				String^ GetPicture(JsonObject^ custom, String^ group, String^ session);
 				String^ GetDate(JsonObject^ notification);
 				String^ GetSession(long long receiverId);
+				static bool IsSecretChatPush(String^ loc_key);
+				static bool ShowSecretChatOnLiveTiles(String^ session, bool sessionMapped);
 
 				static void LogError(String^ operation, Exception^ exception);
 				static void LogDiagnostic(String^ eventName, String^ details);

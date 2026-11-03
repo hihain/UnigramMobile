@@ -244,6 +244,7 @@ namespace Unigram.ViewModels.Settings
                 InAppSounds = true;
                 InAppPreview = true;
                 InAppVibrate = true;
+                ShowSecretChatOnLiveTiles = false;
                 _suppressUpdating = false;
 
                 ProtoService.Send(new ResetAllNotificationSettings());

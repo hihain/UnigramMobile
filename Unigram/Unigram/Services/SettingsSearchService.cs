@@ -184,6 +184,9 @@ namespace Unigram.Services
                     new SettingsSearchPage(typeof(SettingsNotificationsPage), Strings.Resources.BadgeNumberUnread)
                 }),
 
+                // Secret Chats
+                new SettingsSearchPage(typeof(SettingsNotificationsPage), Strings.Resources.SecretChatLiveTile),
+
                 // Reset All Notifications
                 new SettingsSearchPage(typeof(SettingsNotificationsPage), Strings.Resources.BadgeNumberUnread)
             });

@@ -34391,6 +34391,17 @@ namespace Unigram.Strings
         }
         
         /// <summary>
+        /// Localized resource similar to "Show Secret Chat Notifications on Live Tiles"
+        /// </summary>
+        public static string SecretChatLiveTile
+        {
+            get
+            {
+                return resourceLoader.GetString("SecretChatLiveTile");
+            }
+        }
+        
+        /// <summary>
         /// Localized resource similar to "Please note that inline bots are provided by third-party developers. For the bot to work, the symbols you type after the bot's username are sent to the respective developer."
         /// </summary>
         public static string SecretChatContextBotAlert

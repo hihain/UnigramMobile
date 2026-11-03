@@ -98,6 +98,7 @@ task<void> NotificationTask::UpdateToastAndTiles(String^ content /*, std::wofstr
 		{
 			session = GetSession(static_cast<long long>(data->GetNamedNumber(L"user_id")));
 		}
+		auto sessionMapped = session != nullptr;
 		if (session == nullptr)
 		{
 			session = L"0";
@@ -162,7 +163,8 @@ task<void> NotificationTask::UpdateToastAndTiles(String^ content /*, std::wofstr
 			auto sound = data->GetNamedString("sound", "Default");
 			auto launch = GetLaunch(custom, loc_key);
 			auto group = GetGroup(custom);
-			auto picture = GetPicture(custom, group, session);
+			auto isSecretChat = IsSecretChatPush(loc_key);
+			String^ picture = isSecretChat ? nullptr : GetPicture(custom, group, session);
 			auto date = GetDate(notification);
 
 			if (message == nullptr)
@@ -184,9 +186,16 @@ task<void> NotificationTask::UpdateToastAndTiles(String^ content /*, std::wofstr
 			{
 				auto tag = GetTag(custom);
 				create_task(UpdateToast(caption, message, session, session, sound, launch, tag, group, picture, nullptr, date, loc_key)).get();
-				UpdatePrimaryTile(launch, caption, message, picture);
+				if (!isSecretChat || ShowSecretChatOnLiveTiles(session, sessionMapped))
+				{
+					UpdatePrimaryTile(launch, caption, message, picture);
+				}
+				else
+				{
+					LogDiagnostic(L"native.tile.decision", L"result=skipped;reason=secret_chat_setting");
+				}
 			}
-			LogDiagnostic(L"native.notification.displayed", L"toast=true;tile=true");
+			LogDiagnostic(L"native.notification.displayed", L"toast=true");
 		}
 		else
 		{
@@ -436,6 +445,49 @@ String^ NotificationTask::GetSession(long long receiverId)
 	}
 
 	return nullptr;
+}
+
+bool NotificationTask::IsSecretChatPush(String^ loc_key)
+{
+	std::wstring key = loc_key->Data();
+	return key.find(L"ENCRYPTED") == 0 || key.find(L"ENCRYPTION") == 0;
+}
+
+bool NotificationTask::ShowSecretChatOnLiveTiles(String^ session, bool sessionMapped)
+{
+	// Mirrors NotificationsSettings.ShowSecretChatOnLiveTiles: session 0 uses the root
+	// LocalSettings, other sessions use the "{session}" container. Defaults to hidden.
+	if (!sessionMapped || session == nullptr)
+	{
+		return false;
+	}
+
+	try
+	{
+		auto settings = ApplicationData::Current->LocalSettings;
+		Windows::Foundation::Collections::IPropertySet^ values = nullptr;
+
+		if (session->Equals(L"0"))
+		{
+			values = settings->Values;
+		}
+		else if (settings->Containers->HasKey(session))
+		{
+			values = settings->Containers->Lookup(session)->Values;
+		}
+
+		if (values != nullptr && values->HasKey(L"ShowSecretChatOnLiveTiles"))
+		{
+			auto value = dynamic_cast<IBox<bool>^>(values->Lookup(L"ShowSecretChatOnLiveTiles"));
+			return value != nullptr && value->Value;
+		}
+	}
+	catch (Exception ^ ex)
+	{
+		LogError(L"reading secret chat tile setting", ex);
+	}
+
+	return false;
 }
 
 void NotificationTask::UpdatePrimaryBadge(int badgeNumber)
