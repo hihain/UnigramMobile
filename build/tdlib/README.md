@@ -532,6 +532,13 @@ APPX payload items. This avoids both the portable `4.1.1.0`/`4.0.1.0` pair
 and an app/device split where the native image requests `4.1.4.0` but the
 device resolves another manifest (`0x80131040`).
 
+The Store `.appxupload` must not carry that AOT pair: the Store recompiles the
+upload's MSIL, and the AOT `System.Numerics.Vectors` makes its .NET Native
+compiler fail with `NUTC1056` (Store error 1201, reproduced locally with
+`ilc.exe` exit code 1201). The upload therefore receives the same 6.2.10
+reference pair (also `4.1.4.0`/`4.0.4.0`) that the local ILC compiles; only the
+sideload package receives the AOT runtime pair.
+
 ## Chat scroll crash: floating date header (26.9.6116.0)
 
 The third on-device chat crash reproduced when scrolling **up** through a

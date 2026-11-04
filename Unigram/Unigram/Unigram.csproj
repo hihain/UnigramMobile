@@ -2928,7 +2928,8 @@
     <Error Condition="!Exists('$(ModernTdlibBuildManifest)')" Text="The modern TDLib build manifest was not found at $(ModernTdlibBuildManifest). Rebuild the pinned TDLib output with build\tdlib\Build-TdlibArm.ps1." />
     <Error Condition="!Exists('$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.dll')" Text="The ARM UWP System.Numerics.Vectors runtime was not found at $(ModernUwpNumericsRuntimeRoot)." />
     <Error Condition="!Exists('$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.WindowsRuntime.dll')" Text="The ARM UWP System.Numerics.Vectors.WindowsRuntime runtime was not found at $(ModernUwpNumericsRuntimeRoot)." />
-    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ModernTdlibVerifierScript)&quot; -OutputRoot &quot;$(ModernTdlibRoot)&quot; -ExpectedTdlibVersion &quot;1.8.66&quot; -ExpectedTdlibCommit &quot;022d60202e446ad1287b9fb68e687c8a0760788b&quot;" />
+        <Error Condition="!Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll') or !Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll')" Text="The UWP System.Numerics.Vectors reference pair for the Store upload was not found at $(UwpNumericsReferenceRoot)." />
+        <Exec  Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ModernTdlibVerifierScript)&quot; -OutputRoot &quot;$(ModernTdlibRoot)&quot; -ExpectedTdlibVersion &quot;1.8.66&quot; -ExpectedTdlibCommit &quot;022d60202e446ad1287b9fb68e687c8a0760788b&quot;" />
   </Target>
   <Target Name="StageModernZlib1" AfterTargets="ResolveAssemblyReferences" Condition="'$(UseModernTdlib)' == 'true'">
     <!-- RLottie.dll was built against zlib1.dll and imports inflate/inflateEnd/inflateInit2_ from
@@ -2998,10 +2999,12 @@
       <AppxPackagePayload Include="$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
         <TargetPath>System.Numerics.Vectors.WindowsRuntime.dll</TargetPath>
       </AppxPackagePayload>
-      <AppxUploadPackagePayload Include="$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.dll">
+      <!-- The Store recompiles the upload's MSIL; it must receive the same reference pair the local ILC compiled.
+           The ARM AOT pair crashes the Store's .NET Native compiler (NUTC1056, Store error 1201). -->
+      <AppxUploadPackagePayload Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll">
         <TargetPath>System.Numerics.Vectors.dll</TargetPath>
       </AppxUploadPackagePayload>
-      <AppxUploadPackagePayload Include="$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
+      <AppxUploadPackagePayload Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
         <TargetPath>System.Numerics.Vectors.WindowsRuntime.dll</TargetPath>
       </AppxUploadPackagePayload>
     </ItemGroup>
