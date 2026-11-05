@@ -247,11 +247,39 @@ namespace Unigram.Controls.Chats
         {
             if (ContentTemplateRoot is FrameworkElement element && element.Tag is MessageViewModel message)
             {
+#if MODERN_TDLIB
+                if (message.IsService())
+                {
+                    return false;
+                }
+
+                if (!message.HasMessageProperties)
+                {
+                    LoadCanForward(message);
+                    return false;
+                }
+#endif
                 return message.CanBeForwarded;
             }
 
             return false;
         }
+
+#if MODERN_TDLIB
+        private async void LoadCanForward(MessageViewModel message)
+        {
+            if (await message.LoadMessagePropertiesAsync() && ContentTemplateRoot is FrameworkElement element && element.Tag == message)
+            {
+                _forward = message.CanBeForwarded;
+
+                if (_tracker != null)
+                {
+                    _tracker.Properties.InsertBoolean("CanForward", _forward);
+                    _tracker.MinPosition = new Vector3(_forward ? -72 : 0);
+                }
+            }
+        }
+#endif
 
         public void ValuesChanged(InteractionTracker sender, InteractionTrackerValuesChangedArgs args)
         {

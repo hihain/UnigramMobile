@@ -1968,12 +1968,17 @@ namespace Unigram.Views
 
             flyout.CreateFlyoutItem(ViewModel.SearchCommand, Strings.Resources.Search, new FontIcon { Glyph = Icons.Search }, Windows.System.VirtualKey.F);
 
+#if MODERN_TDLIB
+            if (chat.CanBeReported)
+            {
+                flyout.CreateFlyoutItem(ViewModel.ReportCommand, Strings.Resources.ReportChat, new FontIcon { Glyph = Icons.Report });
+            }
+#else
             if (supergroup != null && !(supergroup.Status is ChatMemberStatusCreator) && (supergroup.IsChannel || !string.IsNullOrEmpty(supergroup.GetUsername())))
             {
-#if !MODERN_TDLIB
                 flyout.CreateFlyoutItem(ViewModel.ReportCommand, Strings.Resources.ReportChat, new FontIcon { Glyph = Icons.Report });
-#endif
             }
+#endif
             if (user != null && user.Id != ViewModel.CacheService.Options.MyId)
             {
                 if (!user.IsContact)
@@ -2085,6 +2090,29 @@ namespace Unigram.Views
             }
         }
 
+        private DispatcherTimer _messageTapTimer;
+        private UIElement _messageTapTarget;
+        private int _messageDoubleTapSequence;
+
+        private static TimeSpan GetMessageTapDelay()
+        {
+            // Match the system double-tap window so a slower double-tap is not split into a tap and a double-tap.
+            var milliseconds = new Windows.UI.ViewManagement.UISettings().DoubleClickTime;
+            return TimeSpan.FromMilliseconds(Math.Max(300, Math.Min(800, milliseconds)));
+        }
+
+        private MessageViewModel GetTappedMessage(object sender)
+        {
+            var element = sender as FrameworkElement;
+            var message = element?.Tag as MessageViewModel;
+            if (message == null && sender is SelectorItem selector)
+            {
+                message = (selector.ContentTemplateRoot as FrameworkElement)?.Tag as MessageViewModel;
+            }
+
+            return message;
+        }
+
         private void Message_Tapped(object sender, TappedRoutedEventArgs e)
         {
             if (ViewModel.SelectionMode != ListViewSelectionMode.None || sender is UIElement == false)
@@ -2092,12 +2120,7 @@ namespace Unigram.Views
                 return;
             }
 
-            var element = sender as FrameworkElement;
-            var message = element?.Tag as MessageViewModel;
-            if (message == null && sender is SelectorItem selector)
-            {
-                message = (selector.ContentTemplateRoot as FrameworkElement)?.Tag as MessageViewModel;
-            }
+            var message = GetTappedMessage(sender);
 
             // Keep media, links, inline buttons, reply quotes, and reaction chips on their established tap paths.
             if (!(message?.Content is MessageText) || IsWithinButton(e.OriginalSource as DependencyObject, sender as DependencyObject))
@@ -2106,7 +2129,58 @@ namespace Unigram.Views
             }
 
             e.Handled = true;
+
+            // Give touch users a moment to complete a double-tap before the menu opens.
+            if (e.PointerDeviceType != PointerDeviceType.Mouse && ViewModel.Settings.DoubleTapAction != DoubleTapAction.None)
+            {
+                if (_messageTapTimer == null)
+                {
+                    _messageTapTimer = new DispatcherTimer { Interval = GetMessageTapDelay() };
+                    _messageTapTimer.Tick += MessageTapTimer_Tick;
+                }
+
+                _messageTapTimer.Stop();
+                _messageTapTarget = sender as UIElement;
+                _messageTapTimer.Start();
+                return;
+            }
+
             Message_ContextRequested(sender as UIElement, null);
+        }
+
+        private void MessageTapTimer_Tick(object sender, object e)
+        {
+            _messageTapTimer.Stop();
+
+            var target = _messageTapTarget;
+            _messageTapTarget = null;
+
+            if (target != null && ViewModel?.SelectionMode == ListViewSelectionMode.None)
+            {
+                Message_ContextRequested(target, null);
+            }
+        }
+
+        private void Message_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            // Mouse double-clicks are handled by ChatListView's gesture recognizer.
+            if (e.PointerDeviceType == PointerDeviceType.Mouse || ViewModel.SelectionMode != ListViewSelectionMode.None || ViewModel.Settings.DoubleTapAction == DoubleTapAction.None)
+            {
+                return;
+            }
+
+            var message = GetTappedMessage(sender);
+            if (message == null || IsWithinButton(e.OriginalSource as DependencyObject, sender as DependencyObject))
+            {
+                return;
+            }
+
+            _messageTapTimer?.Stop();
+            _messageTapTarget = null;
+            _messageDoubleTapSequence++;
+
+            e.Handled = true;
+            ViewModel.DoubleTapMessage(message);
         }
 
         private static bool IsWithinButton(DependencyObject source, DependencyObject root)
@@ -2127,6 +2201,7 @@ namespace Unigram.Views
         private async void Message_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
         {
             var flyout = new MenuFlyout();
+            var doubleTapSequence = _messageDoubleTapSequence;
 
             var element = sender as FrameworkElement;
             var message = element.Tag as MessageViewModel;
@@ -2236,7 +2311,6 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessageReschedule_Loaded, ViewModel.MessageRescheduleCommand, message, Strings.Resources.MessageScheduleEditTime, new FontIcon { Glyph = Icons.Schedule });
 
                 // Generic
-                AddReactionPicker(flyout, message, availableReactions);
                 flyout.CreateFlyoutItem(MessageReply_Loaded, ViewModel.MessageReplyCommand, message, Strings.Resources.Reply, new FontIcon { Glyph = Icons.Reply });
                 flyout.CreateFlyoutItem(MessageEdit_Loaded, ViewModel.MessageEditCommand, message, Strings.Resources.Edit, new FontIcon { Glyph = Icons.Edit });
                 flyout.CreateFlyoutItem(MessageThread_Loaded, ViewModel.MessageThreadCommand, message, message.InteractionInfo?.ReplyInfo?.ReplyCount > 0 ? Locale.Declension("ViewReplies", message.InteractionInfo.ReplyInfo.ReplyCount) : Strings.Resources.ViewThread, new FontIcon { Glyph = Icons.Thread, FontFamily = new FontFamily("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram") });
@@ -2247,9 +2321,7 @@ namespace Unigram.Views
                 flyout.CreateFlyoutItem(MessagePin_Loaded, ViewModel.MessagePinCommand, message, message.IsPinned ? Strings.Resources.UnpinMessage : Strings.Resources.PinMessage, new FontIcon { Glyph = message.IsPinned ? Icons.Unpin : Icons.Pin });
 
                 flyout.CreateFlyoutItem(MessageForward_Loaded, ViewModel.MessageForwardCommand, message, Strings.Resources.Forward, new FontIcon { Glyph = Icons.Forward });
-#if !MODERN_TDLIB
                 flyout.CreateFlyoutItem(MessageReport_Loaded, ViewModel.MessageReportCommand, message, Strings.Resources.ReportChat, new FontIcon { Glyph = Icons.Report });
-#endif
                 flyout.CreateFlyoutItem(MessageDelete_Loaded, ViewModel.MessageDeleteCommand, message, Strings.Resources.Delete, new FontIcon { Glyph = Icons.Delete });
                 flyout.CreateFlyoutItem(MessageSelect_Loaded, ViewModel.MessageSelectCommand, message, Strings.Additional.Select, new FontIcon { Glyph = Icons.Select });
 
@@ -2310,6 +2382,17 @@ namespace Unigram.Views
                 flyout.Items.RemoveAt(flyout.Items.Count - 1);
             }
 
+            if (message.SendingState == null)
+            {
+                AddReactionRow(flyout, message, availableReactions);
+            }
+
+            // A double-tap completed while the menu was loading; it already ran its action.
+            if (args == null && doubleTapSequence != _messageDoubleTapSequence)
+            {
+                return;
+            }
+
             if (args != null)
             {
                 args.ShowAt(flyout, sender as FrameworkElement);
@@ -2320,7 +2403,11 @@ namespace Unigram.Views
             }
         }
 
-        private void AddReactionPicker(
+        private const int MenuReactionCount = 5;
+
+        private static ControlTemplate _reactionRowTemplate;
+
+        private void AddReactionRow(
             MenuFlyout flyout,
             MessageViewModel message,
             AvailableReactions reactions)
@@ -2350,14 +2437,80 @@ namespace Unigram.Views
                 return;
             }
 
-            var request = new ReactionPickerRequest(message, emojis);
-            var picker = new MenuFlyoutItem
+            if (_reactionRowTemplate == null)
             {
-                Text = Strings.Resources.Emoji1
-            };
-            picker.Click += (sender, args) => flyout.Closed += (closedSender, closedArgs) => ShowReactionPicker(request);
+                _reactionRowTemplate = (ControlTemplate)Windows.UI.Xaml.Markup.XamlReader.Load(
+                    "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='MenuFlyoutItem'>" +
+                    "<ContentPresenter Content='{TemplateBinding Tag}' HorizontalAlignment='Center' Margin='4,2,4,2'/>" +
+                    "</ControlTemplate>");
+            }
 
-            flyout.Items.Add(picker);
+            var panel = new StackPanel { Orientation = Orientation.Horizontal };
+            var chosenBackground = App.Current.Resources["SystemControlHighlightListAccentLowBrush"] as Brush;
+
+            foreach (var emoji in emojis.Take(MenuReactionCount))
+            {
+                var type = new ReactionTypeEmoji(emoji);
+                var button = CreateReactionRowButton(emoji);
+                if (DialogViewModel.IsReactionChosen(message, type) && chosenBackground != null)
+                {
+                    button.Background = chosenBackground;
+                }
+
+                button.Click += (sender, args) =>
+                {
+                    flyout.Hide();
+                    ViewModel.ToggleMessageReaction(message, type, "menu");
+                };
+
+                panel.Children.Add(button);
+            }
+
+            if (emojis.Count > MenuReactionCount)
+            {
+                var request = new ReactionPickerRequest(message, emojis);
+                var more = CreateReactionRowButton("\uE712");
+                more.FontFamily = new FontFamily("Segoe MDL2 Assets");
+                more.FontSize = 16;
+                AutomationProperties.SetName(more, Strings.Additional.MoreReactions);
+                ToolTipService.SetToolTip(more, Strings.Additional.MoreReactions);
+                more.Click += (sender, args) =>
+                {
+                    flyout.Closed += (closedSender, closedArgs) => ShowReactionPicker(request);
+                    flyout.Hide();
+                };
+
+                panel.Children.Add(more);
+            }
+
+            if (flyout.Items.Count > 0)
+            {
+                flyout.CreateFlyoutSeparator();
+            }
+
+            flyout.Items.Add(new MenuFlyoutItem
+            {
+                Template = _reactionRowTemplate,
+                Tag = panel,
+                IsTabStop = false
+            });
+        }
+
+        private static Button CreateReactionRowButton(string content)
+        {
+            return new Button
+            {
+                Content = content,
+                Width = 40,
+                Height = 40,
+                Padding = new Thickness(0),
+                BorderThickness = new Thickness(0),
+                Background = new SolidColorBrush(Windows.UI.Colors.Transparent),
+                FontFamily = new FontFamily("Segoe UI Emoji"),
+                FontSize = 20,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
         }
 
         private async void ShowReactionPicker(ReactionPickerRequest request)
@@ -2557,11 +2710,12 @@ namespace Unigram.Views
 
         private bool MessageReport_Loaded(MessageViewModel message)
         {
-#if MODERN_TDLIB
-            return false;
-#else
             var chat = ViewModel.Chat;
+#if MODERN_TDLIB
+            if (chat == null || !(chat.CanBeReported || message.CanReportChat))
+#else
             if (chat == null || !chat.CanBeReported)
+#endif
             {
                 return false;
             }
@@ -2578,7 +2732,6 @@ namespace Unigram.Views
             }
 
             return true;
-#endif
         }
 
         private bool MessageRetry_Loaded(MessageViewModel message)
@@ -3626,18 +3779,11 @@ namespace Unigram.Views
             }
             else if (chat.ActionBar is ChatActionBarReportAddBlock)
             {
-#if !MODERN_TDLIB
                 ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamUser, ViewModel.ReportSpamCommand));
-#endif
-#if MODERN_TDLIB
-                ActionBarRoot.Children.Add(CreateButton(Strings.Resources.AddContactChat, ViewModel.AddContactCommand));
-#else
                 ActionBarRoot.Children.Add(CreateButton(Strings.Resources.AddContactChat, ViewModel.AddContactCommand, column: 1));
-#endif
             }
             else if (chat.ActionBar is ChatActionBarReportSpam)
             {
-#if !MODERN_TDLIB
                 var user = ViewModel.CacheService.GetUser(chat);
                 if (user != null)
                 {
@@ -3647,7 +3793,6 @@ namespace Unigram.Views
                 {
                     ActionBarRoot.Children.Add(CreateButton(Strings.Resources.ReportSpamAndLeave, ViewModel.ReportSpamCommand, new ReportReasonSpam()));
                 }
-#endif
             }
 #if !MODERN_TDLIB
             else if (chat.ActionBar is ChatActionBarReportUnrelatedLocation)

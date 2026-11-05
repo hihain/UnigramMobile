@@ -1446,6 +1446,7 @@ namespace Unigram.Views
             item.ContentTemplate = _typeToTemplateMapping[typeName];
             item.Tag = typeName;
             item.Tapped += Message_Tapped;
+            item.DoubleTapped += Message_DoubleTapped;
 
             // For some reason the event is available since Anniversary Update,
             // but the property has been added in April Update.

@@ -123,8 +123,12 @@ namespace Unigram.ViewModels
         public void Replace(Message message)
         {
             _message = message;
+#if MODERN_TDLIB
+            ResetMessageProperties();
+#else
             _messageProperties = null;
             _messagePropertiesLoaded = false;
+#endif
         }
 
         public bool UpdateFile(File file)
@@ -192,6 +196,50 @@ namespace Unigram.ViewModels
 
 #if MODERN_TDLIB
         public bool HasMessageProperties => _messagePropertiesLoaded && _messageProperties is Telegram.Td.Api.MessageProperties;
+
+        public bool CanReportChat => _messagePropertiesLoaded && _messageProperties is Telegram.Td.Api.MessageProperties properties && properties.CanReportChat;
+
+        private System.Threading.Tasks.Task<bool> _messagePropertiesTask;
+        private int _messagePropertiesGeneration;
+
+        // GetMessageProperties cannot be executed synchronously, so callers that need
+        // properties outside the context menu (swipe, comments button) load them here.
+        public System.Threading.Tasks.Task<bool> LoadMessagePropertiesAsync()
+        {
+            if (HasMessageProperties)
+            {
+                return System.Threading.Tasks.Task.FromResult(true);
+            }
+
+            if (_messagePropertiesTask == null)
+            {
+                _messagePropertiesTask = LoadMessagePropertiesCoreAsync();
+            }
+
+            return _messagePropertiesTask;
+        }
+
+        private void ResetMessageProperties()
+        {
+            _messageProperties = null;
+            _messagePropertiesLoaded = false;
+            _messagePropertiesTask = null;
+            _messagePropertiesGeneration++;
+        }
+
+        private async System.Threading.Tasks.Task<bool> LoadMessagePropertiesCoreAsync()
+        {
+            var generation = _messagePropertiesGeneration;
+            var response = await _protoService.SendAsync(new Telegram.Td.Api.GetMessageProperties(_message.ChatId, _message.Id));
+            if (generation != _messagePropertiesGeneration)
+            {
+                return false;
+            }
+
+            _messagePropertiesTask = null;
+            UpdateMessageProperties(response);
+            return HasMessageProperties;
+        }
 #endif
 
         public void UpdateMessageProperties(BaseObject properties)
@@ -319,8 +367,12 @@ namespace Unigram.ViewModels
             _message.SendingState = message.SendingState;
             _message.ViaBotUserId = message.ViaBotUserId;
             _message.InteractionInfo = message.InteractionInfo;
+#if MODERN_TDLIB
+            ResetMessageProperties();
+#else
             _messageProperties = null;
             _messagePropertiesLoaded = false;
+#endif
 
             if (_message.Content is MessageAlbum album)
             {

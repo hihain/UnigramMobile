@@ -223,6 +223,85 @@ namespace Unigram.ViewModels
             MessageReplyCommand.Execute(message);
         }
 
+        public void DoubleTapMessage(MessageViewModel message)
+        {
+            if (message == null || message.Id == 0 || message.IsService())
+            {
+                return;
+            }
+
+            switch (Settings.DoubleTapAction)
+            {
+                case DoubleTapAction.Reply:
+                    ReplyToMessage(message);
+                    break;
+#if MODERN_TDLIB
+                case DoubleTapAction.React:
+                    ToggleQuickReaction(message);
+                    break;
+#endif
+            }
+        }
+
+#if MODERN_TDLIB
+        private void ToggleQuickReaction(MessageViewModel message)
+        {
+            if (message.SendingState != null || message.SchedulingState != null)
+            {
+                return;
+            }
+
+            ToggleMessageReaction(message, ProtoService.DefaultReactionType ?? new ReactionTypeEmoji("\U0001F44D"), "double_tap");
+        }
+
+        public void ToggleMessageReaction(MessageViewModel message, ReactionType type, string source)
+        {
+            if (message == null || message.Id == 0 || type == null)
+            {
+                return;
+            }
+
+            var chosen = IsReactionChosen(message, type);
+
+            Function function = chosen
+                ? new RemoveMessageReaction(message.ChatId, message.Id, type)
+                : (Function)new AddMessageReaction(message.ChatId, message.Id, type, false, true);
+
+            ProtoService.Send(function, result =>
+            {
+                if (result is Error error)
+                {
+                    Logs.PushDiagnostics.Write(
+                        "message.reaction",
+                        $"result=failed;operation={source}_{(chosen ? "remove" : "add")};code={error.Code};message={Logs.PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+                }
+            });
+        }
+
+        public static bool IsReactionChosen(MessageViewModel message, ReactionType type)
+        {
+            return message.InteractionInfo?.Reactions?.Reactions?.Any(x => x.IsChosen && AreSameReaction(x.Type, type)) == true;
+        }
+
+        private static bool AreSameReaction(ReactionType x, ReactionType y)
+        {
+            if (x is ReactionTypeEmoji xEmoji && y is ReactionTypeEmoji yEmoji)
+            {
+                return xEmoji.Emoji == yEmoji.Emoji;
+            }
+            else if (x is ReactionTypeCustomEmoji xCustom && y is ReactionTypeCustomEmoji yCustom)
+            {
+                return xCustom.CustomEmojiId == yCustom.CustomEmojiId;
+            }
+            else if (x is ReactionTypePaid && y is ReactionTypePaid)
+            {
+                return true;
+            }
+
+            return false;
+        }
+#endif
+
         public async void OpenReply(MessageViewModel message)
         {
             if (message.ReplyToMessageState == ReplyToMessageState.None)

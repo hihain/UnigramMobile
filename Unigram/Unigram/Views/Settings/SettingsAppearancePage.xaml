@@ -525,6 +525,11 @@
                         Content="{CustomResource DistanceUnits}"
                         Command="{x:Bind ViewModel.DistanceUnitsCommand}"
                         Badge="{x:Bind ConvertDistanceUnits(ViewModel.DistanceUnits), Mode=OneWay}"/>
+
+                    <controls:BadgeButton
+                        Content="{CustomResource Additional.DoubleTapAction}"
+                        Command="{x:Bind ViewModel.DoubleTapActionCommand}"
+                        Badge="{x:Bind ConvertDoubleTapAction(ViewModel.DoubleTapAction), Mode=OneWay}"/>
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl

@@ -487,8 +487,17 @@ namespace Unigram.ViewModels
         private async void MessagesReportExecute()
         {
 #if MODERN_TDLIB
-            Logs.Logger.Warning(Logs.Target.API, "MessagesReportCommand is disabled for the modern TDLib experimental build.");
-            return;
+            var chat = _chat;
+            if (chat == null || !MessagesReportCanExecute())
+            {
+                return;
+            }
+
+            var messages = SelectedItems.OrderBy(x => x.Id).Select(x => x.Id).ToArray();
+            if (await ReportChatAsync(chat.Id, messages, "messages"))
+            {
+                SelectionMode = ListViewSelectionMode.None;
+            }
 #else
             var chat = _chat;
             if (chat == null)
@@ -557,7 +566,16 @@ namespace Unigram.ViewModels
         private bool MessagesReportCanExecute()
         {
 #if MODERN_TDLIB
-            return false;
+            var chat = _chat;
+            if (chat == null)
+            {
+                return false;
+            }
+
+            var myId = CacheService.Options.MyId;
+            return SelectedItems.Count > 0
+                && SelectedItems.All(x => !x.IsService() && (x.SenderId is MessageSenderChat || (x.SenderId is MessageSenderUser senderUser && senderUser.UserId != myId)))
+                && (chat.CanBeReported || SelectedItems.All(x => x.CanReportChat));
 #else
             var chat = _chat;
             if (chat == null)
@@ -934,8 +952,13 @@ namespace Unigram.ViewModels
         private async void MessageReportExecute(MessageViewModel message)
         {
 #if MODERN_TDLIB
-            Logs.Logger.Warning(Logs.Target.API, "MessageReportCommand is disabled for the modern TDLib experimental build.");
-            return;
+            var chat = _chat;
+            if (chat == null || message == null || message.Id == 0)
+            {
+                return;
+            }
+
+            await ReportChatAsync(chat.Id, new[] { message.Id }, "message");
 #else
             var chat = _chat;
             if (chat == null)

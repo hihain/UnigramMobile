@@ -89,6 +89,7 @@ namespace Unigram.ViewModels
             {
                 MessagesForwardCommand.RaiseCanExecuteChanged();
                 MessagesDeleteCommand.RaiseCanExecuteChanged();
+                MessagesReportCommand.RaiseCanExecuteChanged();
             }
         }
 #endif
@@ -3030,8 +3031,48 @@ namespace Unigram.ViewModels
         private async void ReportSpamExecute(ReportReason reason)
         {
 #if MODERN_TDLIB
-            Logs.Logger.Warning(Logs.Target.API, "ReportSpamCommand is disabled for the modern TDLib experimental build.");
-            return;
+            var chat = _chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            var message = Strings.Resources.ReportSpamAlert;
+            if (chat.Type is ChatTypeSupergroup supergroup)
+            {
+                message = supergroup.IsChannel ? Strings.Resources.ReportSpamAlertChannel : Strings.Resources.ReportSpamAlertGroup;
+            }
+            else if (chat.Type is ChatTypeBasicGroup)
+            {
+                message = Strings.Resources.ReportSpamAlertGroup;
+            }
+
+            var confirm = await MessagePopup.ShowAsync(message, Strings.Resources.AppName, Strings.Resources.OK, Strings.Resources.Cancel);
+            if (confirm != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            // Action-bar spam reports use an empty option and no messages.
+            if (!await ReportChatAsync(chat.Id, new long[0], "action_bar", false))
+            {
+                return;
+            }
+
+            if (chat.Type is ChatTypeBasicGroup || chat.Type is ChatTypeSupergroup)
+            {
+                ProtoService.Send(new LeaveChat(chat.Id));
+            }
+            else if (chat.Type is ChatTypePrivate privata)
+            {
+                ProtoService.Send(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(privata.UserId), true));
+            }
+            else if (chat.Type is ChatTypeSecret secret)
+            {
+                ProtoService.Send(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(secret.UserId), true));
+            }
+
+            ProtoService.Send(new DeleteChatHistory(chat.Id, true, false));
 #else
             var chat = _chat;
             if (chat == null)
@@ -3585,8 +3626,13 @@ namespace Unigram.ViewModels
         private async void ReportExecute()
         {
 #if MODERN_TDLIB
-            Logs.Logger.Warning(Logs.Target.API, "ReportCommand is disabled for the modern TDLib experimental build.");
-            return;
+            var chat = _chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            await ReportChatAsync(chat.Id, new long[0], "chat");
 #else
             var chat = _chat;
             if (chat == null)
@@ -3643,6 +3689,116 @@ namespace Unigram.ViewModels
             var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateReportChat(chat.Id, new long[0], reason, text));
 #endif
         }
+
+#if MODERN_TDLIB
+        private const int MaxReportSteps = 8;
+
+        // Drives TDLib's server-defined report flow: option menus, optional or required
+        // comments, and message selection. Only result types and error codes are logged.
+        internal async Task<bool> ReportChatAsync(long chatId, long[] messageIds, string source, bool showResult = true)
+        {
+            IList<byte> optionId = new byte[0];
+            var text = string.Empty;
+
+            for (int step = 0; step < MaxReportSteps; step++)
+            {
+                var response = await ProtoService.SendAsync(new ReportChat(chatId, optionId, messageIds, text));
+                if (response is ReportChatResultOk)
+                {
+                    Logs.PushDiagnostics.Write("message.report", $"result=ok;source={source};step={step}");
+
+                    if (showResult)
+                    {
+                        await MessagePopup.ShowAsync(Strings.Resources.ReportChatSent, Strings.Resources.AppName, Strings.Resources.OK);
+                    }
+
+                    return true;
+                }
+                else if (response is ReportChatResultOptionRequired optionRequired)
+                {
+                    var options = optionRequired.Options;
+                    if (options == null || options.Count == 0)
+                    {
+                        Logs.PushDiagnostics.Write("message.report", $"result=no_options;source={source};step={step}");
+                        break;
+                    }
+
+                    var items = options.Select((option, index) => new SelectRadioItem(option.Id, option.Text, index == 0)).ToArray();
+
+                    var dialog = new SelectRadioPopup(items);
+                    dialog.Title = string.IsNullOrEmpty(optionRequired.Title) ? Strings.Resources.ReportChat : optionRequired.Title;
+                    dialog.PrimaryButtonText = Strings.Resources.OK;
+                    dialog.SecondaryButtonText = Strings.Resources.Cancel;
+
+                    var confirm = await dialog.ShowQueuedAsync();
+                    if (confirm != ContentDialogResult.Primary || !(dialog.SelectedIndex is IList<byte> selected))
+                    {
+                        Logs.PushDiagnostics.Write("message.report", $"result=cancelled;source={source};step={step}");
+                        return false;
+                    }
+
+                    optionId = selected;
+                    text = string.Empty;
+                }
+                else if (response is ReportChatResultTextRequired textRequired)
+                {
+                    var input = new InputDialog();
+                    input.Title = Strings.Resources.ReportChat;
+                    input.PlaceholderText = Strings.Resources.ReportChatDescription;
+                    input.PrimaryButtonText = Strings.Resources.OK;
+
+                    if (textRequired.IsOptional)
+                    {
+                        input.SecondaryButtonText = Strings.Additional.ReportSkip;
+                        input.CloseButtonText = Strings.Resources.Cancel;
+                    }
+                    else
+                    {
+                        input.SecondaryButtonText = Strings.Resources.Cancel;
+                    }
+
+                    var result = await input.ShowQueuedAsync();
+                    if (result == ContentDialogResult.Primary)
+                    {
+                        text = input.Text;
+                    }
+                    else if (result == ContentDialogResult.Secondary && textRequired.IsOptional)
+                    {
+                        text = string.Empty;
+                    }
+                    else
+                    {
+                        Logs.PushDiagnostics.Write("message.report", $"result=cancelled;source={source};step={step}");
+                        return false;
+                    }
+
+                    optionId = textRequired.OptionId ?? optionId;
+                }
+                else if (response is ReportChatResultMessagesRequired)
+                {
+                    Logs.PushDiagnostics.Write("message.report", $"result=messages_required;source={source};step={step}");
+                    await MessagePopup.ShowAsync(Strings.Additional.ReportSelectMessages, Strings.Resources.ReportChat, Strings.Resources.OK);
+                    return false;
+                }
+                else if (response is Error error)
+                {
+                    Logs.PushDiagnostics.Write(
+                        "message.report",
+                        $"result=failed;source={source};step={step};code={error.Code};message={Logs.PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+                    await MessagePopup.ShowAsync(error.Message, Strings.Resources.ReportChat, Strings.Resources.OK);
+                    return false;
+                }
+                else
+                {
+                    Logs.PushDiagnostics.Write("message.report", $"result=unexpected;source={source};step={step}");
+                    break;
+                }
+            }
+
+            Logs.PushDiagnostics.Write("message.report", $"result=aborted;source={source}");
+            return false;
+        }
+#endif
 
         #endregion
 

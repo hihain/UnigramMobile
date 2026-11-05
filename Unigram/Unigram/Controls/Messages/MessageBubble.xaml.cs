@@ -659,7 +659,16 @@ namespace Unigram.Controls.Messages
         public void UpdateMessageInteractionInfo(MessageViewModel message)
         {
             var info = message.InteractionInfo?.ReplyInfo;
+#if MODERN_TDLIB
+            if (info != null && message.IsChannelPost && !message.HasMessageProperties)
+            {
+                LoadThreadAvailability(message);
+            }
+
+            if (info == null || !message.IsChannelPost || !message.HasMessageProperties || !message.CanGetMessageThread)
+#else
             if (info == null || !message.IsChannelPost || !message.CanGetMessageThread)
+#endif
             {
                 if (Thread != null)
                 {
@@ -714,6 +723,16 @@ namespace Unigram.Controls.Messages
             UpdateMessageReactions(message);
             Footer.UpdateMessageInteractionInfo(message);
         }
+
+#if MODERN_TDLIB
+        private async void LoadThreadAvailability(MessageViewModel message)
+        {
+            if (await message.LoadMessagePropertiesAsync() && _message == message)
+            {
+                UpdateMessageInteractionInfo(message);
+            }
+        }
+#endif
 
         private void UpdateMessageReactions(MessageViewModel message)
         {

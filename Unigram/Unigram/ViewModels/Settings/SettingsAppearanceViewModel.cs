@@ -28,6 +28,7 @@ namespace Unigram.ViewModels.Settings
             UseThreeLinesLayout = Settings.UseThreeLinesLayout;
 
             DistanceUnitsCommand = new RelayCommand(DistanceUnitsExecute);
+            DoubleTapActionCommand = new RelayCommand(DoubleTapActionExecute);
             EmojiSetCommand = new RelayCommand(EmojiSetExecute);
         }
 
@@ -238,6 +239,41 @@ namespace Unigram.ViewModels.Settings
             if (confirm == ContentDialogResult.Primary && dialog.SelectedIndex is DistanceUnits index)
             {
                 DistanceUnits = index;
+            }
+        }
+
+        public DoubleTapAction DoubleTapAction
+        {
+            get
+            {
+                return Settings.DoubleTapAction;
+            }
+            set
+            {
+                Settings.DoubleTapAction = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        public RelayCommand DoubleTapActionCommand { get; }
+        private async void DoubleTapActionExecute()
+        {
+            var items = new[]
+            {
+                new SelectRadioItem(DoubleTapAction.Reply, Strings.Resources.Reply, DoubleTapAction == DoubleTapAction.Reply),
+                new SelectRadioItem(DoubleTapAction.React, Strings.Additional.DoubleTapActionReaction, DoubleTapAction == DoubleTapAction.React),
+                new SelectRadioItem(DoubleTapAction.None, Strings.Additional.DoubleTapActionNone, DoubleTapAction == DoubleTapAction.None),
+            };
+
+            var dialog = new SelectRadioPopup(items);
+            dialog.Title = Strings.Additional.DoubleTapAction;
+            dialog.PrimaryButtonText = Strings.Resources.OK;
+            dialog.SecondaryButtonText = Strings.Resources.Cancel;
+
+            var confirm = await dialog.ShowQueuedAsync();
+            if (confirm == ContentDialogResult.Primary && dialog.SelectedIndex is DoubleTapAction action)
+            {
+                DoubleTapAction = action;
             }
         }
 

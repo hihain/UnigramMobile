@@ -132,6 +132,10 @@ namespace Unigram.Services
 
         Task<StickerSet> GetAnimatedSetAsync(AnimatedSetType type);
         bool IsDiceEmoji(string text, out string dice);
+
+#if MODERN_TDLIB
+        ReactionType DefaultReactionType { get; }
+#endif
     }
 
     public partial class ProtoService : IProtoService, ClientResultHandler
@@ -171,6 +175,11 @@ namespace Unigram.Services
         private TaskCompletionSource<StickerSet>[] _animatedSetTask = new TaskCompletionSource<StickerSet>[2] { null, null };
 
         private IList<string> _diceEmojis;
+
+#if MODERN_TDLIB
+        private ReactionType _defaultReactionType;
+        public ReactionType DefaultReactionType => _defaultReactionType;
+#endif
 
         private IList<int> _savedAnimations;
         private IList<int> _favoriteStickers;
@@ -649,6 +658,9 @@ namespace Unigram.Services
             _usersMap.Clear();
             
             _diceEmojis = null;
+#if MODERN_TDLIB
+            _defaultReactionType = null;
+#endif
 
             _savedAnimations = null;
             _favoriteStickers = null;
@@ -1846,6 +1858,12 @@ namespace Unigram.Services
             {
                 _diceEmojis = updateDiceEmojis.Emojis.ToArray();
             }
+#if MODERN_TDLIB
+            else if (update is UpdateDefaultReactionType updateDefaultReactionType)
+            {
+                _defaultReactionType = updateDefaultReactionType.ReactionType;
+            }
+#endif
             else if (update is UpdateFavoriteStickers updateFavoriteStickers)
             {
                 _favoriteStickers = updateFavoriteStickers.StickerIds;
