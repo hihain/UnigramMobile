@@ -69,11 +69,14 @@
 
                 <controls:HeaderedControl
                     Header="Push Notification Diagnostics"
-                    Footer="Contains timestamps, status, hashed identifiers, and error codes only. Channel URIs and notification payloads are never recorded.">
+                    Footer="Contains timestamps, status, hashed identifiers, and error codes only. Channel URIs and notification payloads are never recorded.&#x0a;&#x0a;Copy WNS channel URI is for a direct delivery test with your own Partner Center credentials. Anyone with this URI and those credentials can push to this device; do not post it publicly.">
                     <controls:BadgeButton
                         Content="push-diagnostics.txt"
                         Click="PushLog_Click"
                         Badge="{x:Bind ConvertSize(ViewModel.PushLogSize), Mode=OneWay}"/>
+                    <controls:BadgeButton
+                        Content="Copy WNS channel URI"
+                        Click="CopyChannel_Click"/>
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl

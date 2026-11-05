@@ -192,6 +192,35 @@ After installing that identity, verify `wns.channel.created`,
 `native.task.run`, `native.raw.received`, and
 `native.notification.displayed`.
 
+#### Store BETA push delivery test (26.11.6280.0)
+
+The Store build uses `ZuneTracks.UnigramMobileMessengerBETA`. The stable
+26.8.6012.3 build that received pushes used `49197Wirdschon.UnigramMobile`,
+whose WNS Package SID is different. Telegram signs each WNS push with the
+credentials it holds for the `api_id` that registered the device, so pushes
+reach this package only if Telegram holds **this** product's Package SID and
+client secret for **this build's** `api_id`. A successful `RegisterDevice` does
+not prove that.
+
+`build\wns\Test-WnsPush.ps1` separates the two halves without involving
+Telegram:
+
+1. On the phone, open Settings > Diagnostics > **Copy WNS channel URI**
+   (user-initiated; the URI is never written to the log), send it to the PC
+   privately, then close the app.
+2. Run `.\build\wns\Test-WnsPush.ps1 -PackageSid 'ms-app://s-1-15-2-...' -ChannelUri '<uri>'`
+   and enter the client secret at the secure prompt.
+3. Interpret:
+   - Authentication fails: the Partner Center credentials are wrong.
+   - HTTP 403: the channel belongs to a different package than that SID.
+   - `X-WNS-Status=received` and the log shows `native.task.run` /
+     `native.raw.received` / `native.notification.displayed` with a "WNS
+     delivery test" toast: the package, WNS, and background task all work, so
+     missing Telegram pushes are a Telegram server-side credential/`api_id`
+     mapping issue.
+   - `received` but no `native.task.run`: background access or battery saver on
+     the device is blocking the task (check `background.access.result`).
+
 #### Foreground Live Tile tracing
 
 The Store and experimental sources use the same foreground tile renderer and

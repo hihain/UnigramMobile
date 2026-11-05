@@ -1,9 +1,13 @@
 ﻿using System;
 using Telegram.Td.Api;
+using Unigram.Common;
+using Unigram.Controls;
 using Unigram.Converters;
 using Unigram.Services;
 using Unigram.ViewModels;
 using Unigram.Views.Popups;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Networking.PushNotifications;
 using Windows.Storage;
 using Windows.UI.Xaml;
 
@@ -62,6 +66,26 @@ namespace Unigram.Views
             if (log != null)
             {
                 await SharePopup.GetForCurrentView().ShowAsync(ModernTdlibCompatibility.CreateInputMessageDocument(new InputFileLocal(log.Path), null, true, null));
+            }
+        }
+
+        private async void CopyChannel_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Returns the app's existing channel; the URI itself is never written to the log.
+                var channel = await PushNotificationChannelManager.CreatePushNotificationChannelForApplicationAsync();
+                var package = new DataPackage();
+                package.SetText(channel.Uri);
+                ClipboardEx.TrySetContent(package);
+
+                Logs.PushDiagnostics.Write("wns.channel.copied", $"uri_hash={Logs.PushDiagnostics.HashIdentifier(channel.Uri)};expires={channel.ExpirationTime:O}");
+                await MessagePopup.ShowAsync("The WNS channel URI was copied to the clipboard. Close the app before sending a test push.", "Push Notification Diagnostics", "OK");
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("wns.channel.copied", ex);
+                await MessagePopup.ShowAsync($"Unable to get the WNS channel (0x{ex.HResult:X8}).", "Push Notification Diagnostics", "OK");
             }
         }
     }
