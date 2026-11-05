@@ -64,7 +64,11 @@ finally {
 Write-Host "WNS authentication: OK (token_type=$($auth.token_type)). These credentials are valid." -ForegroundColor Green
 
 if (-not $ChannelUri) {
-    Write-Host 'No -ChannelUri supplied; skipped the delivery test.'
+    $ChannelUri = Read-Host 'Channel URI from Settings > Diagnostics (close the app first; leave blank to skip)'
+}
+
+if (-not $ChannelUri) {
+    Write-Host 'No channel URI supplied; skipped the delivery test.'
     exit 0
 }
 
