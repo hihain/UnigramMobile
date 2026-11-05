@@ -2099,14 +2099,29 @@ namespace Unigram.Views
                 message = (selector.ContentTemplateRoot as FrameworkElement)?.Tag as MessageViewModel;
             }
 
-            // Keep media, links, inline buttons, and reaction chips on their established tap paths.
-            if (!(message?.Content is MessageText) || e.OriginalSource is Button)
+            // Keep media, links, inline buttons, reply quotes, and reaction chips on their established tap paths.
+            if (!(message?.Content is MessageText) || IsWithinButton(e.OriginalSource as DependencyObject, sender as DependencyObject))
             {
                 return;
             }
 
             e.Handled = true;
             Message_ContextRequested(sender as UIElement, null);
+        }
+
+        private static bool IsWithinButton(DependencyObject source, DependencyObject root)
+        {
+            while (source != null && source != root)
+            {
+                if (source is ButtonBase)
+                {
+                    return true;
+                }
+
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            return false;
         }
 
         private async void Message_ContextRequested(UIElement sender, ContextRequestedEventArgs args)

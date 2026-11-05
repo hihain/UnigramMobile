@@ -10,8 +10,13 @@ namespace Unigram.Views.Popups
 {
     public sealed partial class DeleteMessagesPopup : ContentPopup
     {
-        public DeleteMessagesPopup(IProtoService protoService, IList<Message> messages)
+        public DeleteMessagesPopup(IProtoService protoService, IList<Message> messages, IDictionary<long, BaseObject> properties)
         {
+            BaseObject GetProperties(Message message)
+            {
+                return properties != null && properties.TryGetValue(message.Id, out var value) ? value : null;
+            }
+
             this.InitializeComponent();
 
             Title = messages.Count == 1 ? Strings.Resources.DeleteSingleMessagesTitle : string.Format(Strings.Resources.DeleteMessagesTitle, Locale.Declension("messages", messages.Count));
@@ -62,9 +67,9 @@ namespace Unigram.Views.Popups
                 ReportSpamCheck.Visibility = Visibility.Collapsed;
                 DeleteAllCheck.Visibility = Visibility.Collapsed;
 
-                var canBeDeletedForAllUsers = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(protoService, x));
-                var canBeDeletedOnlyForSelf = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(protoService, x));
-                var anyCanBeDeletedForAllUsers = messages.Any(x => x.IsOutgoing && ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(protoService, x));
+                var canBeDeletedForAllUsers = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(x, GetProperties(x)));
+                var canBeDeletedOnlyForSelf = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(x, GetProperties(x)));
+                var anyCanBeDeletedForAllUsers = messages.Any(x => x.IsOutgoing && ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(x, GetProperties(x)));
 
                 if (chat.Type is ChatTypePrivate || chat.Type is ChatTypeBasicGroup)
                 {

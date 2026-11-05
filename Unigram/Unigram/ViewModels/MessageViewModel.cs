@@ -190,6 +190,10 @@ namespace Unigram.ViewModels
             }
         }
 
+#if MODERN_TDLIB
+        public bool HasMessageProperties => _messagePropertiesLoaded && _messageProperties is Telegram.Td.Api.MessageProperties;
+#endif
+
         public void UpdateMessageProperties(BaseObject properties)
         {
             _messageProperties = properties;

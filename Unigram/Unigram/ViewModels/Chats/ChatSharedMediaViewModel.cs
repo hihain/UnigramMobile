@@ -182,8 +182,42 @@ namespace Unigram.ViewModels.Chats
                 Set(ref _selectedItems, value);
                 MessagesForwardCommand.RaiseCanExecuteChanged();
                 MessagesDeleteCommand.RaiseCanExecuteChanged();
+#if MODERN_TDLIB
+                LoadSelectedMessageProperties(value);
+#endif
             }
         }
+
+        private readonly Dictionary<long, BaseObject> _selectedProperties = new Dictionary<long, BaseObject>();
+
+        private BaseObject GetSelectedProperties(Message message)
+        {
+            return _selectedProperties.TryGetValue(message.Id, out var properties) ? properties : null;
+        }
+
+#if MODERN_TDLIB
+        // GetMessageProperties cannot be executed synchronously, so selection permissions
+        // are fetched asynchronously before the delete/forward commands can enable.
+        private async void LoadSelectedMessageProperties(List<Message> messages)
+        {
+            var pending = messages?.Where(x => !(GetSelectedProperties(x) is MessageProperties)).ToList();
+            if (pending == null || pending.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var message in pending)
+            {
+                _selectedProperties[message.Id] = await ProtoService.SendAsync(new GetMessageProperties(message.ChatId, message.Id));
+            }
+
+            if (ReferenceEquals(_selectedItems, messages))
+            {
+                MessagesForwardCommand.RaiseCanExecuteChanged();
+                MessagesDeleteCommand.RaiseCanExecuteChanged();
+            }
+        }
+#endif
 
         #region View
 
@@ -310,7 +344,15 @@ namespace Unigram.ViewModels.Chats
             }
             
             var sameUser = messages.All(x => x.SenderId.IsEqual(first.SenderId));
-            var dialog = new DeleteMessagesPopup(ProtoService, messages.Where(x => x != null).ToArray());
+            var valid = messages.Where(x => x != null).ToArray();
+            var properties = new Dictionary<long, BaseObject>();
+
+            foreach (var item in valid)
+            {
+                properties[item.Id] = await ProtoService.SendAsync(new GetMessageProperties(item.ChatId, item.Id));
+            }
+
+            var dialog = new DeleteMessagesPopup(ProtoService, valid, properties);
 
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm != ContentDialogResult.Primary)
@@ -378,8 +420,8 @@ namespace Unigram.ViewModels.Chats
         private bool MessagesDeleteCanExecute()
         {
             return SelectedItems.Count > 0 && SelectedItems.All(x =>
-                ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(ProtoService, x)
-                || ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(ProtoService, x));
+                ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(x, GetSelectedProperties(x))
+                || ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(x, GetSelectedProperties(x)));
         }
 
         #endregion
@@ -389,7 +431,7 @@ namespace Unigram.ViewModels.Chats
         public RelayCommand MessagesForwardCommand { get; }
         private async void MessagesForwardExecute()
         {
-            var messages = SelectedItems.Where(x => ModernTdlibCompatibility.GetMessageCanBeForwarded(ProtoService, x)).OrderBy(x => x.Id).ToList();
+            var messages = SelectedItems.Where(x => ModernTdlibCompatibility.GetMessageCanBeForwarded(x, GetSelectedProperties(x))).OrderBy(x => x.Id).ToList();
             if (messages.Count > 0)
             {
                 SelectionMode = ListViewSelectionMode.None;
@@ -399,7 +441,7 @@ namespace Unigram.ViewModels.Chats
 
         private bool MessagesForwardCanExecute()
         {
-            return SelectedItems.Count > 0 && SelectedItems.All(x => ModernTdlibCompatibility.GetMessageCanBeForwarded(ProtoService, x));
+            return SelectedItems.Count > 0 && SelectedItems.All(x => ModernTdlibCompatibility.GetMessageCanBeForwarded(x, GetSelectedProperties(x)));
         }
 
         #endregion

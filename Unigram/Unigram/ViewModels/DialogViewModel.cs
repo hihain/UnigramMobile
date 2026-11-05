@@ -62,8 +62,36 @@ namespace Unigram.ViewModels
                 MessagesDeleteCommand.RaiseCanExecuteChanged();
                 MessagesCopyCommand.RaiseCanExecuteChanged();
                 MessagesReportCommand.RaiseCanExecuteChanged();
+#if MODERN_TDLIB
+                LoadSelectedMessageProperties(value);
+#endif
             }
         }
+
+#if MODERN_TDLIB
+        // GetMessageProperties cannot be executed synchronously, so selection permissions
+        // are fetched asynchronously before the delete/forward commands can enable.
+        private async void LoadSelectedMessageProperties(List<MessageViewModel> messages)
+        {
+            var pending = messages?.Where(x => !x.HasMessageProperties).ToList();
+            if (pending == null || pending.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var message in pending)
+            {
+                var response = await ProtoService.SendAsync(new Telegram.Td.Api.GetMessageProperties(message.ChatId, message.Id));
+                message.UpdateMessageProperties(response);
+            }
+
+            if (ReferenceEquals(_selectedItems, messages))
+            {
+                MessagesForwardCommand.RaiseCanExecuteChanged();
+                MessagesDeleteCommand.RaiseCanExecuteChanged();
+            }
+        }
+#endif
 
         public void ExpandSelection(IEnumerable<MessageViewModel> vector)
         {

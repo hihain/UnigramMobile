@@ -156,7 +156,15 @@ namespace Unigram.ViewModels
             }
 
             var sameUser = messages.All(x => x.SenderId.IsEqual(first.SenderId));
-            var dialog = new DeleteMessagesPopup(ProtoService, items.Where(x => x != null).ToArray());
+            var valid = items.Where(x => x != null).ToArray();
+            var properties = new Dictionary<long, BaseObject>();
+
+            foreach (var item in valid)
+            {
+                properties[item.Id] = await ProtoService.SendAsync(new GetMessageProperties(item.ChatId, item.Id));
+            }
+
+            var dialog = new DeleteMessagesPopup(ProtoService, valid, properties);
 
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm != ContentDialogResult.Primary)
@@ -741,7 +749,26 @@ namespace Unigram.ViewModels
         public RelayCommand MessageEditLastCommand { get; }
         private async void MessageEditLastExecute()
         {
+#if MODERN_TDLIB
+            // Edit permission comes from GetMessageProperties, which must be requested asynchronously.
+            MessageViewModel last = null;
+
+            foreach (var item in Enumerable.Reverse(Items).Where(x => x.IsOutgoing && x.Id != 0).ToList())
+            {
+                if (!item.HasMessageProperties)
+                {
+                    item.UpdateMessageProperties(await ProtoService.SendAsync(new GetMessageProperties(item.ChatId, item.Id)));
+                }
+
+                if (item.CanBeEdited)
+                {
+                    last = item;
+                    break;
+                }
+            }
+#else
             var last = Items.LastOrDefault(x => x.CanBeEdited);
+#endif
             if (last != null)
             {
                 MessageEditCommand.Execute(last);
