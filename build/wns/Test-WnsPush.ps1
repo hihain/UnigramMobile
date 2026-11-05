@@ -15,16 +15,28 @@ Separates "Telegram is not sending" from "Microsoft/app is not delivering":
 The client secret is read with a secure prompt and is never printed or written to disk.
 The access token and channel URI are not printed.
 
+X-WNS-Status=dropped with X-WNS-DeviceConnectionStatus=connected means the phone
+was online but Windows refused the raw push for this app (notifications or
+background activity disabled for the app, battery saver, or no registered push
+background task). disconnected means the phone was not connected to WNS.
+
+Use -Toast to send a visible toast instead of a raw push; if the toast appears
+while raw pushes are dropped, WNS can reach the phone and the problem is raw/
+background-task delivery on the device.
+
 .EXAMPLE
 .\Test-WnsPush.ps1 -PackageSid 'ms-app://s-1-15-2-...'
 .\Test-WnsPush.ps1 -PackageSid 'ms-app://s-1-15-2-...' -ChannelUri (Get-Clipboard)
+.\Test-WnsPush.ps1 -PackageSid 'ms-app://s-1-15-2-...' -Toast
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$PackageSid,
 
-    [string]$ChannelUri
+    [string]$ChannelUri,
+
+    [switch]$Toast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,24 +89,44 @@ if ($channel.Scheme -ne 'https' -or $channel.Host -notmatch '\.notify\.windows\.
     throw 'ChannelUri must be the https://*.notify.windows.com URI copied from the app.'
 }
 
-$payload = @{
-    data = @{
-        loc_key  = 'MESSAGE_TEXT'
-        loc_args = @('WNS delivery test', 'Direct push reached this phone')
-        custom   = @{}
-    }
-    date = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-} | ConvertTo-Json -Depth 5 -Compress
+if ($Toast) {
+    $payload = '<toast><visual><binding template="ToastGeneric"><text>WNS delivery test</text><text>Direct toast reached this phone</text></binding></visual></toast>'
+}
+else {
+    $payload = @{
+        data = @{
+            loc_key  = 'MESSAGE_TEXT'
+            loc_args = @('WNS delivery test', 'Direct push reached this phone')
+            custom   = @{}
+        }
+        date = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    } | ConvertTo-Json -Depth 5 -Compress
+}
 
 $headers = @{
     'Authorization' = "Bearer $($auth.access_token)"
-    'X-WNS-Type'    = 'wns/raw'
+    'X-WNS-Type'    = if ($Toast) { 'wns/toast' } else { 'wns/raw' }
+    'X-WNS-RequestForStatus' = 'true'
 }
+$contentType = if ($Toast) { 'text/xml' } else { 'application/octet-stream' }
 
 try {
-    $response = Invoke-WebRequest -Method Post -Uri $channel -Headers $headers -ContentType 'application/octet-stream' -Body ([Text.Encoding]::UTF8.GetBytes($payload)) -UseBasicParsing
-    Write-Host "WNS delivery: HTTP $([int]$response.StatusCode); X-WNS-Status=$($response.Headers['X-WNS-Status']); X-WNS-DeviceConnectionStatus=$($response.Headers['X-WNS-DeviceConnectionStatus'])" -ForegroundColor Green
-    Write-Host 'Now check push-diagnostics.txt on the phone for native.task.run and native.raw.received.'
+    $response = Invoke-WebRequest -Method Post -Uri $channel -Headers $headers -ContentType $contentType -Body ([Text.Encoding]::UTF8.GetBytes($payload)) -UseBasicParsing
+    $wnsStatus = "$($response.Headers['X-WNS-Status'])"
+    $connection = "$($response.Headers['X-WNS-DeviceConnectionStatus'])"
+    Write-Host "WNS delivery ($($headers['X-WNS-Type'])): HTTP $([int]$response.StatusCode); X-WNS-Status=$wnsStatus; X-WNS-DeviceConnectionStatus=$connection; X-WNS-Msg-ID=$($response.Headers['X-WNS-Msg-ID'])" -ForegroundColor Green
+    if ($wnsStatus -eq 'dropped' -and $connection -eq 'connected') {
+        Write-Host 'The phone is connected, but Windows refused this notification for the app. Check app notifications, background app permission and battery saver on the phone.' -ForegroundColor Yellow
+    }
+    elseif ($connection -match 'disconnected') {
+        Write-Host 'The phone is not connected to WNS right now. Wake it, confirm data/Wi-Fi, and retry.' -ForegroundColor Yellow
+    }
+    elseif ($Toast) {
+        Write-Host 'Check whether the "WNS delivery test" toast appeared on the phone.'
+    }
+    else {
+        Write-Host 'Now check push-diagnostics.txt on the phone for native.task.run and native.raw.received.'
+    }
 }
 catch {
     $r = $_.Exception.Response
