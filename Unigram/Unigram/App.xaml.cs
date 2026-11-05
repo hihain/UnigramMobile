@@ -42,6 +42,13 @@ namespace Unigram
         public static AppServiceConnection Connection { get; private set; }
         public static BackgroundTaskDeferral Deferral { get; private set; }
 
+        private static volatile bool _isInForeground;
+        public static bool IsInForeground
+        {
+            get => _isInForeground;
+            private set => _isInForeground = value;
+        }
+
         private ExtendedExecutionSession _extendedSession;
         private MediaExtensionManager _mediaExtensionManager;
 
@@ -91,6 +98,11 @@ namespace Unigram
             }
 
             InactivityHelper.Detected += Inactivity_Detected;
+
+            // Background activations (e.g. the periodic sync) start without UI and never
+            // raise LeavingBackground, so this stays false until the app is actually shown.
+            LeavingBackground += (s, e) => IsInForeground = true;
+            EnteredBackground += (s, e) => IsInForeground = false;
 
             UnhandledException += (s, args) =>
             {
@@ -298,7 +310,11 @@ namespace Unigram
                 var deferral = args.TaskInstance.GetDeferral();
                 try
                 {
-                    if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
+                    if (args.TaskInstance.Task.Name == BackgroundSync.TaskName)
+                    {
+                        await BackgroundSync.RunAsync(args.TaskInstance, IsInForeground);
+                    }
+                    else if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
                     {
                         var data = Toast.GetData(triggerDetail);
                         if (data == null)

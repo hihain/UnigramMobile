@@ -117,6 +117,15 @@
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl
+                    Header="{CustomResource BackgroundSync}"
+                    Footer="{CustomResource BackgroundSyncInfo}">
+                    <ToggleSwitch
+                        IsOn="{x:Bind ViewModel.IsBackgroundSyncEnabled, Mode=TwoWay}"
+                        Header="{CustomResource BackgroundSyncEnabled}"
+                        Style="{StaticResource CheckButtonStyle}"/>
+                </controls:HeaderedControl>
+
+                <controls:HeaderedControl
                     Footer="{CustomResource UndoAllCustom}">
                     <controls:BadgeButton
                         Content="{CustomResource ResetAllNotifications}"

@@ -34400,6 +34400,30 @@ namespace Unigram.Strings
                 return resourceLoader.GetString("SecretChatLiveTile");
             }
         }
+
+        public static string BackgroundSync
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSync");
+            }
+        }
+
+        public static string BackgroundSyncEnabled
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSyncEnabled");
+            }
+        }
+
+        public static string BackgroundSyncInfo
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSyncInfo");
+            }
+        }
         
         /// <summary>
         /// Localized resource similar to "Please note that inline bots are provided by third-party developers. For the bot to work, the symbols you type after the bot's username are sent to the respective developer."

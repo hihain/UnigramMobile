@@ -221,6 +221,25 @@ namespace Unigram.ViewModels.Settings
             }
         }
 
+        public bool IsBackgroundSyncEnabled
+        {
+            get
+            {
+                return BackgroundSync.IsEnabled;
+            }
+            set
+            {
+                if (BackgroundSync.IsEnabled == value)
+                {
+                    return;
+                }
+
+                BackgroundSync.IsEnabled = value;
+                BackgroundSync.UpdateRegistration();
+                RaisePropertyChanged();
+            }
+        }
+
         public void Handle(UpdateScopeNotificationSettings update)
         {
             foreach (var scope in Scopes)

@@ -98,6 +98,9 @@ namespace Unigram.Common
                 Logs.PushDiagnostics.WriteException("background.task.toast.failed", ex);
             }
 
+            // Optional periodic sync; failures are logged and don't affect push registration.
+            BackgroundSync.UpdateRegistration();
+
             return registered;
         }
 

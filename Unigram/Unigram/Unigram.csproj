@@ -265,6 +265,7 @@
     <Compile Include="Common\PhoneNumber.cs" />
     <Compile Include="Common\PlaceholderHelper.cs" />
     <Compile Include="Common\RatioControl.cs" />
+    <Compile Include="Common\BackgroundSync.cs" />
     <Compile Include="Common\TdExtensions.cs" />
     <Compile Include="Common\TextBlockHelper.cs" />
     <Compile Include="Common\Theme.cs" />

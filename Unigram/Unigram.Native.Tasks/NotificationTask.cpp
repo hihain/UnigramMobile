@@ -10,6 +10,7 @@
 #include <iostream>  
 #include <iomanip>
 #include <sstream>
+#include <ctime>
 #include <windows.h>
 #include "Shlwapi.h"
 
@@ -79,6 +80,16 @@ task<void> NotificationTask::UpdateToastAndTiles(String^ content /*, std::wofstr
 			{
 				session = GetSession(receiver->Id);
 				LogDiagnostic(L"native.receiver.resolve", L"result=success");
+
+				// A real Telegram push arrived, so the managed periodic sync can pause itself.
+				try
+				{
+					ApplicationData::Current->LocalSettings->Values->Insert(L"LastTelegramPushTime", PropertyValue::CreateInt64(static_cast<int64>(std::time(nullptr))));
+				}
+				catch (Exception ^ ex)
+				{
+					LogError(L"recording push time", ex);
+				}
 			}
 			else
 			{

@@ -464,7 +464,7 @@ namespace Unigram.Services
             }
 
             var connectionState = _protoService.GetConnectionState();
-            if (connectionState is ConnectionStateUpdating)
+            if (connectionState is ConnectionStateUpdating && !BackgroundSync.IsActiveInBackground)
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
                 WriteForegroundTileDiagnostic("managed.tile.group", "result=skipped;reason=connection_updating");
@@ -477,6 +477,7 @@ namespace Unigram.Services
                 return;
             }
 
+            BackgroundSync.OnNotificationGroup();
             WriteForegroundTileDiagnostic("managed.tile.group", $"result=received;added={update.AddedNotifications?.Count ?? 0};removed={update.RemovedNotificationIds?.Count ?? 0};session_active={_sessionService.IsActive.ToString().ToLowerInvariant()}");
 
             foreach (var notification in update.AddedNotifications)
@@ -662,7 +663,7 @@ namespace Unigram.Services
         private async Task UpdateAsync(Chat chat, Func<Task> action)
         { //TODO: Simplified active chat logic?
             var open = WindowContext.ActiveWrappers.Cast<TLWindowContext>().Any(x => x.IsChatOpen(_protoService.SessionId, chat.Id));
-            if (open)
+            if (open && !BackgroundSync.IsActiveInBackground)
             {
                 WriteForegroundTileDiagnostic("managed.tile.gate", "result=skipped;reason=chat_open");
                 return;

@@ -9536,6 +9536,15 @@ You may need to restart the app for this to take effect.</value>
   <data name="SecretChatLiveTile" xml:space="preserve">
     <value>Show Secret Chat Notifications on Live Tiles</value>
   </data>
+  <data name="BackgroundSync" xml:space="preserve">
+    <value>Background Check</value>
+  </data>
+  <data name="BackgroundSyncEnabled" xml:space="preserve">
+    <value>Check for new messages every 15 minutes</value>
+  </data>
+  <data name="BackgroundSyncInfo" xml:space="preserve">
+    <value>Use this while instant push notifications are unavailable. Windows decides exactly when the check runs, so notifications can be delayed by 15 minutes or more, and it uses some extra battery and data. It pauses automatically once instant push notifications start working.</value>
+  </data>
   <data name="SecretChatContextBotAlert" xml:space="preserve">
     <value>Please note that inline bots are provided by third-party developers. For the bot to work, the symbols you type after the bot's username are sent to the respective developer.</value>
   </data>
