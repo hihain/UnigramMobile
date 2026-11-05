@@ -848,10 +848,10 @@ namespace Unigram.Services
                 var userId = _protoService.Options.MyId;
                 Logs.PushDiagnostics.Write("wns.registration.start", $"session={_sessionService.Id};user_ready={userId != 0};already_registered={_alreadyRegistered}");
 #if MODERN_TDLIB
-                // This side-by-side package does not share the stable application's WNS
-                // association. A successful TDLib registration only proves the channel was
-                // stored server-side; native-task records are still needed to prove delivery.
-                Logs.PushDiagnostics.Write("wns.identity", $"package={Package.Current.Id.Name};isolation=experimental;delivery=requires_experimental_wns_association");
+                // WNS only delivers to the Store-associated identity. Telegram must hold this
+                // product's Package SID/secret for the compiled api_id; a successful TDLib
+                // registration only proves the channel was stored, native-task records prove delivery.
+                Logs.PushDiagnostics.Write("wns.identity", $"package={Package.Current.Id.Name};publisher_id={Package.Current.Id.PublisherId};signature={Package.Current.SignatureKind};delivery=requires_telegram_wns_credentials_for_api_id");
 #endif
                 if (userId == 0)
                 {

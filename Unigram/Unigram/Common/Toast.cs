@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Background;
+using Windows.Storage;
 using Windows.UI.Notifications;
 
 namespace Unigram.Common
@@ -13,6 +15,7 @@ namespace Unigram.Common
         private const string NotificationTaskName = "NotificationTask";
         private const string NotificationTaskEntryPoint = "Unigram.Native.Tasks.NotificationTask";
         private const string InteractiveTaskName = "NewInteractiveTask";
+        private const string BackgroundAccessVersionKey = "BackgroundAccessVersion";
 
         private static readonly HashSet<string> LegacyTaskNames = new HashSet<string>
         {
@@ -26,9 +29,20 @@ namespace Unigram.Common
         public static async Task<bool> RegisterBackgroundTasks()
         {
             BackgroundAccessStatus access;
-            Logs.PushDiagnostics.Write("background.access.request");
+            var version = Package.Current.Id.Version;
+            var currentVersion = $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+            var settings = ApplicationData.Current.LocalSettings.Values;
+            var accessRefreshed = !(settings.TryGetValue(BackgroundAccessVersionKey, out var accessVersion) && accessVersion is string grantedVersion && grantedVersion == currentVersion);
+            Logs.PushDiagnostics.Write("background.access.request", $"refresh_after_update={accessRefreshed}");
             try
             {
+                // Microsoft requires RemoveAccess before RequestAccessAsync on the first launch
+                // after an update; otherwise the push trigger can silently stop firing.
+                if (accessRefreshed)
+                {
+                    BackgroundExecutionManager.RemoveAccess();
+                }
+
                 access = await BackgroundExecutionManager.RequestAccessAsync();
             }
             catch (Exception ex)
@@ -44,6 +58,8 @@ namespace Unigram.Common
                 Logs.Logger.Warning(Logs.Target.Notifications, $"Background notifications are disabled: {access}");
                 return false;
             }
+
+            settings[BackgroundAccessVersionKey] = currentVersion;
 
             foreach (var task in BackgroundTaskRegistration.AllTasks)
             {

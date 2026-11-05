@@ -202,7 +202,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "• Privacy: Secret Chat notifications are excluded from Live Tiles by default, including when the app is closed. You can enable them in Settings > Notifications (also searchable in Settings); sender profile images are never shown on Secret Chat tiles or toasts.\r\n• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.\r\n• Store: fixed the upload package so Microsoft Store compilation succeeds.";
+        public static readonly string CurrentChangelog = "• Privacy: Secret Chat notifications are excluded from Live Tiles by default, including when the app is closed. You can enable them in Settings > Notifications (also searchable in Settings); sender profile images are never shown on Secret Chat tiles or toasts.\r\n• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.\r\n• Store: fixed the upload package so Microsoft Store compilation succeeds.\r\n• Notifications: background push access is refreshed after each update so closed-app notifications keep working.";
 
         public int Session => _session;
 
