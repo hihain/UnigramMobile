@@ -14,6 +14,8 @@ namespace Unigram.Controls
     /// </summary>
     public partial class WrapPanel : Panel
     {
+        private const double ArrangeTolerance = 1.0;
+
         /// <summary>
         /// Gets or sets the orientation of the WrapPanel, Horizontal or vertical means that child controls will be added horizontally until the width of the panel can't fit more control then a new row is added to fit new horizontal added child controls, vertical means that child will be added vertically until the height of the panel is recieved then a new column is added
         /// </summary>
@@ -105,7 +107,9 @@ namespace Unigram.Controls
             foreach (var child in Children)
             {
                 var desiredMeasure = new UvMeasure(Orientation, child.DesiredSize.Width, child.DesiredSize.Height);
-                if ((desiredMeasure.U + position.U) > parentMeasure.U)
+                // Layout rounding can make finalSize marginally smaller than the measured
+                // sum of children, which would otherwise wrap into a row Measure never reserved.
+                if ((desiredMeasure.U + position.U) > parentMeasure.U + ArrangeTolerance)
                 {
                     // next row!
                     position.U = 0;
