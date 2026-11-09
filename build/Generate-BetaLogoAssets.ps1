@@ -108,16 +108,17 @@ function Draw-MonochromeMessageBubble {
     $bodyPath.CloseFigure()
     $Graphics.DrawPath($pen, $bodyPath)
 
-    $envelope = [System.Drawing.RectangleF]::new(
-        $X + ($Width * 0.52),
-        $Y + ($bodyHeight * 0.24),
-        $Width * 0.33,
-        $bodyHeight * 0.48)
-    $Graphics.DrawRectangle($pen, $envelope.X, $envelope.Y, $envelope.Width, $envelope.Height)
-    $Graphics.DrawLines($pen, @(
-            [System.Drawing.PointF]::new($envelope.X, $envelope.Y),
-            [System.Drawing.PointF]::new($envelope.X + ($envelope.Width / 2), $envelope.Y + ($envelope.Height * 0.45)),
-            [System.Drawing.PointF]::new($envelope.Right, $envelope.Y)))
+    $gliderNose = [System.Drawing.PointF]::new($X + ($Width * 0.88), $Y + ($bodyHeight * 0.50))
+    $upperWing = @(
+        [System.Drawing.PointF]::new($X + ($Width * 0.50), $Y + ($bodyHeight * 0.24)),
+        $gliderNose,
+        [System.Drawing.PointF]::new($X + ($Width * 0.46), $Y + ($bodyHeight * 0.45)))
+    $lowerWing = @(
+        [System.Drawing.PointF]::new($X + ($Width * 0.48), $Y + ($bodyHeight * 0.53)),
+        $gliderNose,
+        [System.Drawing.PointF]::new($X + ($Width * 0.53), $Y + ($bodyHeight * 0.78)))
+    $Graphics.DrawPolygon($pen, $upperWing)
+    $Graphics.DrawPolygon($pen, $lowerWing)
 
     foreach ($row in 0..2) {
         $trailY = $Y + ($bodyHeight * (0.30 + ($row * 0.18)))
@@ -168,18 +169,17 @@ function Draw-MessageBubble {
         [System.Drawing.PointF]::new($x + ($designWidth * 0.36), $y + $bodyHeight))
     $Graphics.FillPolygon($whiteBrush, $tail)
 
-    $envelope = [System.Drawing.RectangleF]::new(
-        $x + ($designWidth * 0.52),
-        $y + ($bodyHeight * 0.24),
-        $designWidth * 0.33,
-        $bodyHeight * 0.48)
-    $Graphics.FillRectangle($blueBrush, $envelope)
-    $flapPen = [System.Drawing.Pen]::new($white, [Math]::Max(1, $bodyHeight * 0.065))
-    $flapPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Miter
-    $Graphics.DrawLines($flapPen, @(
-            [System.Drawing.PointF]::new($envelope.X, $envelope.Y),
-            [System.Drawing.PointF]::new($envelope.X + ($envelope.Width / 2), $envelope.Y + ($envelope.Height * 0.45)),
-            [System.Drawing.PointF]::new($envelope.Right, $envelope.Y)))
+    $gliderNose = [System.Drawing.PointF]::new($x + ($designWidth * 0.88), $y + ($bodyHeight * 0.50))
+    $upperWing = @(
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.50), $y + ($bodyHeight * 0.24)),
+        $gliderNose,
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.46), $y + ($bodyHeight * 0.45)))
+    $lowerWing = @(
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.48), $y + ($bodyHeight * 0.53)),
+        $gliderNose,
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.53), $y + ($bodyHeight * 0.78)))
+    $Graphics.FillPolygon($blueBrush, $upperWing)
+    $Graphics.FillPolygon($blueBrush, $lowerWing)
 
     foreach ($row in 0..2) {
         $trailWidth = $designWidth * (0.23 - ($row * 0.025))
@@ -196,7 +196,6 @@ function Draw-MessageBubble {
         Draw-BetaLabel -Graphics $Graphics -Width $CanvasWidth -Height $CanvasHeight
     }
 
-    $flapPen.Dispose()
     $bodyPath.Dispose()
     $blueBrush.Dispose()
     $whiteBrush.Dispose()
