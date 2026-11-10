@@ -155,6 +155,13 @@ namespace Unigram.Navigation.Services
         {
             DebugWrite();
 
+#if MODERN_TDLIB
+            // A page whose XAML fails to load throws out of Frame.Navigate and is otherwise
+            // only visible as an unhandled HRESULT with no stack, so the target page name and
+            // the failure are recorded here before the exception is rethrown.
+            try
+            {
+#endif
             if (Frame.Navigate(page, parameter, infoOverride))
             {
                 return page.Equals(Frame.Content?.GetType());
@@ -163,6 +170,14 @@ namespace Unigram.Navigation.Services
             {
                 return false;
             }
+#if MODERN_TDLIB
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("navigate.page", ex, "page=" + page?.Name);
+                throw;
+            }
+#endif
         }
 
         public int BackStackDepth => Frame.BackStackDepth;

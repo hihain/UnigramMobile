@@ -158,9 +158,18 @@ namespace Unigram.Views.Folders
 
         #region Binding
 
-        private string ConvertTitle(ChatFilter filter)
+        private string ConvertTitle(
+#if MODERN_TDLIB
+            ChatFolder filter)
+#else
+            ChatFilter filter)
+#endif
         {
+#if MODERN_TDLIB
+            return filter == null ? Strings.Resources.FilterNew : filter.Name?.Text?.Text;
+#else
             return filter == null ? Strings.Resources.FilterNew : filter.Title;
+#endif
         }
 
         private Uri ConvertEmoji(ChatFilterIcon icon)

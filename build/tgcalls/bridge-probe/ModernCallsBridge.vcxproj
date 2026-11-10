@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|ARM"><Configuration>Release</Configuration><Platform>ARM</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{C422C413-BE35-47DC-82E2-5FDBBF3A9212}</ProjectGuid>
+    <Keyword>WindowsRuntimeComponent</Keyword>
+    <RootNamespace>Unigram.Native.Calls.Proof</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.15063.0</WindowsTargetPlatformMinVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup>
+    <WebRtcRoot Condition="'$(WebRtcRoot)'==''">C:\wrtcar\src</WebRtcRoot>
+    <WebRtcOutputRoot Condition="'$(WebRtcOutputRoot)'==''">$(WebRtcRoot)\out\msvc\uwp\Release\arm</WebRtcOutputRoot>
+    <TgCallsRoot Condition="'$(TgCallsRoot)'==''">$(LOCALAPPDATA)\UnigramTdlibExperiment\tgcalls</TgCallsRoot>
+    <TgCallsEngineOutputRoot Condition="'$(TgCallsEngineOutputRoot)'==''">$(LOCALAPPDATA)\UnigramTdlibExperiment\bridge-probe\native-engine</TgCallsEngineOutputRoot>
+    <ZlibRoot Condition="'$(ZlibRoot)'==''">$(LOCALAPPDATA)\UnigramTdlibExperiment\vcpkg_installed\arm-uwp-dynamic-v141</ZlibRoot>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutputDirectory)'!=''">
+    <OutDir>$(OutputDirectory)\</OutDir>
+    <IntDir>$(OutputDirectory)\obj\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <ClCompile>
+      <CompileAsWinRT>true</CompileAsWinRT>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\native-engine;$(WebRtcRoot);$(WebRtcRoot)\third_party\abseil-cpp;$(WebRtcOutputRoot)\gen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WINRT_DLL;WEBRTC_WIN;WINUWP;WINAPI_FAMILY=WINAPI_FAMILY_PC_APP;WIN32_LEAN_AND_MEAN;NOMINMAX;_UNICODE;UNICODE;NTDDI_VERSION=NTDDI_WIN10_RS2;_WIN32_WINNT=0x0A00;WINVER=0x0A00;WEBRTC_ENABLE_PROTOBUF=0;WEBRTC_STRICT_FIELD_TRIALS=0;WEBRTC_HAVE_SCTP;WEBRTC_ARCH_ARM;RTC_DISABLE_METRICS;WEBRTC_VIDEO_CAPTURE_WINRT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalUsingDirectories>$(WindowsSDK_WindowsMetadata);%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapExports>true</MapExports>
+      <AdditionalDependencies>TgCallsEngine.lib;webrtc.lib;z.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;d2d1.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TgCallsEngineOutputRoot);$(WebRtcOutputRoot)\obj;$(ZlibRoot)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="CompositionVideoOutput.h" />
+    <ClInclude Include="ModernCallsBridge.h" />
+    <ClCompile Include="CompositionVideoOutput.cpp" />
+    <ClCompile Include="ModernCallsBridge.cpp" />
+    <ClCompile Include="UwpTlsSupport.cpp">
+      <CompileAsWinRT>false</CompileAsWinRT>
+    </ClCompile>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

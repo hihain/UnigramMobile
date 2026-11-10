@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|ARM"><Configuration>Release</Configuration><Platform>ARM</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B9AE446A-DAC3-4425-942D-8622B1B333EF}</ProjectGuid>
+    <RootNamespace>Unigram.Native.Calls.Engine</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.15063.0</WindowsTargetPlatformMinVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <WebRtcRoot Condition="'$(WebRtcRoot)'==''">C:\wrtcar\src</WebRtcRoot>
+    <WebRtcOutputRoot Condition="'$(WebRtcOutputRoot)'==''">$(WebRtcRoot)\out\msvc\uwp\Release\arm</WebRtcOutputRoot>
+    <TgCallsRoot Condition="'$(TgCallsRoot)'==''">$(LOCALAPPDATA)\UnigramTdlibExperiment\tgcalls</TgCallsRoot>
+    <ZlibRoot Condition="'$(ZlibRoot)'==''">$(LOCALAPPDATA)\UnigramTdlibExperiment\vcpkg_installed\arm-uwp-dynamic-v141</ZlibRoot>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutputDirectory)'!=''">
+    <OutDir>$(OutputDirectory)\</OutDir>
+    <IntDir>$(OutputDirectory)\obj\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <ClCompile>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(TgCallsRoot);$(TgCallsRoot)\tgcalls;$(ZlibRoot)\include;$(WebRtcRoot);$(WebRtcRoot)\third_party\abseil-cpp;$(WebRtcRoot)\third_party\boringssl\src\include;$(WebRtcOutputRoot)\gen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- NDEBUG, ABSL_ALLOCATOR_NOTHROW, WEBRTC_LIBRARY_IMPL, WEBRTC_NON_STATIC_TRACE_EVENT_HANDLERS
+           and WEBRTC_INCLUDE_INTERNAL_AUDIO_DEVICE are not optional tuning: they must match the
+           defines the linked webrtc.lib was compiled with (see out\msvc\uwp\Release\arm\args.gn,
+           is_debug=false). NDEBUG in particular selects RTC_DCHECK_IS_ON, which decides whether
+           webrtc::SequenceChecker is a real mutex-and-thread-reference object or an empty stub.
+           Every WebRTC type embedding one - AudioDeviceBuffer, cricket::BaseChannel, TaskQueueBase -
+           therefore changes size and member offsets with it, so a mismatch here silently corrupts
+           any such object shared between these sources and the library. -->
+      <PreprocessorDefinitions>NDEBUG;WEBRTC_WIN;WINUWP;WINAPI_FAMILY=WINAPI_FAMILY_PC_APP;WIN32_LEAN_AND_MEAN;NOMINMAX;_UNICODE;UNICODE;NTDDI_VERSION=NTDDI_WIN10_RS2;_WIN32_WINNT=0x0A00;WINVER=0x0A00;WEBRTC_ENABLE_PROTOBUF=0;WEBRTC_STRICT_FIELD_TRIALS=0;WEBRTC_HAVE_SCTP;WEBRTC_ARCH_ARM;RTC_DISABLE_METRICS;WEBRTC_VIDEO_CAPTURE_WINRT;WEBRTC_INCLUDE_INTERNAL_AUDIO_DEVICE;WEBRTC_LIBRARY_IMPL;WEBRTC_NON_STATIC_TRACE_EVENT_HANDLERS=0;ABSL_ALLOCATOR_NOTHROW=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <ProgramDataBaseFileName>$(IntDir)%(Filename).pdb</ProgramDataBaseFileName>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="TgCallsEngineFacade.h" />
+    <ClInclude Include="UwpCameraCaptureControl.h" />
+    <ClCompile Include="UwpCameraPlatform.cpp" />
+    <ClCompile Include="TgCallsEngineFacade.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\AudioDeviceHelper.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\ChannelManager.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\CodecSelectHelper.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\CryptoHelper.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\EncryptedConnection.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\FieldTrialsConfig.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\Instance.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\InstanceImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\LogSinkImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\Manager.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\MediaManager.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\Message.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\NetworkManager.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\SctpDataChannelProviderInterfaceImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\StaticThreads.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\ThreadLocalObject.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\TurnCustomizerImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\VideoCaptureInterface.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\VideoCaptureInterfaceImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\third-party\json11.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\utils\gzip.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\ContentNegotiation.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\CustomDcSctpSocket.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\ExternalSignalingConnection.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\InstanceV2Impl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\InstanceV2ReferenceImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\MtProtoIceTransport.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\NativeNetworkingImpl.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\ReflectorRelayPortFactory.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\ReflectorPort.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\RawTcpSocket.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\Signaling.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\SignalingConnection.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\SignalingEncryption.cpp" />
+    <ClCompile Include="$(TgCallsRoot)\tgcalls\v2\SignalingSctpConnection.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

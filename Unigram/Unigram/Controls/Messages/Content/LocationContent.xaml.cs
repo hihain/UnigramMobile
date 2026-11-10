@@ -40,9 +40,9 @@ namespace Unigram.Controls.Messages.Content
             //VenueDot.Visibility = Visibility.Visible;
             //VenueGlyph.UriSource = null;
 
-            if (location.LivePeriod > 0)
+            if (location.GetLivePeriod() > 0)
             {
-                var expired = BindConvert.Current.DateTime(message.Date + location.LivePeriod) < DateTime.Now;
+                var expired = BindConvert.Current.DateTime(message.Date + location.GetLivePeriod()) < DateTime.Now;
                 if (expired)
                 {
                     LivePanel.Visibility = Visibility.Collapsed;
@@ -88,7 +88,7 @@ namespace Unigram.Controls.Messages.Content
                 return;
             }
 
-            if (location.LivePeriod > 0)
+            if (location.GetLivePeriod() > 0)
             {
                 _message.Delegate.OpenLiveLocation(_message);
             }

@@ -118,7 +118,11 @@ namespace Unigram.ViewModels
 
             if (_item.Type is BackgroundTypePattern || _item.Type is BackgroundTypeFill)
             {
+#if MODERN_TDLIB
+                var response = await ProtoService.SendAsync(new GetInstalledBackgrounds(Settings.Appearance.IsDarkTheme()));
+#else
                 var response = await ProtoService.SendAsync(new GetBackgrounds());
+#endif
                 if (response is Backgrounds backgrounds)
                 {
                     Patterns.ReplaceWith(new[] { new Background(0, true, false, string.Empty, null, new BackgroundTypeFill(new BackgroundFillSolid())) }.Union(backgrounds.BackgroundsValue.Where(x => x.Type is BackgroundTypePattern)));
@@ -329,7 +333,11 @@ namespace Unigram.ViewModels
                 var item = await StorageApplicationPermissions.FutureAccessList.GetFileAsync(wallpaper.Name);
                 var generated = await item.ToGeneratedAsync(ConversionType.Copy);
 
+#if MODERN_TDLIB
+                task = ProtoService.SendAsync(new SetDefaultBackground(new InputBackgroundLocal(generated), new BackgroundTypeWallpaper(_isBlurEnabled, _isMotionEnabled), Settings.Appearance.IsDarkTheme()));
+#else
                 task = ProtoService.SendAsync(new SetBackground(new InputBackgroundLocal(generated), new BackgroundTypeWallpaper(_isBlurEnabled, _isMotionEnabled), Settings.Appearance.IsDarkTheme()));
+#endif
             }
             else
             {
@@ -352,7 +360,11 @@ namespace Unigram.ViewModels
                     return;
                 }
 
+#if MODERN_TDLIB
+                task = ProtoService.SendAsync(new SetDefaultBackground(new InputBackgroundRemote(wallpaper.Id), type, Settings.Appearance.IsDarkTheme()));
+#else
                 task = ProtoService.SendAsync(new SetBackground(new InputBackgroundRemote(wallpaper.Id), type, Settings.Appearance.IsDarkTheme()));
+#endif
             }
 
             var response = await task;

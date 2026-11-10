@@ -1,5 +1,7 @@
 ﻿using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Controls;
+using Unigram.Logs;
 using Unigram.Services;
 using Unigram.ViewModels.Supergroups;
 
@@ -23,16 +25,17 @@ namespace Unigram.ViewModels.Channels
             if (chat.Type is ChatTypeSupergroup supergroup)
             {
                 var item = ProtoService.GetSupergroup(supergroup.SupergroupId);
-                var cache = ProtoService.GetSupergroupFull(supergroup.SupergroupId);
 
-                if (item == null || cache == null)
+                if (item == null)
                 {
+                    PushDiagnostics.Write("channel.create", "result=supergroup_unavailable");
+                    await MessagePopup.ShowAsync(Strings.Resources.ErrorOccurred, Strings.Resources.AppName, Strings.Resources.OK);
                     return;
                 }
 
                 var username = _isPublic ? _username?.Trim() ?? string.Empty : string.Empty;
 
-                if (!string.Equals(username, item.Username))
+                if (!string.Equals(username, item.GetUsername()))
                 {
                     var response = await ProtoService.SendAsync(new SetSupergroupUsername(item.Id, username));
                     if (response is Error error)
@@ -47,6 +50,11 @@ namespace Unigram.ViewModels.Channels
                         return;
                     }
                 }
+
+                await MessagePopup.ShowAsync(
+                    Strings.Resources.ActionCreateChannel,
+                    chat.Title,
+                    Strings.Resources.OpenChannel);
 
                 NavigationService.NavigateToChat(chat);
                 NavigationService.GoBackAt(0, false);

@@ -1,0 +1,39 @@
+diff --git a/td/generate/tl_writer_dotnet.h b/td/generate/tl_writer_dotnet.h
+index 679cfb9b9..b6eac7a2d 100644
+--- a/td/generate/tl_writer_dotnet.h
++++ b/td/generate/tl_writer_dotnet.h
+@@ -254,16 +254,23 @@ class TlWriterDotNet final : public TL_writer {
+     if (!is_header_) {
+       return "";
+     }
++    auto fixed_type_name = type_name;
++    std::size_t pos = 0;
++    while (fixed_type_name.substr(pos, 6) == "Array<") {
++      pos += 6;
++    }
++    if (fixed_type_name.substr(pos, 4) != "BYTE" && fixed_type_name.substr(pos, 6) != "String" &&
++        to_upper(fixed_type_name[pos]) == fixed_type_name[pos]) {
++      fixed_type_name = fixed_type_name.substr(0, pos) + "::Telegram::Td::Api::" + fixed_type_name.substr(pos);
++    }
+     auto fixed_field_name = field_name;
+     if (field_name == class_name) {
+       fixed_field_name += "Value";
+     }
+     auto is_web_page_stickers =
+         (class_name == "WebPage" && field_name == "Stickers" && type_name == "Array<Sticker^>^");
+     if (type_name == field_name + "^" || (type_name == "Message^" && field_name == "ReplyToMessage") ||
+         is_web_page_stickers) {
+-      auto fixed_type_name =
+-          is_web_page_stickers ? "Array<::Telegram::Td::Api::Sticker^>^" : "::Telegram::Td::Api::" + type_name;
+       std::stringstream ss;
+       ss << "private:\n";
+       ss << "  " << fixed_type_name << " " << fixed_field_name << "PrivateField;\n";
+@@ -278,7 +286,7 @@ class TlWriterDotNet final : public TL_writer {
+       ss << "  }\n";
+       return ss.str();
+     }
+-    return "  property " + type_name + " " + fixed_field_name + ";\n";
++    return "  property " + fixed_type_name + " " + fixed_field_name + ";\n";
+   }
+ 
+   std::string gen_store_function_begin(const std::string &storer_name, const std::string &class_name, int arity,

@@ -59,7 +59,9 @@
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
-    <AppxBundlePlatforms>x86|x64|arm</AppxBundlePlatforms>
+    <UseModernTdlib Condition="'$(UseModernTdlib)' == ''">false</UseModernTdlib>
+    <AppxBundlePlatforms Condition="'$(UseModernTdlib)' == 'true'">arm</AppxBundlePlatforms>
+    <AppxBundlePlatforms Condition="'$(UseModernTdlib)' != 'true'">x86|x64|arm</AppxBundlePlatforms>
     <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>

@@ -511,7 +511,7 @@ namespace Unigram.Controls.Chats
                             foreach (var id in chats.ChatIds)
                             {
                                 var user = _protoService.GetUser(_protoService.GetChat(id));
-                                if (user != null && user.Username.StartsWith(_query, StringComparison.OrdinalIgnoreCase))
+                                if (user != null && user.GetUsername().StartsWith(_query, StringComparison.OrdinalIgnoreCase))
                                 {
                                     Add(user);
                                     count++;
@@ -522,7 +522,11 @@ namespace Unigram.Controls.Chats
 
                     if (_members)
                     {
+#if MODERN_TDLIB
+                        var response = await _protoService.SendAsync(new SearchChatMembers(_chatId, _query, 20, new ChatMembersFilterMention(ModernTdlibCompatibility.GetMessageTopic(_threadId))));
+#else
                         var response = await _protoService.SendAsync(new SearchChatMembers(_chatId, _query, 20, new ChatMembersFilterMention(_threadId)));
+#endif
                         if (response is ChatMembers members)
                         {
                             foreach (var member in members.Members)
@@ -577,7 +581,7 @@ namespace Unigram.Controls.Chats
                     }
                     else
                     {
-                        var response = await _protoService.SendAsync(new SearchEmojis(_query, false, new[] { _inputLanguage }));
+                        var response = await _protoService.SendAsync(ModernTdlibCompatibility.CreateSearchEmojis(_query, _inputLanguage));
                         if (response is Emojis emojis)
                         {
                             var results = emojis.EmojisValue.Reverse();
@@ -696,7 +700,7 @@ namespace Unigram.Controls.Chats
 
             Sending?.Invoke(this, EventArgs.Empty);
 
-            var options = new MessageSendOptions(disableNotification, false, null);
+            var options = ModernTdlibCompatibility.CreateMessageSendOptions(disableNotification, false, null);
 
             var text = GetFormattedText(true);
             await ViewModel.SendMessageAsync(text, options);
@@ -992,7 +996,7 @@ namespace Unigram.Controls.Chats
 
             if (ViewModel.CurrentInlineBot != null)
             {
-                var username = ViewModel.CurrentInlineBot.Username;
+                var username = ViewModel.CurrentInlineBot.GetUsername();
                 if (text != null && text.TrimStart().StartsWith("@" + username, StringComparison.OrdinalIgnoreCase))
                 {
                     searchText = ReplaceFirst(text.TrimStart(), "@" + username, string.Empty);

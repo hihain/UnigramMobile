@@ -10,8 +10,13 @@ namespace Unigram.Views.Popups
 {
     public sealed partial class DeleteMessagesPopup : ContentPopup
     {
-        public DeleteMessagesPopup(ICacheService cacheService, IList<Message> messages)
+        public DeleteMessagesPopup(IProtoService protoService, IList<Message> messages, IDictionary<long, BaseObject> properties)
         {
+            BaseObject GetProperties(Message message)
+            {
+                return properties != null && properties.TryGetValue(message.Id, out var value) ? value : null;
+            }
+
             this.InitializeComponent();
 
             Title = messages.Count == 1 ? Strings.Resources.DeleteSingleMessagesTitle : string.Format(Strings.Resources.DeleteMessagesTitle, Locale.Declension("messages", messages.Count));
@@ -24,23 +29,24 @@ namespace Unigram.Views.Popups
                 return;
             }
 
-            var chat = cacheService.GetChat(first.ChatId);
+            var chat = protoService.GetChat(first.ChatId);
             if (chat == null)
             {
                 return;
             }
 
-            var user = cacheService.GetUser(chat);
+            var user = protoService.GetUser(chat);
 
             var sameUser = messages.All(x => x.SenderId.IsEqual(first.SenderId));
-            if (sameUser && !first.IsOutgoing && chat.Type is ChatTypeSupergroup supergroup && !supergroup.IsChannel)
+            var supergroup = chat.Type as ChatTypeSupergroup;
+            if (sameUser && !first.IsOutgoing && supergroup != null && !supergroup.IsChannel)
             {
                 RevokeCheck.Visibility = Visibility.Collapsed;
                 BanUserCheck.Visibility = Visibility.Visible;
                 ReportSpamCheck.Visibility = Visibility.Visible;
                 DeleteAllCheck.Visibility = Visibility.Visible;
 
-                var sender = cacheService.GetMessageSender(first.SenderId);
+                var sender = protoService.GetMessageSender(first.SenderId);
                 if (sender is User senderUser)
                 {
                     DeleteAllCheck.Content = string.Format(Strings.Resources.DeleteAllFrom, senderUser.GetFullName());
@@ -61,9 +67,9 @@ namespace Unigram.Views.Popups
                 ReportSpamCheck.Visibility = Visibility.Collapsed;
                 DeleteAllCheck.Visibility = Visibility.Collapsed;
 
-                var canBeDeletedForAllUsers = messages.All(x => x.CanBeDeletedForAllUsers);
-                var canBeDeletedOnlyForSelf = messages.All(x => x.CanBeDeletedOnlyForSelf);
-                var anyCanBeDeletedForAllUsers = messages.Any(x => x.IsOutgoing && x.CanBeDeletedForAllUsers);
+                var canBeDeletedForAllUsers = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(x, GetProperties(x)));
+                var canBeDeletedOnlyForSelf = messages.All(x => ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(x, GetProperties(x)));
+                var anyCanBeDeletedForAllUsers = messages.Any(x => x.IsOutgoing && ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(x, GetProperties(x)));
 
                 if (chat.Type is ChatTypePrivate || chat.Type is ChatTypeBasicGroup)
                 {

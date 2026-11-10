@@ -19,6 +19,34 @@ namespace Unigram.Views.Popups
     {
         private string _path;
 
+        private static VoiceNote CreateMockVoiceNote()
+        {
+#if MODERN_TDLIB
+            return new VoiceNote(3, new byte[]
+            {
+                0, 0, 163, 198, 43, 17, 250, 248, 127, 155, 85, 58, 159, 230, 164, 212, 185, 247, 73, 42,
+                173, 66, 165, 69, 41, 251, 255, 242, 127, 223, 113, 133, 237, 148, 243, 30, 127, 184, 206, 183, 234,
+                108, 175, 168, 250, 207, 114, 229, 233, 154, 35, 254, 21, 66, 99, 134, 141, 92, 159, 2
+            }, "audio/ogg", null, null);
+#else
+            return new VoiceNote(3, new byte[]
+            {
+                0, 0, 163, 198, 43, 17, 250, 248, 127, 155, 85, 58, 159, 230, 164, 212, 185, 247, 73, 42,
+                173, 66, 165, 69, 41, 251, 255, 242, 127, 223, 113, 133, 237, 148, 243, 30, 127, 184, 206, 183, 234,
+                108, 175, 168, 250, 207, 114, 229, 233, 154, 35, 254, 21, 66, 99, 134, 141, 92, 159, 2
+            }, "audio/ogg", null);
+#endif
+        }
+
+        private static Audio CreateMockAudio()
+        {
+#if MODERN_TDLIB
+            return new Audio(4 * 60 + 3, "True Survivor", "David Hasselhoff", "preview.mp3", "audio/mp3", null, null, null, null);
+#else
+            return new Audio(4 * 60 + 3, "True Survivor", "David Hasselhoff", "preview.mp3", "audio/mp3", null, null, null);
+#endif
+        }
+
         public ThemePreviewPopup(string path)
         {
             InitializeComponent();
@@ -103,17 +131,12 @@ namespace Unigram.Views.Popups
             TitleChat.Text = "Reinhardt";
             Subtitle.Text = string.Format("{0} {1} {2}", Strings.Resources.LastSeen, Strings.Resources.TodayAt, BindConvert.Current.ShortTime.Format(DateTime.Now.AddHours(-1)));
 
-            Message1.Mockup(new MessagePhoto(new Photo(false, null, new[] { new PhotoSize("i", new File { Local = new LocalFile { Path = "ms-appx:///Assets/Mockup/theme_preview_image.jpg" } }, 500, 302, new int[0]) }), new FormattedText(), false), "Bring it on! I LIVE for this!", false, DateTime.Now.AddSeconds(-25), true, true);
+            Message1.Mockup(ModernTdlibCompatibility.CreateMessagePhoto(new Photo(false, null, new[] { new PhotoSize("i", new File { Local = new LocalFile { Path = "ms-appx:///Assets/Mockup/theme_preview_image.jpg" } }, 500, 302, new int[0]) }), new FormattedText()), "Bring it on! I LIVE for this!", false, DateTime.Now.AddSeconds(-25), true, true);
             Message2.Mockup("Reinhardt, we need to find you some new tunes 🎶.", true, DateTime.Now, true, false);
             //Message3.Mockup(Strings.Resources.FontSizePreviewLine1, Strings.Resources.FontSizePreviewName, Strings.Resources.FontSizePreviewReply, false, DateTime.Now.AddSeconds(-25));
-            Message3.Mockup(new MessageVoiceNote(new VoiceNote(3, new byte[]
-            {
-                0, 0, 163, 198, 43, 17, 250, 248, 127, 155, 85, 58, 159, 230, 164, 212, 185, 247, 73, 42,
-                173, 66, 165, 69, 41, 251, 255, 242, 127, 223, 113, 133, 237, 148, 243, 30, 127, 184, 206, 183, 234,
-                108, 175, 168, 250, 207, 114, 229, 233, 154, 35, 254, 21, 66, 99, 134, 141, 92, 159, 2
-            }, "audio/ogg", null), new FormattedText(), true), true, DateTime.Now.AddSeconds(-25), false, true);
+            Message3.Mockup(new MessageVoiceNote(CreateMockVoiceNote(), new FormattedText(), true), true, DateTime.Now.AddSeconds(-25), false, true);
             Message4.Mockup("Ah, you kids today with techno music! You should enjoy the classics, like Hasselhoff!", "Lucio", "Reinhardt, we need to find you some new tunes 🎶.", false, DateTime.Now.AddSeconds(-25), true, false);
-            Message5.Mockup(new MessageAudio(new Audio(4 * 60 + 3, "True Survivor", "David Hasselhoff", "preview.mp3", "audio/mp3", null, null, null), new FormattedText()), false, DateTime.Now, false, true);
+            Message5.Mockup(new MessageAudio(CreateMockAudio(), new FormattedText()), false, DateTime.Now, false, true);
             Message6.Mockup("I can't even take you seriously right now.", true, DateTime.Now, true, true);
 
             PrimaryButtonText = Strings.Resources.ApplyTheme;

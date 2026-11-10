@@ -128,7 +128,7 @@ namespace Unigram.ViewModels.Supergroups
                     Delegate?.UpdateSupergroupFullInfo(chat, item, cache);
                 }
 
-                if (string.IsNullOrEmpty(item.Username))
+                if (string.IsNullOrEmpty(item.GetUsername()))
                 {
                     LoadUsername(chat.Id);
                 }
@@ -240,7 +240,7 @@ namespace Unigram.ViewModels.Supergroups
         private async void LoadUsername(long chatId)
         {
             var response = await ProtoService.SendAsync(new CheckChatUsername(chatId, "username"));
-            if (response is CheckChatUsernameResultPublicChatsTooMuch)
+            if (response is CheckChatUsernameResultPublicChatsTooMany)
             {
                 HasTooMuchUsernames = true;
                 LoadAdminedPublicChannels();
@@ -296,7 +296,7 @@ namespace Unigram.ViewModels.Supergroups
 
                 var dialog = new MessagePopup();
                 dialog.Title = Strings.Resources.AppName;
-                dialog.Message = string.Format(Strings.Resources.RevokeLinkAlert, MeUrlPrefixConverter.Convert(CacheService, supergroup.Username, true), chat.Title);
+                dialog.Message = string.Format(Strings.Resources.RevokeLinkAlert, MeUrlPrefixConverter.Convert(CacheService, supergroup.GetUsername(), true), chat.Title);
                 dialog.PrimaryButtonText = Strings.Resources.RevokeButton;
                 dialog.SecondaryButtonText = Strings.Resources.Cancel;
 
@@ -363,7 +363,7 @@ namespace Unigram.ViewModels.Supergroups
             }
 
             var supergroup = CacheService.GetSupergroup(chat);
-            if (supergroup != null && string.Equals(text, supergroup.Username))
+            if (supergroup != null && string.Equals(text, supergroup.GetUsername()))
             {
                 IsLoading = false;
                 IsAvailable = false;
@@ -393,7 +393,7 @@ namespace Unigram.ViewModels.Supergroups
                 IsAvailable = false;
                 ErrorMessage = Strings.Resources.UsernameInUse;
             }
-            else if (response is CheckChatUsernameResultPublicChatsTooMuch)
+            else if (response is CheckChatUsernameResultPublicChatsTooMany)
             {
                 HasTooMuchUsernames = true;
                 LoadAdminedPublicChannels();

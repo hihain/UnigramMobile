@@ -25,18 +25,18 @@ namespace Unigram.ViewModels
             var response = await protoService.SendAsync(new GetWebPageInstantView(webPage.Url, false));
             if (response is WebPageInstantView instantView && instantView.IsFull)
             {
-                foreach (var block in instantView.PageBlocks)
+                foreach (var block in instantView.GetPageBlocks())
                 {
                     if (block is PageBlockSlideshow slideshow)
                     {
-                        foreach (var item in slideshow.PageBlocks)
+                        foreach (var item in slideshow.GetPageBlocks())
                         {
                             items.Add(CountBlock(protoService, instantView, item));
                         }
                     }
                     else if (block is PageBlockCollage collage)
                     {
-                        foreach (var item in collage.PageBlocks)
+                        foreach (var item in collage.GetPageBlocks())
                         {
                             items.Add(CountBlock(protoService, instantView, item));
                         }

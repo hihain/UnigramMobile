@@ -2,6 +2,7 @@
 using System.Threading;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.UI.Xaml;
 
@@ -79,7 +80,7 @@ namespace Unigram.Controls.Messages.Content
                 }
                 else if (webPage.Document != null)
                 {
-                    if (string.Equals(webPage.Type, "telegram_background", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_background", StringComparison.OrdinalIgnoreCase))
                     {
                         Media.Child = new DocumentPhotoContent(message);
                     }
@@ -90,7 +91,7 @@ namespace Unigram.Controls.Messages.Content
                 }
                 else if (webPage.Sticker != null)
                 {
-                    if (webPage.Sticker.IsAnimated)
+                    if (webPage.Sticker.GetIsAnimated())
                     {
                         Media.Child = new AnimatedStickerContent(message);
                     }

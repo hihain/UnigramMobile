@@ -114,7 +114,7 @@ namespace Unigram.Common
                     return;
                 }
 
-                if (supergroup.Status is ChatMemberStatusLeft && string.IsNullOrEmpty(supergroup.Username) && !supergroup.HasLocation && !supergroup.HasLinkedChat && !_protoService.IsChatAccessible(chat))
+                if (supergroup.Status is ChatMemberStatusLeft && string.IsNullOrEmpty(supergroup.GetUsername()) && !supergroup.HasLocation && !supergroup.HasLinkedChat && !_protoService.IsChatAccessible(chat))
                 {
                     await MessagePopup.ShowAsync(Strings.Resources.ChannelCantOpenPrivate, Strings.Resources.AppName, Strings.Resources.OK);
                     return;

@@ -48,10 +48,26 @@ namespace Unigram.Controls.Drawers
                 _zoomer.GetEmojisAsync = fileId => ViewModel.ProtoService.SendAsync(new GetStickerEmojis(new InputFileId(fileId)));
             }
 
+#if MODERN_TDLIB
+            // See EmojiDrawer: a throwing constructor surfaces as a XamlParseException and
+            // aborts navigation, so decorative composition is reported and skipped.
+            try
+            {
+                ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
+
+                var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
+                DropShadowEx.SetRelativeSize(shadow, Separator);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("drawer.construct", ex, "drawer=animation");
+            }
+#else
             ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
 
             var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
             shadow.RelativeSizeAdjustment = Vector2.One;
+#endif
 
             var observable = Observable.FromEventPattern<TextChangedEventArgs>(FieldAnimations, "TextChanged");
             var throttled = observable.Throttle(TimeSpan.FromMilliseconds(Constants.TypingTimeout)).ObserveOnDispatcher().Subscribe(x =>

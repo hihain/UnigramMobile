@@ -207,7 +207,12 @@ namespace Unigram.ViewModels
 
             var reply = GetReply(true);
 
+#if MODERN_TDLIB
+            var replyTo = reply == 0 ? null : new InputMessageReplyToMessage(reply, null, 0, string.Empty);
+            var response = await ProtoService.SendAsync(new SendInlineQueryResultMessage(chat.Id, null, replyTo, options, queryId, queryResult.GetId(), false));
+#else
             var response = await ProtoService.SendAsync(new SendInlineQueryResultMessage(chat.Id, _threadId, reply, options, queryId, queryResult.GetId(), false));
+#endif
         }
     }
 
@@ -256,8 +261,8 @@ namespace Unigram.ViewModels
         public long InlineQueryId => _results.InlineQueryId;
         public string NextOffset => _results.NextOffset;
 
-        public string SwitchPmParameter => _results.SwitchPmParameter;
-        public string SwitchPmText => _results.SwitchPmText;
+        public string SwitchPmParameter => _results.GetSwitchPmParameter();
+        public string SwitchPmText => _results.GetSwitchPmText();
 
         public override async Task<IList<InlineQueryResult>> LoadDataAsync()
         {

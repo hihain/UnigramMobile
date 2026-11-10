@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Reactive.Linq;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.Controls;
 using Unigram.Converters;
 using Unigram.Navigation;
@@ -155,7 +156,7 @@ namespace Unigram.Views.Supergroups
                 return false;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanPromoteMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanPromoteMembers(administrator);
         }
 
         private bool MemberRestrict_Loaded(ChatType chatType, ChatMemberStatus status, ChatMember member)
@@ -175,7 +176,7 @@ namespace Unigram.Views.Supergroups
                 return false;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanRestrictMembers(administrator);
         }
 
         private bool MemberRemove_Loaded(ChatType chatType, ChatMemberStatus status, ChatMember member)
@@ -195,7 +196,7 @@ namespace Unigram.Views.Supergroups
                 return member.InviterUserId == ViewModel.CacheService.Options.MyId;
             }
 
-            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return status is ChatMemberStatusCreator || status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanRestrictMembers(administrator);
         }
 
         #endregion
@@ -255,11 +256,13 @@ namespace Unigram.Views.Supergroups
 
                     if (member.Status is ChatMemberStatusAdministrator administrator)
                     {
-                        label.Text = string.IsNullOrEmpty(administrator.CustomTitle) ? Strings.Resources.ChannelAdmin : administrator.CustomTitle;
+                        var customTitle = ModernTdlibCompatibility.GetAdministratorCustomTitle(administrator);
+                        label.Text = string.IsNullOrEmpty(customTitle) ? Strings.Resources.ChannelAdmin : customTitle;
                     }
                     else if (member.Status is ChatMemberStatusCreator creator)
                     {
-                        label.Text = string.IsNullOrEmpty(creator.CustomTitle) ? Strings.Resources.ChannelCreator : creator.CustomTitle;
+                        var customTitle = ModernTdlibCompatibility.GetCreatorCustomTitle(creator);
+                        label.Text = string.IsNullOrEmpty(customTitle) ? Strings.Resources.ChannelCreator : customTitle;
                     }
                     else
                     {

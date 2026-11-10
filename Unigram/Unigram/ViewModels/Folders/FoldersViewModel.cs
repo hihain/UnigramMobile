@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Collections;
@@ -39,11 +40,23 @@ namespace Unigram.ViewModels.Folders
 
             if (Items.Count < 10)
             {
+#if MODERN_TDLIB
+                var response = await ProtoService.SendAsync(new GetRecommendedChatFolders());
+                if (response is RecommendedChatFolders folders)
+                {
+                    Recommended.ReplaceWith(folders.ChatFolders.Select(x => new RecommendedChatFilter
+                    {
+                        Folder = x.Folder,
+                        Description = x.Description
+                    }));
+                }
+#else
                 var response = await ProtoService.SendAsync(new GetRecommendedChatFilters());
                 if (response is RecommendedChatFilters filters)
                 {
                     Recommended.ReplaceWith(filters.ChatFilters);
                 }
+#endif
             }
             else
             {
@@ -112,11 +125,23 @@ namespace Unigram.ViewModels.Folders
 
                 if (Items.Count < 10)
                 {
+#if MODERN_TDLIB
+                    var response = await ProtoService.SendAsync(new GetRecommendedChatFolders());
+                    if (response is RecommendedChatFolders folders)
+                    {
+                        Recommended.ReplaceWith(folders.ChatFolders.Select(x => new RecommendedChatFilter
+                        {
+                            Folder = x.Folder,
+                            Description = x.Description
+                        }));
+                    }
+#else
                     var response = await ProtoService.SendAsync(new GetRecommendedChatFilters());
                     if (response is RecommendedChatFilters recommended)
                     {
                         Recommended.ReplaceWith(recommended.ChatFilters);
                     }
+#endif
                 }
                 else
                 {
@@ -129,7 +154,11 @@ namespace Unigram.ViewModels.Folders
         private void RecommendExecute(RecommendedChatFilter filter)
         {
             Recommended.Remove(filter);
+#if MODERN_TDLIB
+            ProtoService.Send(ModernTdlibCompatibility.CreateCreateChatFolder(filter.Folder));
+#else
             ProtoService.Send(new CreateChatFilter(filter.Filter));
+#endif
         }
 
         public RelayCommand<ChatFilterInfo> EditCommand { get; }
@@ -147,7 +176,11 @@ namespace Unigram.ViewModels.Folders
                 return;
             }
 
+#if MODERN_TDLIB
+            ProtoService.Send(ModernTdlibCompatibility.CreateDeleteChatFolder(filter.Id, new List<long>()));
+#else
             ProtoService.Send(new DeleteChatFilter(filter.Id));
+#endif
         }
 
         public RelayCommand CreateCommand { get; }

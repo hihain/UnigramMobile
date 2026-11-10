@@ -9,7 +9,6 @@ using Windows.Storage.Pickers;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Media.Imaging;
 
 namespace Unigram.Views.BasicGroups
 {
@@ -54,7 +53,7 @@ namespace Unigram.Views.BasicGroups
 
         #region Binding
 
-        private ImageSource ConvertPhoto(string title, BitmapImage preview)
+        private ImageSource ConvertPhoto(string title, ImageSource preview)
         {
             if (preview != null)
             {
@@ -64,7 +63,7 @@ namespace Unigram.Views.BasicGroups
             return PlaceholderHelper.GetNameForChat(title, 64);
         }
 
-        private Visibility ConvertPhotoVisibility(string title, BitmapImage preview)
+        private Visibility ConvertPhotoVisibility(string title, ImageSource preview)
         {
             return !string.IsNullOrWhiteSpace(title) || preview != null ? Visibility.Collapsed : Visibility.Visible;
         }

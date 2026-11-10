@@ -22,7 +22,7 @@
                       VerticalScrollMode="Auto">
             <payments:ShippingOptionsPanel
                 Options="{x:Bind ViewModel.RequestedInfo.ShippingOptions}"
-                Currency="{x:Bind ViewModel.PaymentForm.Invoice.Currency}"
+                Currency="{x:Bind ViewModel.PaymentInvoice.Currency}"
                 Shipping="{x:Bind ViewModel.Shipping, Mode=TwoWay}"/>
         </ScrollViewer>
     </Grid>

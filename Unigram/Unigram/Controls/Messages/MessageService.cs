@@ -61,8 +61,13 @@ namespace Unigram.Controls.Messages
                     return UpdateChatDeletePhoto(message, chatDeletePhoto, active);
                 case MessageChatJoinByLink chatJoinByLink:
                     return UpdateChatJoinByLink(message, chatJoinByLink, active);
+#if MODERN_TDLIB
+                case MessageChatSetMessageAutoDeleteTime chatSetMessageAutoDeleteTime:
+                    return UpdateChatSetMessageAutoDeleteTime(message, chatSetMessageAutoDeleteTime, active);
+#else
                 case MessageChatSetTtl chatSetTtl:
                     return UpdateChatSetTtl(message, chatSetTtl, active);
+#endif
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                     return UpdateChatUpgradeFrom(message, chatUpgradeFrom, active);
                 case MessageChatUpgradeTo chatUpgradeTo:
@@ -85,8 +90,10 @@ namespace Unigram.Controls.Messages
                     return UpdateScreenshotTaken(message, screenshotTaken, active);
                 case MessageSupergroupChatCreate supergroupChatCreate:
                     return UpdateSupergroupChatCreate(message, supergroupChatCreate, active);
+#if !MODERN_TDLIB
                 case MessageWebsiteConnected websiteConnected:
                     return UpdateWebsiteConnected(message, websiteConnected, active);
+#endif
                 case MessageExpiredPhoto expiredPhoto:
                     return UpdateExpiredPhoto(message, expiredPhoto, active);
                 case MessageExpiredVideo expiredVideo:
@@ -699,6 +706,38 @@ namespace Unigram.Controls.Messages
             return (content, entities);
         }
 
+#if MODERN_TDLIB
+        private static (string, IList<TextEntity>) UpdateChatSetMessageAutoDeleteTime(MessageViewModel message, MessageChatSetMessageAutoDeleteTime chatSetMessageAutoDeleteTime, bool active)
+        {
+            var content = string.Empty;
+            var entities = active ? new List<TextEntity>() : null;
+
+            if (chatSetMessageAutoDeleteTime.MessageAutoDeleteTime != 0)
+            {
+                if (message.IsOutgoing)
+                {
+                    content = string.Format(Strings.Resources.MessageLifetimeChangedOutgoing, Locale.FormatTtl(chatSetMessageAutoDeleteTime.MessageAutoDeleteTime));
+                }
+                else
+                {
+                    content = ReplaceWithLink(string.Format(Strings.Resources.MessageLifetimeChanged, "un1", Locale.FormatTtl(chatSetMessageAutoDeleteTime.MessageAutoDeleteTime)), "un1", message.GetSender(), ref entities);
+                }
+            }
+            else
+            {
+                if (message.IsOutgoing)
+                {
+                    content = Strings.Resources.MessageLifetimeYouRemoved;
+                }
+                else
+                {
+                    content = ReplaceWithLink(string.Format(Strings.Resources.MessageLifetimeRemoved, "un1"), "un1", message.GetSender(), ref entities);
+                }
+            }
+
+            return (content, entities);
+        }
+#else
         private static (string, IList<TextEntity>) UpdateChatSetTtl(MessageViewModel message, MessageChatSetTtl chatSetTtl, bool active)
         {
             var content = string.Empty;
@@ -729,6 +768,7 @@ namespace Unigram.Controls.Messages
 
             return (content, entities);
         }
+#endif
 
         private static (string, IList<TextEntity>) UpdateChatUpgradeFrom(MessageViewModel message, MessageChatUpgradeFrom chatUpgradeFrom, bool active)
         {
@@ -908,7 +948,7 @@ namespace Unigram.Controls.Messages
 
             if (invoice != null)
             {
-                content = string.Format(Strings.Resources.PaymentSuccessfullyPaid, Locale.FormatCurrency(paymentSuccessful.TotalAmount, paymentSuccessful.Currency), message.ProtoService.GetTitle(chat), invoice.Title);
+                content = string.Format(Strings.Resources.PaymentSuccessfullyPaid, Locale.FormatCurrency(paymentSuccessful.TotalAmount, paymentSuccessful.Currency), message.ProtoService.GetTitle(chat), invoice.GetTitle());
             }
             else
             {
@@ -962,7 +1002,7 @@ namespace Unigram.Controls.Messages
                 }
                 else if (reply.Content is MessageLocation location)
                 {
-                    if (location.LivePeriod > 0)
+                    if (location.GetLivePeriod() > 0)
                     {
                         content = ReplaceWithLink(Strings.Resources.ActionPinnedGeoLive, "un1", sender, ref entities);
                     }
@@ -1051,6 +1091,7 @@ namespace Unigram.Controls.Messages
             return (content, null);
         }
 
+#if !MODERN_TDLIB
         private static (string Text, IList<TextEntity> Entities) UpdateWebsiteConnected(MessageViewModel message, MessageWebsiteConnected websiteConnected, bool active)
         {
             var content = Strings.Resources.ActionBotAllowed;
@@ -1066,6 +1107,8 @@ namespace Unigram.Controls.Messages
 
             return (content, entities);
         }
+
+        #endif
 
         private static (string, IList<TextEntity>) UpdateExpiredPhoto(MessageViewModel message, MessageExpiredPhoto expiredPhoto, bool active)
         {

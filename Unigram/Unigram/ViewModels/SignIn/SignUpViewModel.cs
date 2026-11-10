@@ -95,7 +95,11 @@ namespace Unigram.ViewModels.SignIn
                 }
             }
 
-            var response = await ProtoService.SendAsync(new RegisterUser(_firstName ?? string.Empty, _lastName ?? string.Empty));
+            var response = await ProtoService.SendAsync(new RegisterUser(_firstName ?? string.Empty, _lastName ?? string.Empty
+#if MODERN_TDLIB
+                , false
+#endif
+            ));
             if (response is Error error)
             {
 

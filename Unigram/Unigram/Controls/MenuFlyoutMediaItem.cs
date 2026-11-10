@@ -2,6 +2,7 @@
 using Windows.UI.Xaml;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Windows.UI.Xaml.Controls;
 
 namespace Unigram.Controls
@@ -82,7 +83,7 @@ namespace Unigram.Controls
         {
             if (file.Local.IsDownloadingCompleted)
             {
-                if (sticker.IsAnimated)
+                if (ModernTdlibCompatibility.GetStickerIsAnimated(sticker))
                 {
                     thumbnail.Opacity = 0;
                     texture.Source = null;

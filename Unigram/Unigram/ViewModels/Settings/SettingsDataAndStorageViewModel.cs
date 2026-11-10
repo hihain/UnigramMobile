@@ -13,6 +13,11 @@ using Windows.Storage.Pickers;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
+#if MODERN_TDLIB
+using DataSavingMode = Unigram.Services.DataSavingMode;
+#else
+using DataSavingMode = libtgvoip.DataSavingMode;
+#endif
 
 namespace Unigram.ViewModels.Settings
 {
@@ -38,7 +43,7 @@ namespace Unigram.ViewModels.Settings
             return Task.CompletedTask;
         }
 
-        public libtgvoip.DataSavingMode UseLessData
+        public DataSavingMode UseLessData
         {
             get
             {
@@ -150,9 +155,9 @@ namespace Unigram.ViewModels.Settings
         {
             var items = new[]
             {
-                new SelectRadioItem(libtgvoip.DataSavingMode.Never, Strings.Resources.UseLessDataNever, UseLessData == libtgvoip.DataSavingMode.Never),
-                new SelectRadioItem(libtgvoip.DataSavingMode.MobileOnly, Strings.Resources.UseLessDataOnMobile, UseLessData == libtgvoip.DataSavingMode.MobileOnly),
-                new SelectRadioItem(libtgvoip.DataSavingMode.Always, Strings.Resources.UseLessDataAlways, UseLessData == libtgvoip.DataSavingMode.Always),
+                new SelectRadioItem(DataSavingMode.Never, Strings.Resources.UseLessDataNever, UseLessData == DataSavingMode.Never),
+                new SelectRadioItem(DataSavingMode.MobileOnly, Strings.Resources.UseLessDataOnMobile, UseLessData == DataSavingMode.MobileOnly),
+                new SelectRadioItem(DataSavingMode.Always, Strings.Resources.UseLessDataAlways, UseLessData == DataSavingMode.Always),
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -161,7 +166,7 @@ namespace Unigram.ViewModels.Settings
             dialog.SecondaryButtonText = Strings.Resources.Cancel;
 
             var confirm = await dialog.ShowQueuedAsync();
-            if (confirm == ContentDialogResult.Primary && dialog.SelectedIndex is libtgvoip.DataSavingMode index)
+            if (confirm == ContentDialogResult.Primary && dialog.SelectedIndex is DataSavingMode index)
             {
                 UseLessData = index;
             }

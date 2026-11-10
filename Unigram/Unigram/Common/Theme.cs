@@ -34,6 +34,33 @@ namespace Unigram.Common
 
                 this.Add("MessageFontSize", GetValueOrDefault("MessageFontSize", ApiInfo.IsUniversalApiContract7Present ? 14d : 15d));
 
+#if MODERN_TDLIB
+                // The bundled emoji sets (Assets\Emoji\apple.ttf and the downloadable ones) are
+                // CBDT/CBLC colour-BITMAP fonts: 13.8 MB of CBDT bitmap data against an 87 KB
+                // glyf table, so emoji codepoints carry no outlines whatsoever. Windows 10
+                // Mobile's DirectWrite loads the font and honours its advance widths, but does
+                // not composite the CBDT bitmaps, so every emoji painted as blank space of the
+                // correct size - no glyph, and no .notdef box either. Use the system font and
+                // let DirectWrite fall back to the platform's own Segoe UI Emoji, which
+                // Windows 10 Mobile does render natively.
+                //
+                // Resolved in its own scope so neither an earlier failure in this constructor
+                // nor a failure reading the setting can leave EmojiThemeFontFamily unregistered:
+                // the enclosing catch is silent, and a missing key leaves every emoji-bearing
+                // control with no font at all.
+                string emojiSetId;
+                try
+                {
+                    emojiSetId = SettingsService.Current.Appearance.EmojiSet.Id ?? "null";
+                }
+                catch (Exception ex)
+                {
+                    emojiSetId = "error_" + ex.GetType().Name;
+                }
+
+                this.Add("EmojiThemeFontFamily", new FontFamily("XamlAutoFontFamily"));
+                Logs.PushDiagnostics.Write("theme.emoji", $"set={emojiSetId};font=system;reason=cbdt_bitmap_not_composited");
+#else
                 var emojiSet = SettingsService.Current.Appearance.EmojiSet;
                 switch (emojiSet.Id)
                 {
@@ -47,6 +74,7 @@ namespace Unigram.Common
                         this.Add("EmojiThemeFontFamily", new FontFamily($"ms-appdata:///local/emoji/{emojiSet.Id}.{emojiSet.Version}.ttf#Segoe UI Emoji"));
                         break;
                 }
+#endif
             }
             catch { }
         }

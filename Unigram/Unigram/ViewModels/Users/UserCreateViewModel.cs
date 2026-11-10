@@ -103,7 +103,7 @@ namespace Unigram.ViewModels.Users
         {
             var phoneNumber = _phoneNumber?.Trim('+').Replace(" ", string.Empty);
 
-            var response = await ProtoService.SendAsync(new ImportContacts(new[] { new Contact(phoneNumber, _firstName, _lastName, string.Empty, 0) }));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateImportContacts(phoneNumber, _firstName, _lastName));
             if (response is ImportedContacts imported)
             {
                 if (imported.UserIds.Count > 0)

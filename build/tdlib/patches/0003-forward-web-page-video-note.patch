@@ -1,0 +1,14 @@
+diff --git a/td/generate/tl_writer_dotnet.h b/td/generate/tl_writer_dotnet.h
+--- a/td/generate/tl_writer_dotnet.h
++++ b/td/generate/tl_writer_dotnet.h
+@@ -226,7 +226,10 @@ class TlWriterDotNet final : public TL_writer {
+     if (!is_header_) {
+       return "";
+     }
+     std::stringstream ss;
++    if (class_name == "LinkPreviewType") {
++      ss << "ref class VideoNote;\n";
++    }
+     ss << (is_proxy ? "interface" : "ref") << " class " << class_name << ";\n";
+     return ss.str();
+   }

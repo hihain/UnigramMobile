@@ -35,7 +35,7 @@ namespace Unigram.Converters
             //{
             //    builder.append(Strings.Resources.UserRestrictionsNoRead);
             //}
-            if (rights.CanSendMessages && defaultBannedRights.CanSendMessages != rights.CanSendMessages)
+            if (rights.GetCanSendMessages() && defaultBannedRights.GetCanSendMessages() != rights.GetCanSendMessages())
             {
                 if (builder.Length > 0)
                 {
@@ -43,7 +43,7 @@ namespace Unigram.Converters
                 }
                 builder.Append(Strings.Resources.UserRestrictionsNoSend);
             }
-            if (rights.CanSendMediaMessages && defaultBannedRights.CanSendMediaMessages != rights.CanSendMediaMessages)
+            if (rights.GetCanSendMediaMessages() && defaultBannedRights.GetCanSendMediaMessages() != rights.GetCanSendMediaMessages())
             {
                 if (builder.Length > 0)
                 {
@@ -67,7 +67,7 @@ namespace Unigram.Converters
                 }
                 builder.Append(Strings.Resources.UserRestrictionsNoSendPolls);
             }
-            if (rights.CanAddWebPagePreviews && defaultBannedRights.CanAddWebPagePreviews != rights.CanAddWebPagePreviews)
+            if (rights.GetCanAddWebPagePreviews() && defaultBannedRights.GetCanAddWebPagePreviews() != rights.GetCanAddWebPagePreviews())
             {
                 if (builder.Length > 0)
                 {

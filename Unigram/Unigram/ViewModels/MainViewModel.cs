@@ -8,6 +8,9 @@ using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Converters;
+#if MODERN_TDLIB
+using Unigram.Logs;
+#endif
 using Unigram.Navigation;
 using Unigram.Services;
 using Unigram.Services.Updates;
@@ -140,7 +143,11 @@ namespace Unigram.ViewModels
         public RelayCommand SetupFiltersCommand { get; }
         private void SetupFiltersExecute()
         {
+#if !MODERN_TDLIB
             NavigationService.Navigate(typeof(FoldersPage));
+#else
+            PushDiagnostics.Write("chat-folder.disabled", "result=unsupported;feature=experimental_tdlib");
+#endif
         }
 
         public bool CollapseArchivedChats
@@ -232,7 +239,11 @@ namespace Unigram.ViewModels
             {
                 foreach (var filter in _filters)
                 {
+#if MODERN_TDLIB
+                    if (filter.ChatList is ChatListFolder && filter.ChatList.ListEquals(update.ChatList))
+#else
                     if (filter.ChatList is ChatListFilter && filter.ChatList.ListEquals(update.ChatList))
+#endif
                     {
                         filter.UpdateCount(update);
                     }
@@ -254,7 +265,11 @@ namespace Unigram.ViewModels
 
                 Merge(Filters, new[] { new ChatFilterInfo { Id = Constants.ChatListMain, Title = Strings.Resources.FilterAllChats, IconName = "All" } }.Union(chatFilters).ToArray());
 
+#if MODERN_TDLIB
+                if (Chats.Items.ChatList is ChatListFolder already && already.ChatFolderId != selected)
+#else
                 if (Chats.Items.ChatList is ChatListFilter already && already.ChatFilterId != selected)
+#endif
                 {
                     SelectedFilter = Filters[0];
                 }
@@ -356,10 +371,17 @@ namespace Unigram.ViewModels
         {
             get
             {
+#if MODERN_TDLIB
+                if (Chats.Items.ChatList is ChatListFolder filter && _filters != null)
+                {
+                    return _filters.FirstOrDefault(x => x.ChatFilterId == filter.ChatFolderId);
+                }
+#else
                 if (Chats.Items.ChatList is ChatListFilter filter && _filters != null)
                 {
                     return _filters.FirstOrDefault(x => x.ChatFilterId == filter.ChatFilterId);
                 }
+#endif
 
                 return _filters?.FirstOrDefault();
             }
@@ -385,8 +407,20 @@ namespace Unigram.ViewModels
 #if CLOUDUPDATES
             UpdateAppVersion(_cloudUpdateService.NextUpdate);
 #endif
+#if MODERN_TDLIB
+            // This prologue runs synchronously inside Frame.Navigate, so a failure here
+            // aborts the whole navigation to MainPage. TLRootNavigationService.Handle is
+            // async void, which means the exception is posted to the dispatcher instead of
+            // propagating, and .NET Native reduces a NullReferenceException message to a
+            // resource key. These markers name the step that failed even when the frame
+            // list is unavailable.
+            PushDiagnostics.Write("main.navigated", "step=chat_filters");
+#endif
             UpdateChatFilters(CacheService.ChatFilters);
 
+#if MODERN_TDLIB
+            PushDiagnostics.Write("main.navigated", "step=unread_count");
+#endif
             var unreadCount = CacheService.GetUnreadCount(new ChatListMain());
             UnreadCount = unreadCount.UnreadMessageCount.UnreadCount;
             UnreadMutedCount = unreadCount.UnreadMessageCount.UnreadCount - unreadCount.UnreadMessageCount.UnreadUnmutedCount;
@@ -401,6 +435,9 @@ namespace Unigram.ViewModels
 #endif
             }
 
+#if MODERN_TDLIB
+            PushDiagnostics.Write("main.navigated", "step=children");
+#endif
             return base.OnNavigatedToAsync(parameter, mode, state);
         }
 
@@ -507,7 +544,7 @@ namespace Unigram.ViewModels
                     continue;
                 }
 
-                ProtoService.Send(new ViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
+                ProtoService.Send(new ViewMessages(chat.Id, new[] { chat.LastMessage.Id }, null, true));
             }
         }
 
@@ -520,7 +557,11 @@ namespace Unigram.ViewModels
                 return;
             }
 
+#if MODERN_TDLIB
+            ProtoService.Send(ModernTdlibCompatibility.CreateDeleteChatFolder(filter.ChatFilterId, new List<long>()));
+#else
             ProtoService.Send(new DeleteChatFilter(filter.ChatFilterId));
+#endif
         }
     }
 
@@ -540,7 +581,11 @@ namespace Unigram.ViewModels
             }
             else
             {
+#if MODERN_TDLIB
+                ChatList = new ChatListFolder(info.Id);
+#else
                 ChatList = new ChatListFilter(info.Id);
+#endif
             }
 
             ChatFilterId = info.Id;

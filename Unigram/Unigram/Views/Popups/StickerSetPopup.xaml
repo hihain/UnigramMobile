@@ -9,7 +9,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     TitleTemplate="{x:Null}"
-    PrimaryButtonText="{x:Bind ConvertIsInstalled(ViewModel.StickerSet.IsInstalled, ViewModel.StickerSet.IsArchived, ViewModel.StickerSet.IsOfficial, ViewModel.StickerSet.IsMasks), Mode=OneWay}"
+    PrimaryButtonText="{x:Bind ConvertIsInstalled(ViewModel.StickerSet.IsInstalled, ViewModel.StickerSet.IsArchived, ViewModel.StickerSet.IsOfficial, ViewModel.IsStickerSetMasks), Mode=OneWay}"
     PrimaryButtonCommand="{x:Bind ViewModel.SendCommand}"
     Closing="OnClosing"
     Loaded="OnLoaded"

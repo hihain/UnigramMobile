@@ -40,11 +40,30 @@ namespace Unigram.Controls.Drawers
 
         private bool _isActive;
 
+#if MODERN_TDLIB
+        private static int _templateBudget = 2;
+        private static int _searchBudget = 2;
+
+        private static void TraceTemplate(string site)
+        {
+            if (System.Threading.Interlocked.Decrement(ref _templateBudget) >= 0)
+            {
+                Logs.PushDiagnostics.Write("drawer.template", $"result=unavailable;site={site}");
+            }
+        }
+
+        private static void TraceSearch(NullReferenceException exception, string context)
+        {
+            if (System.Threading.Interlocked.Decrement(ref _searchBudget) >= 0)
+            {
+                Logs.PushDiagnostics.WriteException("drawer.search", exception, context);
+            }
+        }
+#endif
+
         public StickerDrawer()
         {
             InitializeComponent();
-
-            ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
 
             _handler = new AnimatedListHandler<StickerViewModel>(Stickers);
             _handler.DownloadFile = (id, sticker) =>
@@ -64,8 +83,24 @@ namespace Unigram.Controls.Drawers
 
             //_toolbarHandler = new AnimatedStickerHandler<StickerSetViewModel>(Toolbar);
 
+#if MODERN_TDLIB
+            try
+            {
+                ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
+
+                var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
+                DropShadowEx.SetRelativeSize(shadow, Separator);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("drawer.construct", ex, "drawer=sticker");
+            }
+#else
+            ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
+
             var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
             shadow.RelativeSizeAdjustment = Vector2.One;
+#endif
 
             var observable = Observable.FromEventPattern<TextChangedEventArgs>(FieldStickers, "TextChanged");
             var throttled = observable.Throttle(TimeSpan.FromMilliseconds(Constants.TypingTimeout)).ObserveOnDispatcher().Subscribe(async x =>
@@ -73,11 +108,32 @@ namespace Unigram.Controls.Drawers
                 var items = ViewModel.SearchStickers;
                 if (items != null && string.Equals(FieldStickers.Text, items.Query))
                 {
-                    await items.LoadMoreItemsAsync(1);
-                    await items.LoadMoreItemsAsync(2);
+                    await LoadSearchPhaseAsync(items, 1);
+                    await LoadSearchPhaseAsync(items, 2);
                 }
             });
         }
+
+#if MODERN_TDLIB
+        private static async Task LoadSearchPhaseAsync(SearchStickerSetsCollection items, uint phase)
+        {
+            try
+            {
+                await items.LoadMoreItemsAsync(phase);
+            }
+            catch (NullReferenceException ex)
+            {
+                // Emoji suggestions and sticker-set search are independent, so one failed
+                // phase must not prevent the other from returning results.
+                TraceSearch(ex, $"phase={phase}");
+            }
+        }
+#else
+        private static async Task LoadSearchPhaseAsync(SearchStickerSetsCollection items, uint phase)
+        {
+            await items.LoadMoreItemsAsync(phase);
+        }
+#endif
 
         public Services.Settings.StickersTab Tab => Services.Settings.StickersTab.Stickers;
 
@@ -127,7 +183,14 @@ namespace Unigram.Controls.Drawers
                         }
 
                         var content = container.ContentTemplateRoot as Grid;
-                        var photo = content.Children[0] as Image;
+                        var photo = content?.Children.Count > 0 ? content.Children[0] as Image : null;
+                        if (photo == null)
+                        {
+#if MODERN_TDLIB
+                            TraceTemplate("file_item");
+#endif
+                            continue;
+                        }
 
                         photo.Source = PlaceholderHelper.GetWebPFrame(file.Local.Path);
                     }
@@ -157,10 +220,13 @@ namespace Unigram.Controls.Drawers
                     }
 
                     var content = container.ContentTemplateRoot as Grid;
-                    var photo = content?.Children[0] as Image;
+                    var photo = content?.Children.Count > 0 ? content.Children[0] as Image : null;
 
-                    if (content == null)
+                    if (photo == null)
                     {
+#if MODERN_TDLIB
+                        TraceTemplate("file_toolbar");
+#endif
                         continue;
                     }
 
@@ -285,7 +351,14 @@ namespace Unigram.Controls.Drawers
         private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
             var content = args.ItemContainer.ContentTemplateRoot as Grid;
-            var photo = content.Children[0] as Image;
+            var photo = content?.Children.Count > 0 ? content.Children[0] as Image : null;
+            if (photo == null)
+            {
+#if MODERN_TDLIB
+                TraceTemplate(args.InRecycleQueue ? "item_recycle" : "item_prepare");
+#endif
+                return;
+            }
 
             if (args.InRecycleQueue)
             {
@@ -378,10 +451,16 @@ namespace Unigram.Controls.Drawers
             else if (args.Item is StickerSetViewModel sticker)
             {
                 var content = args.ItemContainer.ContentTemplateRoot as Grid;
-                var photo = content?.Children[0] as Image;
+                var photo = content?.Children.Count > 0 ? content.Children[0] as Image : null;
 
-                if (content == null || sticker == null || (sticker.Thumbnail == null && sticker.Covers == null))
+                if (photo == null || sticker == null || (sticker.Thumbnail == null && sticker.Covers == null))
                 {
+#if MODERN_TDLIB
+                    if (photo == null)
+                    {
+                        TraceTemplate("toolbar_prepare");
+                    }
+#endif
                     return;
                 }
 

@@ -58,7 +58,7 @@ namespace Unigram.ViewModels
 
         public void Handle(UpdateChatAction update)
         {
-            if (update.ChatId == _chat?.Id && update.MessageThreadId == _threadId && (_type == DialogType.History || _type == DialogType.Thread))
+            if (update.ChatId == _chat?.Id && ModernTdlibCompatibility.GetUpdateChatActionThreadId(update) == _threadId && (_type == DialogType.History || _type == DialogType.Thread))
             {
                 BeginOnUIThread(() => Delegate?.UpdateChatActions(_chat, CacheService.GetChatActions(update.ChatId)));
             }
@@ -249,7 +249,7 @@ namespace Unigram.ViewModels
         {
             if (update.ChatId == _chat?.Id)
             {
-                var response = await ProtoService.SendAsync(new GetMessage(update.ChatId, update.ReplyMarkupMessageId));
+                var response = await ProtoService.SendAsync(new GetMessage(update.ChatId, ModernTdlibCompatibility.GetUpdateChatReplyMarkupMessageId(update)));
                 if (response is Message message)
                 {
                     BeginOnUIThread(() => Delegate?.UpdateChatReplyMarkup(_chat, _messageFactory.Create(this, message)));
@@ -380,7 +380,7 @@ namespace Unigram.ViewModels
             }
             else if (_type == DialogType.Thread)
             {
-                return message.SchedulingState == null && message.MessageThreadId == _threadId;
+                return message.SchedulingState == null && ModernTdlibCompatibility.GetMessageThreadId(message) == _threadId;
             }
 
             return message.SchedulingState == null && _type == DialogType.History;

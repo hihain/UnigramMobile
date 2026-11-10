@@ -82,7 +82,13 @@ namespace Unigram.Collections
                 }
                 else if (phase == 2)
                 {
-                    var response = await _protoService.SendAsync(new SearchChatsOnServer(_query, 100));
+                    var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                        new SearchChatsOnServer(_query, null, 100)
+#else
+                        new SearchChatsOnServer(_query, 100)
+#endif
+                    );
                     if (response is Chats chats)
                     {
                         foreach (var id in chats.ChatIds)
@@ -103,7 +109,13 @@ namespace Unigram.Collections
                 }
                 else if (phase == 3)
                 {
-                    var response = await _protoService.SendAsync(new SearchPublicChats(_query));
+                    var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                        new SearchPublicChats(_query, null)
+#else
+                        new SearchPublicChats(_query)
+#endif
+                    );
                     if (response is Chats chats)
                     {
                         foreach (var id in chats.ChatIds)

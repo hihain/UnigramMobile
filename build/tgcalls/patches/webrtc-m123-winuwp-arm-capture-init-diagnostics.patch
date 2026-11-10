@@ -1,0 +1,81 @@
+diff --git a/modules/audio_device/win/audio_device_core_win.cc b/modules/audio_device/win/audio_device_core_win.cc
+index 82b0dbc57..101ccf6c8 100644
+--- a/modules/audio_device/win/audio_device_core_win.cc
++++ b/modules/audio_device/win/audio_device_core_win.cc
+@@ -69,6 +69,15 @@ const size_t MAXERRORLENGTH = 256;
+ 
+ const size_t MIN_CORE_SPEAKER_VOLUME = 0;
+ const size_t MAX_CORE_SPEAKER_VOLUME = 100;
++
++// The UWP capture backend otherwise reduces every initialization failure to -1.
++// These numeric breadcrumbs let the app distinguish platform failure stages without
++// exposing endpoint identifiers, paths, or audio data.
++extern "C" {
++volatile LONG g_unigram_webrtc_capture_init_stage = 0;
++volatile LONG g_unigram_webrtc_capture_init_hresult = 0;
++}
++
+ HRESULT WaitForASyncWithEvent(
+     _In_ IAsyncInfo* async_info,
+     _In_ std::shared_ptr<HANDLE> event_completed_handle_ptr,
+@@ -1174,6 +1183,9 @@ struct CaptureDeviceInternal
+       return 0;
+     }
+ 
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 1);
++    InterlockedExchange(&g_unigram_webrtc_capture_init_hresult, E_FAIL);
++
+     if (QueryPerformanceFrequency(&_perfCounterFreq) == 0) {
+       return -1;
+     }
+@@ -1207,6 +1219,7 @@ struct CaptureDeviceInternal
+ 
+     // Retrieve the stream format that the audio engine uses for its internal
+     // processing (mixing) of shared-mode streams.
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 6);
+     hr = _audioClient->GetMixFormat(&pWfxIn);
+     if (SUCCEEDED(hr)) {
+       RTC_LOG(LS_VERBOSE) << "Audio Engine's current capturing mix format:";
+@@ -1239,6 +1252,7 @@ struct CaptureDeviceInternal
+     hr = S_FALSE;
+ 
+     // Iterate over frequencies and channels, in order of priority
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 7);
+     for (unsigned int freq = 0; freq < sizeof(freqs) / sizeof(freqs[0]);
+          freq++) {
+       for (unsigned int chan = 0;
+@@ -1304,6 +1318,7 @@ struct CaptureDeviceInternal
+     }
+ 
+     // Create a capturing stream.
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 8);
+     hr = _audioClient->Initialize(
+         AUDCLNT_SHAREMODE_SHARED,  // share Audio Engine with other applications
+         AUDCLNT_STREAMFLAGS_EVENTCALLBACK |  // processing of the audio buffer
+@@ -1348,10 +1363,12 @@ struct CaptureDeviceInternal
+ 
+     // Set the event handle that the system signals when an audio buffer is
+     // ready to be processed by the client.
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 9);
+     hr = _audioClient->SetEventHandle(_hSamplesReadyEvent);
+     EXIT_ON_ERROR(hr);
+ 
+     // Get an IAudioCaptureClient interface.
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 10);
+     hr = _audioClient->GetService(__uuidof(IAudioCaptureClient),
+                                   (void**)&_audioCaptureClient);
+     EXIT_ON_ERROR(hr);
+@@ -1363,10 +1380,13 @@ struct CaptureDeviceInternal
+     CoTaskMemFree(pWfxClosestMatch);
+ 
+     RTC_LOG(LS_VERBOSE) << "capture side is now initialized";
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 0);
++    InterlockedExchange(&g_unigram_webrtc_capture_init_hresult, S_OK);
+     return 0;
+ 
+   Exit:
+     _TraceCOMError(hr);
++    InterlockedExchange(&g_unigram_webrtc_capture_init_hresult, static_cast<LONG>(hr));
+     CoTaskMemFree(pWfxIn);
+     CoTaskMemFree(pWfxClosestMatch);
+ 

@@ -90,10 +90,10 @@ namespace Unigram.ViewModels.Supergroups
                     CanPinMessages = restricted.Permissions.CanPinMessages;
                     CanInviteUsers = restricted.Permissions.CanInviteUsers;
                     CanSendPolls = restricted.Permissions.CanSendPolls;
-                    CanAddWebPagePreviews = restricted.Permissions.CanAddWebPagePreviews;
+                    CanAddWebPagePreviews = restricted.Permissions.GetCanAddWebPagePreviews();
                     CanSendOtherMessages = restricted.Permissions.CanSendOtherMessages;
-                    CanSendMediaMessages = restricted.Permissions.CanSendMediaMessages;
-                    CanSendMessages = restricted.Permissions.CanSendMessages;
+                    CanSendMediaMessages = restricted.Permissions.GetCanSendMediaMessages();
+                    CanSendMessages = restricted.Permissions.GetCanSendMessages();
                     UntilDate = restricted.RestrictedUntilDate;
                 }
                 else if (member.Status is ChatMemberStatusBanned banned)
@@ -114,10 +114,10 @@ namespace Unigram.ViewModels.Supergroups
                     CanPinMessages = chat.Permissions.CanPinMessages;
                     CanInviteUsers = chat.Permissions.CanInviteUsers;
                     CanSendPolls = chat.Permissions.CanSendPolls;
-                    CanAddWebPagePreviews = chat.Permissions.CanAddWebPagePreviews;
+                    CanAddWebPagePreviews = chat.Permissions.GetCanAddWebPagePreviews();
                     CanSendOtherMessages = chat.Permissions.CanSendOtherMessages;
-                    CanSendMediaMessages = chat.Permissions.CanSendMediaMessages;
-                    CanSendMessages = chat.Permissions.CanSendMessages;
+                    CanSendMediaMessages = chat.Permissions.GetCanSendMediaMessages();
+                    CanSendMessages = chat.Permissions.GetCanSendMessages();
                     UntilDate = 0;
                 }
             }
@@ -328,11 +328,25 @@ namespace Unigram.ViewModels.Supergroups
                     CanChangeInfo = _canChangeInfo,
                     CanPinMessages = _canPinMessages,
                     CanInviteUsers = _canInviteUsers,
+#if MODERN_TDLIB
+                    CanAddLinkPreviews = _canAddWebPagePreviews,
+#else
                     CanAddWebPagePreviews = _canAddWebPagePreviews,
+#endif
                     CanSendPolls = _canSendPolls,
                     CanSendOtherMessages = _canSendOtherMessages,
+#if MODERN_TDLIB
+                    CanSendAudios = _canSendMediaMessages,
+                    CanSendDocuments = _canSendMediaMessages,
+                    CanSendPhotos = _canSendMediaMessages,
+                    CanSendVideos = _canSendMediaMessages,
+                    CanSendVideoNotes = _canSendMediaMessages,
+                    CanSendVoiceNotes = _canSendMediaMessages,
+                    CanSendBasicMessages = _canSendMessages,
+#else
                     CanSendMediaMessages = _canSendMediaMessages,
                     CanSendMessages = _canSendMessages,
+#endif
                 }
             };
 

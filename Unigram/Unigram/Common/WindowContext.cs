@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Controls;
+using Unigram.Logs;
 using Unigram.Navigation;
 using Unigram.Navigation.Services;
 using Unigram.Services;
@@ -139,34 +141,48 @@ namespace Unigram.Common
 
             // Desktop Title Bar
             var titleBar = Windows.UI.ViewManagement.ApplicationView.GetForCurrentView().TitleBar;
-            CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = true;
+            var coreTitleBar = CoreApplication.GetCurrentView().TitleBar;
+            if (coreTitleBar != null)
+            {
+                coreTitleBar.ExtendViewIntoTitleBar = true;
+            }
 
-            // Background
-            titleBar.BackgroundColor = background;
-            titleBar.InactiveBackgroundColor = background;
+            if (titleBar != null)
+            {
+                // Background
+                titleBar.BackgroundColor = background;
+                titleBar.InactiveBackgroundColor = background;
 
-            // Foreground
-            titleBar.ForegroundColor = foreground;
-            titleBar.ButtonForegroundColor = foreground;
-            titleBar.ButtonHoverForegroundColor = foreground;
+                // Foreground
+                titleBar.ForegroundColor = foreground;
+                titleBar.ButtonForegroundColor = foreground;
+                titleBar.ButtonHoverForegroundColor = foreground;
 
-            // Buttons
-            //titleBar.ButtonBackgroundColor = background;
-            //titleBar.ButtonInactiveBackgroundColor = background;
-            titleBar.ButtonBackgroundColor = Colors.Transparent;
-            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+                // Buttons
+                //titleBar.ButtonBackgroundColor = background;
+                //titleBar.ButtonInactiveBackgroundColor = background;
+                titleBar.ButtonBackgroundColor = Colors.Transparent;
+                titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
 
-            // Buttons feedback
-            titleBar.ButtonPressedBackgroundColor = buttonPressed;
-            titleBar.ButtonHoverBackgroundColor = buttonHover;
+                // Buttons feedback
+                titleBar.ButtonPressedBackgroundColor = buttonPressed;
+                titleBar.ButtonHoverBackgroundColor = buttonHover;
+            }
+            else
+            {
+                PushDiagnostics.Write("view.title_bar", "result=unavailable");
+            }
 
             // Mobile Status Bar
             if (ApiInfo.HasStatusBar)
             {
                 var statusBar = StatusBar.GetForCurrentView();
-                statusBar.BackgroundColor = Application.Current.Resources["PageTitleBackgroundBrush"] is SolidColorBrush pageTitleBackgroundBrush ? pageTitleBackgroundBrush.Color : background;
-                statusBar.ForegroundColor = foreground;
-                statusBar.BackgroundOpacity = 1;
+                if (statusBar != null)
+                {
+                    statusBar.BackgroundColor = Application.Current.Resources["PageTitleBackgroundBrush"] is SolidColorBrush pageTitleBackgroundBrush ? pageTitleBackgroundBrush.Color : background;
+                    statusBar.ForegroundColor = foreground;
+                    statusBar.BackgroundOpacity = 1;
+                }
             }
         }
 
@@ -213,13 +229,44 @@ namespace Unigram.Common
             {
                 switch (state)
                 {
+#if MODERN_TDLIB
+                    case null:
+                        // Modern TDLib reports the first authorization state asynchronously.
+                        // A persisted user belongs to a restored session; keep its frame empty
+                        // until TDLib confirms Ready instead of flashing the first-run intro.
+                        if (_lifetime.ActiveItem.Settings.UserId == 0)
+                        {
+                            PushDiagnostics.Write("startup.navigate", "state=null;target=IntroPage;first_run=1");
+                            service.Navigate(typeof(IntroPage));
+                        }
+                        else
+                        {
+                            PushDiagnostics.Write("startup.navigate", "state=null;target=deferred;first_run=0");
+                        }
+                        break;
+#endif
+                    case AuthorizationStateWaitTdlibParameters waitTdlibParameters:
+#if MODERN_TDLIB
+                        if (_lifetime.ActiveItem.Settings.UserId == 0)
+                        {
+                            PushDiagnostics.Write("startup.navigate", "state=WaitTdlibParameters;target=IntroPage;first_run=1");
+                            service.Navigate(typeof(IntroPage));
+                        }
+                        else
+                        {
+                            PushDiagnostics.Write("startup.navigate", "state=WaitTdlibParameters;target=deferred;first_run=0");
+                        }
+#else
+                        service.Navigate(typeof(SignInPage));
+#endif
+                        break;
                     case AuthorizationStateReady ready:
                         //App.Current.NavigationService.Navigate(typeof(Views.MainPage));
                         UseActivatedArgs(args, service);
                         break;
                     case AuthorizationStateWaitPhoneNumber waitPhoneNumber:
                     case AuthorizationStateWaitOtherDeviceConfirmation waitOtherDeviceConfirmation:
-                        service.Navigate(service.CurrentPageType != null ? typeof(SignInPage) : typeof(IntroPage));
+                        service.Navigate(typeof(SignInPage));
                         break;
                     case AuthorizationStateWaitCode waitCode:
                         service.Navigate(typeof(SignInSentCodePage));
@@ -235,13 +282,46 @@ namespace Unigram.Common
 
                         service.Navigate(typeof(SignInPasswordPage));
                         break;
+#if MODERN_TDLIB
+                    default:
+                        // An unmapped modern authorization state must not leave the frame
+                        // empty. Surface it instead of silently rendering nothing.
+                        PushDiagnostics.Write("startup.navigate", $"state={state.GetType().Name};target=IntroPage;reason=unmapped");
+                        service.Navigate(typeof(IntroPage));
+                        break;
+#endif
                 }
             }
+#if MODERN_TDLIB
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("startup.navigate", ex);
+            }
+#else
             catch { }
+#endif
         }
 
         private async void UseActivatedArgs(IActivatedEventArgs args, INavigationService service)
         {
+#if MODERN_TDLIB
+            // This overload is async void and previously had no handler at all, so any
+            // failure on the launch path surfaced only as an unhandled app crash with no
+            // indication of its origin. Record it before letting it propagate.
+            try
+            {
+                await UseActivatedArgsCore(args, service);
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("startup.activate", ex);
+                throw;
+            }
+        }
+
+        private async Task UseActivatedArgsCore(IActivatedEventArgs args, INavigationService service)
+        {
+#endif
             if (service == null)
             {
                 service = WindowContext.GetForCurrentView().NavigationServices.FirstOrDefault();
@@ -327,7 +407,7 @@ namespace Unigram.Common
             }
             else if (args is VoiceCommandActivatedEventArgs voice)
             {
-                SpeechRecognitionResult speechResult = voice.Result;
+                Windows.Media.SpeechRecognition.SpeechRecognitionResult speechResult = voice.Result;
                 string command = speechResult.RulePath[0];
 
                 if (command == "ShowAllDialogs")

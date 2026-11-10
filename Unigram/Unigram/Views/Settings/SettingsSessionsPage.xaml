@@ -92,9 +92,9 @@
                                 <Run Text="{x:Bind ViewModel.Current.SystemVersion, Mode=OneWay, FallbackValue=''}"/>
                             </TextBlock>
                             <TextBlock TextTrimming="CharacterEllipsis" Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}" Grid.ColumnSpan="2" Grid.Row="2">
-                                <Run Text="{x:Bind ViewModel.Current.Ip, Mode=OneWay, FallbackValue=''}"/>
+                                <Run Text="{x:Bind ViewModel.CurrentIp, Mode=OneWay, FallbackValue=''}"/>
                                 <Run Text="—"/>
-                                <Run Text="{x:Bind ViewModel.Current.Country, Mode=OneWay, FallbackValue=''}"/>
+                                <Run Text="{x:Bind ViewModel.CurrentCountry, Mode=OneWay, FallbackValue=''}"/>
                             </TextBlock>
 
                             <TextBlock Text="{CustomResource Online}" Margin="12,0,0,0" VerticalAlignment="Bottom" Foreground="{ThemeResource TelegramForegroundAccentBrush}" Style="{StaticResource CaptionTextBlockStyle}" Grid.Column="1"/>

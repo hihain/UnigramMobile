@@ -1,0 +1,9 @@
+diff --git a/tgcalls/v2/InstanceV2Impl.cpp b/tgcalls/v2/InstanceV2Impl.cpp
+index f34c47562..db92f0edd 100644
+--- a/tgcalls/v2/InstanceV2Impl.cpp
++++ b/tgcalls/v2/InstanceV2Impl.cpp
+@@ -2150 +2150,3 @@
+-            _outgoingVideoChannel->setMaxBitrate(1000 * 1024);
++            // The ARM UWP platform adapter captures H.264 at 1280x720/30fps. The
++            // upstream 1 Mbps V2 ceiling produces visibly blocky motion at that size.
++            _outgoingVideoChannel->setMaxBitrate(1536 * 1024);

@@ -58,7 +58,12 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessageSticker(new InputFileId(sticker.StickerValue.Id), sticker.Thumbnail?.ToInput(), sticker.Width, sticker.Height, emoji ?? string.Empty);
+            var input =
+#if MODERN_TDLIB
+                new InputMessageSticker(new InputSticker(new InputFileId(sticker.StickerValue.Id), sticker.Thumbnail?.ToInput(), sticker.Width, sticker.Height), emoji ?? string.Empty);
+#else
+                new InputMessageSticker(new InputFileId(sticker.StickerValue.Id), sticker.Thumbnail?.ToInput(), sticker.Width, sticker.Height, emoji ?? string.Empty);
+#endif
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -116,7 +121,7 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessageAnimation(new InputFileId(animation.AnimationValue.Id), animation.Thumbnail?.ToInput(), new int[0], animation.Duration, animation.Width, animation.Height, null);
+            var input = ModernTdlibCompatibility.CreateInputMessageAnimation(new InputFileId(animation.AnimationValue.Id), animation.Thumbnail?.ToInput(), animation.Duration, animation.Width, animation.Height, null);
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -413,7 +418,7 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessageVoiceNote(await file.ToGeneratedAsync(), duration, new byte[0], caption);
+            var input = ModernTdlibCompatibility.CreateInputMessageVoiceNote(await file.ToGeneratedAsync(), duration, caption);
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -694,16 +699,16 @@ namespace Unigram.ViewModels
 
                 if (dialog.IsUntilOnline)
                 {
-                    return new MessageSendOptions(false, false, new MessageSchedulingStateSendWhenOnline());
+                    return ModernTdlibCompatibility.CreateMessageSendOptions(false, false, new MessageSchedulingStateSendWhenOnline());
                 }
                 else
                 {
-                    return new MessageSendOptions(false, false, new MessageSchedulingStateSendAtDate(dialog.Value.ToTimestamp()));
+                    return ModernTdlibCompatibility.CreateMessageSendOptions(false, false, ModernTdlibCompatibility.CreateMessageSchedulingStateSendAtDate(dialog.Value.ToTimestamp()));
                 }
             }
             else
             {
-                return new MessageSendOptions(silent ?? false, false, null);
+                return ModernTdlibCompatibility.CreateMessageSendOptions(silent ?? false, false, null);
             }
         }
 
@@ -711,10 +716,10 @@ namespace Unigram.ViewModels
         {
             if (options == null)
             {
-                options = new MessageSendOptions(false, false, null);
+                options = ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null);
             }
 
-            var response = await ProtoService.SendAsync(new SendMessage(chat.Id, _threadId, replyToMessageId, options, null, inputMessageContent));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateSendMessage(chat.Id, _threadId, replyToMessageId, options, inputMessageContent));
             if (response is Error error)
             {
                 if (error.TypeEquals(ErrorType.PEER_FLOOD))
@@ -736,7 +741,7 @@ namespace Unigram.ViewModels
 
         private async Task<BaseObject> EditMessageAsync(MessageViewModel message, InputFile inputFile, FileType type, Func<InputFile, InputMessageContent> inputMessageContent)
         {
-            var response = await ProtoService.SendAsync(new UploadFile(inputFile, type, 32));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateUploadFile(inputFile, type, 32));
             if (response is Telegram.Td.Api.File file)
             {
                 ComposerHeader = new MessageComposerHeader { EditingMessage = message, EditingMessageMedia = null, EditingMessageFileId = file.Id };
@@ -824,7 +829,7 @@ namespace Unigram.ViewModels
             }
 
             var reply = GetReply(true);
-            var input = new InputMessagePoll(dialog.Question, dialog.Options, dialog.IsAnonymous, dialog.Type, 0, 0, false);
+            var input = ModernTdlibCompatibility.CreateInputMessagePoll(dialog.Question, dialog.Options, dialog.IsAnonymous, dialog.Type, dialog.AllowsMultipleAnswers);
 
             await SendMessageAsync(chat, reply, input, options);
         }
@@ -895,7 +900,7 @@ namespace Unigram.ViewModels
                 }
             }
 
-            return await ProtoService.SendAsync(new SendMessageAlbum(chat.Id, _threadId, reply, options, operations));
+            return await ProtoService.SendAsync(ModernTdlibCompatibility.CreateSendMessageAlbum(chat.Id, _threadId, reply, options, operations));
         }
 
         private FormattedText GetFormattedText(string text)

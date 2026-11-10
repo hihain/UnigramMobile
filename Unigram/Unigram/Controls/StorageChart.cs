@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Telegram.Td.Api;
+using Unigram.Common;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Composition;
@@ -31,12 +32,30 @@ namespace Unigram.Controls
         {
             DefaultStyleKey = typeof(StorageChart);
 
+#if MODERN_TDLIB
+            // ShapeVisual and its geometries are unavailable on this device. The chart is
+            // skipped entirely and every member below null-checks _visual, so the storage
+            // page still renders its textual breakdown. This reuses the same
+            // CanUseDirectComposition gate as the other ShapeVisual users in the project.
+            if (!ApiInfo.CanUseDirectComposition)
+            {
+                return;
+            }
+#endif
+
             _visual = Window.Current.Compositor.CreateShapeVisual();
             ElementCompositionPreview.SetElementChildVisual(this, _visual);
         }
 
         protected override Size ArrangeOverride(Size finalSize)
         {
+#if MODERN_TDLIB
+            if (_visual == null)
+            {
+                return base.ArrangeOverride(finalSize);
+            }
+#endif
+
             _visual.Size = finalSize.ToVector2();
 
             var width = Math.Max(THICKNESS, Math.Min((float)finalSize.Width, (float)finalSize.Height));
@@ -79,6 +98,14 @@ namespace Unigram.Controls
         private void SetItems(IList<StorageChartItem> items)
         {
             _items = items;
+
+#if MODERN_TDLIB
+            if (_visual == null)
+            {
+                return;
+            }
+#endif
+
             _visual.Shapes.Clear();
 
             _values = items.Select(x => (float)x.Size).ToArray();
@@ -114,6 +141,13 @@ namespace Unigram.Controls
 
         public void Update(int index, bool v)
         {
+#if MODERN_TDLIB
+            if (_visual == null || _visible == null)
+            {
+                return;
+            }
+#endif
+
             var (prev, prevOne) = Snapshot();
 
             _visible[index] = v;

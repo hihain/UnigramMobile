@@ -78,7 +78,43 @@ namespace Unigram.ViewModels
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
             await base.OnNavigatedToAsync(parameter, mode, state);
+#if MODERN_TDLIB
+            // Task.WhenAll reports only the first fault and loses which child produced it,
+            // and the caller is async void, so the failure arrives as a bare unhandled
+            // exception. Start every child as before, then await them individually so the
+            // faulting view model is named.
+            var pending = new List<Task>();
+
+            foreach (var child in Children)
+            {
+                try
+                {
+                    pending.Add(child.OnNavigatedToAsync(parameter, mode, state));
+                }
+                catch (System.Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException($"children.navigated.{child.GetType().Name}", ex);
+                    throw;
+                }
+            }
+
+            for (int i = 0; i < pending.Count; i++)
+            {
+                try
+                {
+                    await pending[i];
+                }
+                catch (System.Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException($"children.navigated.{Children[i].GetType().Name}", ex);
+                    throw;
+                }
+            }
+
+            Logs.PushDiagnostics.Write("children.navigated", $"count={pending.Count};result=ok");
+#else
             await Task.WhenAll(Children.Select(x => x.OnNavigatedToAsync(parameter, mode, state)));
+#endif
         }
 
         public override void OnNavigatingFrom(NavigatingEventArgs args)

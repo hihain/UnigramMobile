@@ -18,7 +18,7 @@ namespace Unigram.ViewModels.Settings
 
         public override Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
-            ProtoService.Send(new GetTrendingStickerSets(0, 24), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetTrendingStickerSets(), result =>
             {
                 if (result is StickerSets stickerSets)
                 {

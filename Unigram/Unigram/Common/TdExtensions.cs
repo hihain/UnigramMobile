@@ -1,4 +1,4 @@
-﻿using libtgvoip;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -7,11 +7,20 @@ using System.Text;
 using System.Threading;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Unigram.ViewModels.Settings;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Xaml.Media;
+
+#if MODERN_TDLIB
+using MessageForwardOriginUser = Telegram.Td.Api.MessageOriginUser;
+using MessageForwardOriginChat = Telegram.Td.Api.MessageOriginChat;
+using MessageForwardOriginChannel = Telegram.Td.Api.MessageOriginChannel;
+using MessageForwardOriginHiddenUser = Telegram.Td.Api.MessageOriginHiddenUser;
+using MessageForwardOriginMessageImport = Telegram.Td.Api.MessageOriginHiddenUser;
+#endif
 using Point = Windows.Foundation.Point;
 
 namespace Unigram.Common
@@ -200,6 +209,60 @@ namespace Unigram.Common
 
     public static class TdExtensions
     {
+        public static string GetUsername(this User user)
+        {
+#if MODERN_TDLIB
+            return user.Usernames?.ActiveUsernames?.FirstOrDefault() ?? string.Empty;
+#else
+            return user.Username;
+#endif
+        }
+
+        public static string GetUsername(this Supergroup supergroup)
+        {
+#if MODERN_TDLIB
+            return supergroup.Usernames?.ActiveUsernames?.FirstOrDefault() ?? string.Empty;
+#else
+            return supergroup.Username;
+#endif
+        }
+
+        public static bool GetCanSendMessages(this ChatPermissions permissions)
+        {
+#if MODERN_TDLIB
+            return permissions.CanSendBasicMessages;
+#else
+            return permissions.CanSendMessages;
+#endif
+        }
+
+        public static bool GetCanSendMediaMessages(this ChatPermissions permissions)
+        {
+#if MODERN_TDLIB
+            return permissions.CanSendAudios || permissions.CanSendDocuments || permissions.CanSendPhotos || permissions.CanSendVideos || permissions.CanSendVideoNotes || permissions.CanSendVoiceNotes;
+#else
+            return permissions.CanSendMediaMessages;
+#endif
+        }
+
+        public static bool GetCanAddWebPagePreviews(this ChatPermissions permissions)
+        {
+#if MODERN_TDLIB
+            return permissions.CanAddLinkPreviews;
+#else
+            return permissions.CanAddWebPagePreviews;
+#endif
+        }
+
+        public static bool IsChatBlocked(this Chat chat)
+        {
+#if MODERN_TDLIB
+            return chat.BlockList is BlockListMain;
+#else
+            return chat.IsBlocked;
+#endif
+        }
+
         public static File InvalidFile()
         {
             return new File(0, 0, 0, new LocalFile(string.Empty, false, false, false, false, 0, 0, 0), new RemoteFile(string.Empty, string.Empty, false, false, 0));
@@ -215,10 +278,18 @@ namespace Unigram.Common
             {
                 return 1;
             }
+#if !MODERN_TDLIB
             else if (chatList is ChatListFilter filter)
             {
                 return filter.ChatFilterId;
             }
+#endif
+#if MODERN_TDLIB
+            else if (chatList is ChatListFolder folder)
+            {
+                return folder.ChatFolderId;
+            }
+#endif
 
             return -1;
         }
@@ -346,10 +417,18 @@ namespace Unigram.Common
             {
                 return true;
             }
+#if !MODERN_TDLIB
             else if (x is ChatListFilter filterX && y is ChatListFilter filterY)
             {
                 return filterX.ChatFilterId == filterY.ChatFilterId;
             }
+#endif
+#if MODERN_TDLIB
+            else if (x is ChatListFolder folderX && y is ChatListFolder folderY)
+            {
+                return folderX.ChatFolderId == folderY.ChatFolderId;
+            }
+#endif
 
             return false;
         }
@@ -359,7 +438,7 @@ namespace Unigram.Common
             return webPage.InstantViewVersion != 0 &&
                 (string.Equals(webPage.SiteName, "twitter", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(webPage.SiteName, "instagram", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(webPage.Type, "telegram_album", StringComparison.OrdinalIgnoreCase));
+                 string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_album", StringComparison.OrdinalIgnoreCase));
         }
 
         public static InputThumbnail ToInputThumbnail(this PhotoSize photo)
@@ -515,7 +594,7 @@ namespace Unigram.Common
                 case MessageGame game:
                     return game.Game.Photo;
                 case MessageInvoice invoice:
-                    return invoice.Photo;
+                    return invoice.GetPhoto();
                 case MessagePhoto photo:
                     return photo.Photo;
                 case MessageText text:
@@ -526,6 +605,249 @@ namespace Unigram.Common
                     return null;
             }
         }
+
+            public static Photo GetPhoto(this MessageInvoice invoice)
+            {
+#if MODERN_TDLIB
+                return invoice.ProductInfo?.Photo;
+#else
+                return invoice.Photo;
+#endif
+            }
+
+            public static string GetTitle(this MessageInvoice invoice)
+            {
+#if MODERN_TDLIB
+                return invoice.ProductInfo?.Title;
+#else
+                return invoice.Title;
+#endif
+            }
+
+            public static string GetDescription(this MessageInvoice invoice)
+            {
+#if MODERN_TDLIB
+                return invoice.ProductInfo?.Description?.Text;
+#else
+                return invoice.Description;
+#endif
+            }
+
+            public static int GetLivePeriod(this MessageLocation location)
+            {
+#if MODERN_TDLIB
+                return 0;
+#else
+                return location.LivePeriod;
+#endif
+            }
+
+            public static bool GetIsAnimated(this Sticker sticker)
+            {
+#if MODERN_TDLIB
+                return sticker?.Format is StickerFormatTgs || sticker?.Format is StickerFormatWebm;
+#else
+                return sticker?.IsAnimated == true;
+#endif
+            }
+
+            public static bool GetIsAnimated(this StickerSetInfo stickerSet)
+            {
+#if MODERN_TDLIB
+                return stickerSet?.Covers?.Any(sticker => sticker.GetIsAnimated()) == true;
+#else
+                return stickerSet?.IsAnimated == true;
+#endif
+            }
+
+            public static bool GetIsAnimated(this StickerSet stickerSet)
+            {
+#if MODERN_TDLIB
+                return stickerSet?.Stickers?.Any(sticker => sticker.GetIsAnimated()) == true;
+#else
+                return stickerSet?.IsAnimated == true;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this WebPageInstantView value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockDetails value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockBlockQuote value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockEmbeddedPost value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockListItem value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockSlideshow value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static IList<PageBlock> GetPageBlocks(this PageBlockCollage value)
+            {
+#if MODERN_TDLIB
+                return value?.Blocks;
+#else
+                return value?.PageBlocks;
+#endif
+            }
+
+            public static string GetIpAddress(this Session value)
+            {
+#if MODERN_TDLIB
+                return value?.IpAddress;
+#else
+                return value?.Ip;
+#endif
+            }
+
+            public static string GetLocation(this Session value)
+            {
+#if MODERN_TDLIB
+                return value?.Location;
+#else
+                return value?.Country;
+#endif
+            }
+
+            public static StatisticalValue GetMeanMessageViewCount(this ChatStatisticsChannel value)
+            {
+#if MODERN_TDLIB
+                return value?.MeanMessageViewCount;
+#else
+                return value?.MeanViewCount;
+#endif
+            }
+
+            public static StatisticalValue GetMeanMessageShareCount(this ChatStatisticsChannel value)
+            {
+#if MODERN_TDLIB
+                return value?.MeanMessageShareCount;
+#else
+                return value?.MeanShareCount;
+#endif
+            }
+
+            public static bool HasEmbedUrl(this WebPage value)
+            {
+#if MODERN_TDLIB
+                return value?.Type is LinkPreviewTypeEmbeddedVideoPlayer;
+#else
+                return value?.EmbedUrl?.Length > 0;
+#endif
+            }
+
+            public static string GetSwitchPmParameter(this InlineQueryResults value)
+            {
+#if MODERN_TDLIB
+                return (value?.Button?.Type as InlineQueryResultsButtonTypeStartBot)?.Parameter;
+#else
+                return value?.SwitchPmParameter;
+#endif
+            }
+
+            public static string GetSwitchPmText(this InlineQueryResults value)
+            {
+#if MODERN_TDLIB
+                return value?.Button?.Text;
+#else
+                return value?.SwitchPmText;
+#endif
+            }
+
+            public static string GetIpAddress(this ConnectedWebsite value)
+            {
+#if MODERN_TDLIB
+                return value?.IpAddress;
+#else
+                return value?.Ip;
+#endif
+            }
+
+            public static string GetText(this PollOption option)
+            {
+#if MODERN_TDLIB
+                return option.Text?.Text;
+#else
+                return option.Text;
+#endif
+            }
+
+            public static string GetQuestionText(this Poll poll)
+            {
+#if MODERN_TDLIB
+                return poll.Question?.Text;
+#else
+                return poll.Question;
+#endif
+            }
+
+            public static int GetCorrectOptionId(this PollTypeQuiz quiz)
+            {
+#if MODERN_TDLIB
+                return quiz.CorrectOptionIds.Count > 0 ? quiz.CorrectOptionIds[0] : -1;
+#else
+                return quiz.CorrectOptionId;
+#endif
+            }
+
+            public static bool GetAllowsMultipleAnswers(this Poll poll)
+            {
+#if MODERN_TDLIB
+                return poll.AllowsMultipleAnswers;
+#else
+                return poll.Type is PollTypeRegular regular && regular.AllowMultipleAnswers;
+#endif
+            }
+
+            public static IList<long> GetRecentVoterUserIds(this Poll poll)
+            {
+#if MODERN_TDLIB
+                return poll.RecentVoterIds.OfType<MessageSenderUser>().Select(x => x.UserId).ToList();
+#else
+                return poll.RecentVoterUserIds;
+#endif
+            }
 
         public static (File File, string FileName) GetFileAndName(this Message message, bool allowPhoto)
         {
@@ -832,9 +1154,9 @@ namespace Unigram.Common
             switch (content)
             {
                 case MessageSticker sticker:
-                    return sticker.Sticker.IsAnimated ? sticker.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
+                    return sticker.Sticker.GetIsAnimated() ? sticker.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
                 case MessageText text:
-                    return text.WebPage?.Sticker?.IsAnimated ?? false ? text.WebPage.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
+                    return text.WebPage?.Sticker?.GetIsAnimated() == true ? text.WebPage.Sticker.StickerValue.Local.IsDownloadingCompleted : false;
                 case MessageDice dice:
                     var state = dice.InitialState;
                     if (state is DiceStickersRegular regular)
@@ -912,9 +1234,9 @@ namespace Unigram.Common
             switch (message.Content)
             {
                 case MessageSticker sticker:
-                    return sticker.Sticker.IsAnimated ? sticker.Sticker.StickerValue : null;
+                    return sticker.Sticker.GetIsAnimated() ? sticker.Sticker.StickerValue : null;
                 case MessageText text:
-                    return text.WebPage?.Sticker?.IsAnimated ?? false ? text.WebPage?.Sticker?.StickerValue : null;
+                    return text.WebPage?.Sticker?.GetIsAnimated() == true ? text.WebPage?.Sticker?.StickerValue : null;
                 default:
                     return null;
             }
@@ -1082,13 +1404,13 @@ namespace Unigram.Common
         {
             if (webPage.Photo != null && webPage.Type != null)
             {
-                if (string.Equals(webPage.Type, "photo", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(webPage.Type, "video", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(webPage.Type, "telegram_album", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "photo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "video", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_album", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
-                else if (string.Equals(webPage.Type, "article", StringComparison.OrdinalIgnoreCase))
+                else if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "article", StringComparison.OrdinalIgnoreCase))
                 {
                     var photo = webPage.Photo;
                     var big = photo.GetBig();
@@ -1143,7 +1465,9 @@ namespace Unigram.Common
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
+#if !MODERN_TDLIB
                 case MessageChatSetTtl chatSetTtl:
+#endif
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:
@@ -1159,7 +1483,9 @@ namespace Unigram.Common
                 case MessageVideoChatEnded newTodo1:
                 case MessageVideoChatScheduled newTodo2:
                 case MessageVideoChatStarted newTodo3:
+#if !MODERN_TDLIB
                 case MessageWebsiteConnected websiteConnected:
+#endif
                     return true;
                 case MessageExpiredPhoto expiredPhoto:
                 case MessageExpiredVideo expiredVideo:
@@ -1223,12 +1549,12 @@ namespace Unigram.Common
 
         public static string GetRestrictionReason(this User user)
         {
-            return GetRestrictionReason(user.RestrictionReason);
+            return GetRestrictionReason(ModernTdlibCompatibility.GetUserRestrictionReason(user));
         }
 
         public static string GetRestrictionReason(this Supergroup supergroup)
         {
-            return GetRestrictionReason(supergroup.RestrictionReason);
+            return GetRestrictionReason(ModernTdlibCompatibility.GetSupergroupRestrictionReason(supergroup));
         }
 
         public static string GetRestrictionReason(string reason)
@@ -1402,17 +1728,23 @@ namespace Unigram.Common
 
         public static bool IsSaved(this Message message, long savedMessagesId)
         {
+#if MODERN_TDLIB
+            if (message.ForwardInfo?.Origin is MessageOriginHiddenUser)
+            {
+                return message.ChatId == savedMessagesId;
+            }
+#endif
             if (message.ForwardInfo?.Origin is MessageForwardOriginUser fromUser)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return message.ForwardInfo.GetForwardFromChatId() != 0;
             }
             else if (message.ForwardInfo?.Origin is MessageForwardOriginChat fromChat)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return message.ForwardInfo.GetForwardFromChatId() != 0;
             }
             else if (message.ForwardInfo?.Origin is MessageForwardOriginChannel fromChannel)
             {
-                return message.ForwardInfo.FromChatId != 0;
+                return message.ForwardInfo.GetForwardFromChatId() != 0;
             }
             else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport fromImport)
             {
@@ -1424,6 +1756,43 @@ namespace Unigram.Common
             }
 
             return false;
+        }
+
+        public static long GetForwardFromChatId(this MessageForwardInfo info)
+        {
+#if MODERN_TDLIB
+            if (info?.Origin is MessageOriginChannel channel)
+            {
+                return channel.ChatId;
+            }
+
+            if (info?.Origin is MessageOriginChat chat)
+            {
+                return chat.SenderChatId;
+            }
+
+            return 0;
+#else
+            return info?.FromChatId ?? 0;
+#endif
+        }
+
+        public static long GetForwardFromMessageId(this MessageForwardInfo info)
+        {
+#if MODERN_TDLIB
+            return (info?.Origin as MessageOriginChannel)?.MessageId ?? 0;
+#else
+            return info?.FromMessageId ?? 0;
+#endif
+        }
+
+        public static bool IsImportedForward(this MessageForwardInfo info)
+        {
+#if MODERN_TDLIB
+            return info?.Source != null;
+#else
+            return info?.Origin is MessageForwardOriginMessageImport;
+#endif
         }
 
         public static string GetFullName(this User user)
@@ -1675,7 +2044,7 @@ namespace Unigram.Common
         public static int Count(this ChatPermissions permissions)
         {
             var count = 0;
-            if (permissions.CanAddWebPagePreviews)
+            if (permissions.GetCanAddWebPagePreviews())
             {
                 count++;
             }
@@ -1691,11 +2060,11 @@ namespace Unigram.Common
             {
                 count++;
             }
-            if (permissions.CanSendMediaMessages)
+            if (permissions.GetCanSendMediaMessages())
             {
                 count++;
             }
-            if (permissions.CanSendMessages)
+            if (permissions.GetCanSendMessages())
             {
                 count++;
             }
@@ -1723,7 +2092,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPinMessages;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanPinMessages(administrator);
         }
 
         public static bool CanDeleteMessages(this Supergroup supergroup)
@@ -1733,7 +2102,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanDeleteMessages;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanDeleteMessages(administrator);
         }
 
         public static bool CanPinMessages(this BasicGroup basicGroup)
@@ -1743,7 +2112,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPinMessages;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanPinMessages(administrator);
         }
 
         public static bool CanDeleteMessages(this BasicGroup basicGroup)
@@ -1753,7 +2122,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanDeleteMessages;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanDeleteMessages(administrator);
         }
 
         public static bool CanChangeInfo(this Supergroup supergroup)
@@ -1763,7 +2132,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanChangeInfo;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanChangeInfo(administrator);
         }
 
         public static bool CanPostMessages(this Supergroup supergroup)
@@ -1775,7 +2144,7 @@ namespace Unigram.Common
 
             if (supergroup.IsChannel)
             {
-                return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPostMessages;
+                return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanPostMessages(administrator);
             }
             else
             {
@@ -1790,7 +2159,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanRestrictMembers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanRestrictMembers(administrator);
         }
 
         public static bool CanPromoteMembers(this Supergroup supergroup)
@@ -1800,7 +2169,7 @@ namespace Unigram.Common
                 return false;
             }
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanPromoteMembers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanPromoteMembers(administrator);
         }
 
         public static bool CanPromoteMembers(this BasicGroup basicGroup)
@@ -1830,7 +2199,7 @@ namespace Unigram.Common
             //    return true;
             //}
 
-            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers;
+            return supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanInviteUsers(administrator);
         }
 
         public static bool CanInviteUsers(this BasicGroup basicGroup)
@@ -1845,7 +2214,7 @@ namespace Unigram.Common
             //    return true;
             //}
 
-            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers;
+            return basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanInviteUsers(administrator);
         }
 
         public static bool CanPostMessages(this BasicGroup basicGroup)
@@ -2146,9 +2515,9 @@ namespace Unigram.Common
 
         public static bool UpdateFile(this MessageInvoice invoice, File file)
         {
-            if (invoice.Photo != null)
+            if (invoice.GetPhoto() != null)
             {
-                return invoice.Photo.UpdateFile(file);
+                return invoice.GetPhoto().UpdateFile(file);
             }
 
             return false;
@@ -2599,7 +2968,11 @@ namespace Telegram.Td.Api
         public MessageChatEvent(ChatEvent chatEvent)
         {
             Action = chatEvent.Action;
+#if MODERN_TDLIB
+            UserId = (chatEvent.MemberId as MessageSenderUser)?.UserId ?? 0;
+#else
             UserId = chatEvent.UserId;
+#endif
             Date = chatEvent.Date;
             Id = chatEvent.Id;
         }

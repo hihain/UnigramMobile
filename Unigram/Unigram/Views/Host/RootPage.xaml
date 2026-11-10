@@ -84,7 +84,7 @@
                     Margin="4,0,0,0"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Center"
-                    Visibility="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Visibility="Collapsed"
                     Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}" />
 
                 <TextBlock
@@ -148,20 +148,28 @@
                 </Button>
             </controls:NavigationView.PaneHeader>
             <controls:NavigationView.PaneFooter>
-                <ListView x:Name="NavigationViewList"
-                            ItemClick="OnItemClick"
-                            IsItemClickEnabled="True"
-                            SelectionMode="None"
-                          ChoosingItemContainer="OnChoosingItemContainer"
-                            ContainerContentChanging="OnContainerContentChanging"
-                            Grid.Row="1">
-                    <ListView.ItemContainerStyle>
-                        <Style TargetType="ListViewItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Padding" Value="0"/>
-                        </Style>
-                    </ListView.ItemContainerStyle>
-                </ListView>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel x:Name="AccountSelectorPanel"/>
+                    <controls:NavigationViewItem x:Name="AddAccountItem"
+                                                 Glyph="&#xE109;"
+                                                 Tapped="OnAddAccountTapped"
+                                                 Grid.Row="1"/>
+                    <controls:NavigationViewItemSeparator x:Name="AccountSelectorSeparator"
+                                                          Grid.Row="2"/>
+                    <ListView x:Name="NavigationViewList"
+                              ItemClick="OnItemClick"
+                              IsItemClickEnabled="True"
+                              SelectionMode="None"
+                              ChoosingItemContainer="OnChoosingItemContainer"
+                              ContainerContentChanging="OnContainerContentChanging"
+                              Grid.Row="3"/>
+                </Grid>
             </controls:NavigationView.PaneFooter>
         </controls:NavigationView>
 

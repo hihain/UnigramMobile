@@ -6,8 +6,17 @@ using System.Linq;
 using System.Text;
 using Telegram.Td.Api;
 using Unigram.Common;
+
+#if MODERN_TDLIB
+using MessageForwardOriginUser = Telegram.Td.Api.MessageOriginUser;
+using MessageForwardOriginChat = Telegram.Td.Api.MessageOriginChat;
+using MessageForwardOriginChannel = Telegram.Td.Api.MessageOriginChannel;
+using MessageForwardOriginHiddenUser = Telegram.Td.Api.MessageOriginHiddenUser;
+using MessageForwardOriginMessageImport = Telegram.Td.Api.MessageOriginHiddenUser;
+#endif
 using Unigram.Controls.Messages.Content;
 using Unigram.Converters;
+using Unigram.Logs;
 using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.Foundation;
@@ -84,6 +93,8 @@ namespace Unigram.Controls.Messages
             {
                 Span.Inlines.Clear();
                 Media.Child = null;
+                Reactions.Children.Clear();
+                Reactions.Visibility = Visibility.Collapsed;
             }
 
             if (_highlight != null)
@@ -530,11 +541,11 @@ namespace Unigram.Controls.Messages
 
             //if (message.HasViaBotId && message.ViaBot != null && !message.ViaBot.IsDeleted && message.ViaBot.HasUsername)
             var viaBot = message.ProtoService.GetUser(message.ViaBotUserId);
-            if (viaBot != null && viaBot.Type is UserTypeBot && !string.IsNullOrEmpty(viaBot.Username))
+            if (viaBot != null && viaBot.Type is UserTypeBot && !string.IsNullOrEmpty(viaBot.GetUsername()))
             {
                 var hyperlink = new Hyperlink();
                 hyperlink.Inlines.Add(new Run { Text = paragraph.Inlines.Count > 0 ? " via @" : "via @", FontWeight = FontWeights.Normal });
-                hyperlink.Inlines.Add(new Run { Text = viaBot.Username });
+                hyperlink.Inlines.Add(new Run { Text = viaBot.GetUsername() });
                 hyperlink.UnderlineStyle = UnderlineStyle.None;
                 hyperlink.Foreground = light ? new SolidColorBrush(Colors.White) : GetBrush("MessageHeaderForegroundBrush");
                 hyperlink.Click += (s, args) => ViaBot_Click(message);
@@ -648,7 +659,16 @@ namespace Unigram.Controls.Messages
         public void UpdateMessageInteractionInfo(MessageViewModel message)
         {
             var info = message.InteractionInfo?.ReplyInfo;
+#if MODERN_TDLIB
+            if (info != null && message.IsChannelPost && !message.HasMessageProperties)
+            {
+                LoadThreadAvailability(message);
+            }
+
+            if (info == null || !message.IsChannelPost || !message.HasMessageProperties || !message.CanGetMessageThread)
+#else
             if (info == null || !message.IsChannelPost || !message.CanGetMessageThread)
+#endif
             {
                 if (Thread != null)
                 {
@@ -700,7 +720,90 @@ namespace Unigram.Controls.Messages
                 Thread.Visibility = Visibility.Visible;
             }
 
+            UpdateMessageReactions(message);
             Footer.UpdateMessageInteractionInfo(message);
+        }
+
+#if MODERN_TDLIB
+        private async void LoadThreadAvailability(MessageViewModel message)
+        {
+            if (await message.LoadMessagePropertiesAsync() && _message == message)
+            {
+                UpdateMessageInteractionInfo(message);
+            }
+        }
+#endif
+
+        private void UpdateMessageReactions(MessageViewModel message)
+        {
+            Reactions.Children.Clear();
+
+            var reactions = message.InteractionInfo?.Reactions?.Reactions;
+            if (reactions == null)
+            {
+                Reactions.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            foreach (var reaction in reactions)
+            {
+                if (!(reaction.Type is ReactionTypeEmoji emoji) || reaction.TotalCount <= 0)
+                {
+                    continue;
+                }
+
+                var button = new Button
+                {
+                    Content = $"{emoji.Emoji} {reaction.TotalCount}",
+                    Tag = reaction,
+                    Padding = new Thickness(6, 1, 6, 1),
+                    Margin = new Thickness(0, 0, 4, 4),
+                    MinHeight = 28,
+                    FontFamily = new FontFamily("Segoe UI Emoji"),
+                    FontWeight = reaction.IsChosen ? FontWeights.SemiBold : FontWeights.Normal
+                };
+                button.Click += Reaction_Click;
+
+                Reactions.Children.Add(button);
+            }
+
+            Reactions.HorizontalAlignment = message.IsOutgoing
+                ? HorizontalAlignment.Right
+                : HorizontalAlignment.Left;
+            Reactions.Visibility = Reactions.Children.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void Reaction_Click(object sender, RoutedEventArgs e)
+        {
+            var message = _message;
+            if (message == null || message.Id == 0 || !(sender is Button button) ||
+                !(button.Tag is MessageReaction reaction) || !(reaction.Type is ReactionTypeEmoji emoji))
+            {
+                return;
+            }
+
+            var operation = reaction.IsChosen ? "remove" : "add";
+            Function function;
+            if (reaction.IsChosen)
+            {
+                function = new RemoveMessageReaction(message.ChatId, message.Id, emoji);
+            }
+            else
+            {
+                function = new AddMessageReaction(message.ChatId, message.Id, emoji, false, false);
+            }
+
+            message.ProtoService.Send(function, result =>
+            {
+                if (result is Error error)
+                {
+                    PushDiagnostics.Write(
+                        "message.reaction",
+                        $"result=failed;operation={operation};code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+                }
+            });
         }
 
         public void UpdateMessageContentOpened(MessageViewModel message)
@@ -758,7 +861,7 @@ namespace Unigram.Controls.Messages
                     FooterToNormal();
                     bottom = 4;
                 }
-                else if (content is MessageCall || (content is MessageLocation location && location.LivePeriod > 0 && BindConvert.Current.DateTime(message.Date + location.LivePeriod) > DateTime.Now))
+                else if (content is MessageCall || (content is MessageLocation location && location.GetLivePeriod() > 0 && BindConvert.Current.DateTime(message.Date + location.GetLivePeriod()) > DateTime.Now))
                 {
                     FooterToHidden();
                 }
@@ -816,7 +919,7 @@ namespace Unigram.Controls.Messages
             }
             else if (content is MessageInvoice invoice)
             {
-                var caption = invoice.Photo == null;
+                var caption = invoice.GetPhoto() == null;
 
                 Media.Margin = new Thickness(0);
                 _placeholder = caption;
@@ -921,7 +1024,7 @@ namespace Unigram.Controls.Messages
                 }
                 else if (content is MessageInvoice invoice)
                 {
-                    if (invoice.Photo == null)
+                    if (invoice.GetPhoto() == null)
                     {
                         Media.Child = new InvoiceContent(message);
                     }
@@ -944,7 +1047,7 @@ namespace Unigram.Controls.Messages
                 }
                 else if (content is MessageSticker sticker)
                 {
-                    if (sticker.Sticker.IsAnimated)
+                    if (sticker.Sticker.GetIsAnimated())
                     {
                         Media.Child = new AnimatedStickerContent(message);
                     }
@@ -1045,6 +1148,16 @@ namespace Unigram.Controls.Messages
                 Span.Inlines.Add(new Run { Text = bigEmoji.Text.Text, FontSize = 32 });
                 result = true;
             }
+#if MODERN_TDLIB
+            else if (content is MessageAnimatedEmoji animatedEmoji)
+            {
+                // Safety net for the TDLib 1.8.66 content type: if ProcessEmojiAsync has not
+                // already replaced this with a sticker or a MessageBigEmoji, draw the emoji
+                // itself so the bubble is never rendered empty.
+                Span.Inlines.Add(new Run { Text = animatedEmoji.Emoji ?? string.Empty, FontSize = 32 });
+                result = true;
+            }
+#endif
 
             Message.Visibility = result ? Visibility.Visible : Visibility.Collapsed;
             //Footer.HorizontalAlignment = adjust ? HorizontalAlignment.Left : HorizontalAlignment.Right;
@@ -1851,7 +1964,7 @@ namespace Unigram.Controls.Messages
             }
             else if (constraint is Message message)
             {
-                ttl = message.Ttl > 0;
+                ttl = ModernTdlibCompatibility.GetMessageTtl(message) > 0;
                 constraint = message.Content;
             }
 
@@ -1861,7 +1974,7 @@ namespace Unigram.Controls.Messages
             }
             else if (constraint is MessageInvoice invoiceMessage)
             {
-                constraint = invoiceMessage.Photo;
+                constraint = invoiceMessage.GetPhoto();
             }
             else if (constraint is MessageLocation locationMessage)
             {
@@ -2034,7 +2147,7 @@ namespace Unigram.Controls.Messages
                 case MessageAlbum album:
                     return album.IsMedia;
                 case MessageInvoice invoice:
-                    return width && invoice.Photo != null;
+                    return width && invoice.GetPhoto() != null;
                 default:
                     return false;
             }

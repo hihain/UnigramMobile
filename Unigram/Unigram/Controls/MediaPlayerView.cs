@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
 using Telegram.Td.Api;
+using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.Foundation;
 using Windows.UI.Xaml;
@@ -55,7 +57,7 @@ namespace Unigram.Controls
             }
             else if (constraint is Message message)
             {
-                ttl = message.Ttl > 0;
+                ttl = ModernTdlibCompatibility.GetMessageTtl(message) > 0;
                 constraint = message.Content;
             }
 
@@ -67,7 +69,7 @@ namespace Unigram.Controls
             }
             else if (constraint is MessageInvoice invoiceMessage)
             {
-                constraint = invoiceMessage.Photo;
+                constraint = invoiceMessage.GetPhoto();
             }
             else if (constraint is MessageGame gameMessage)
             {

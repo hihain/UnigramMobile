@@ -1,0 +1,12 @@
+diff --git a/pffft/BUILD.gn b/pffft/BUILD.gn
+index ce74d354e..a4e9857da 100644
+--- a/pffft/BUILD.gn
++++ b/pffft/BUILD.gn
+@@ -23,6 +23,6 @@ config("common_config") {
+       current_cpu == "mips64el" || current_cpu == "ppc64" ||
+       current_cpu == "riscv64" || current_cpu == "s390x" ||
+       current_cpu == "loong64") {
+-    defines = [ "PFFFT_SIMD_DISABLE" ]
++    defines += [ "PFFFT_SIMD_DISABLE" ]
+   }
+ }

@@ -130,7 +130,7 @@ namespace Unigram.Controls.Chats
                 var username = title.Inlines[1] as Run;
 
                 name.Text = user.GetFullName();
-                username.Text = string.IsNullOrEmpty(user.Username) ? string.Empty : $" @{user.Username}";
+                username.Text = string.IsNullOrEmpty(user.GetUsername()) ? string.Empty : $" @{user.GetUsername()}";
 
                 photo.Source = PlaceholderHelper.GetUser(ViewModel?.ProtoService, user, 36);
             }

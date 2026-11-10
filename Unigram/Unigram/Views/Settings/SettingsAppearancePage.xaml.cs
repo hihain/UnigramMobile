@@ -85,6 +85,19 @@ namespace Unigram.Views.Settings
                 : Strings.Resources.AutoNightDisabled;
         }
 
+        private string ConvertDoubleTapAction(DoubleTapAction action)
+        {
+            switch (action)
+            {
+                case DoubleTapAction.Reply:
+                    return Strings.Resources.Reply;
+                case DoubleTapAction.React:
+                    return Strings.Additional.DoubleTapActionReaction;
+                default:
+                    return Strings.Additional.DoubleTapActionNone;
+            }
+        }
+
         private string ConvertDistanceUnits(DistanceUnits units)
         {
             switch (units)

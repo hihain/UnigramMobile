@@ -100,8 +100,13 @@ namespace Unigram.ViewModels.Settings
             set
             {
                 Set(ref _current, value);
+                RaisePropertyChanged(nameof(CurrentIp));
+                RaisePropertyChanged(nameof(CurrentCountry));
             }
         }
+
+        public string CurrentIp => Current.GetIpAddress();
+        public string CurrentCountry => Current.GetLocation();
 
         public RelayCommand<Session> TerminateCommand { get; }
         private async void TerminateExecute(Session session)

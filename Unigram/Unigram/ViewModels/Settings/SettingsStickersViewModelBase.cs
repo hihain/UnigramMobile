@@ -38,15 +38,15 @@ namespace Unigram.ViewModels.Settings
         {
             Aggregator.Subscribe(this);
 
-            ProtoService.Send(new GetInstalledStickerSets(_masks), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetInstalledStickerSets(_masks), result =>
             {
                 if (result is StickerSets stickerSets)
                 {
-                    ProtoService.Send(new GetRecentStickers(_masks), resultRecent =>
+                    ProtoService.Send(ModernTdlibCompatibility.GetRecentStickers(_masks), resultRecent =>
                     {
                         if (resultRecent is Stickers recents && recents.StickersValue.Count > 0)
                         {
-                            BeginOnUIThread(() => Items.ReplaceWith(new[] { new StickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, new ClosedVectorPath[0], false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
+                            BeginOnUIThread(() => Items.ReplaceWith(new[] { ModernTdlibCompatibility.CreateStickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, null, false, false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
                         }
                         else
                         {
@@ -56,7 +56,7 @@ namespace Unigram.ViewModels.Settings
                 }
             });
 
-            ProtoService.Send(new GetArchivedStickerSets(_masks, 0, 1), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetArchivedStickerSets(_masks, 0, 1), result =>
             {
                 if (result is StickerSets stickerSets)
                 {
@@ -69,7 +69,7 @@ namespace Unigram.ViewModels.Settings
                 return Task.CompletedTask;
             }
 
-            ProtoService.Send(new GetTrendingStickerSets(), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetTrendingStickerSets(), result =>
             {
                 if (result is StickerSets stickerSets)
                 {
@@ -87,7 +87,7 @@ namespace Unigram.ViewModels.Settings
             if (_needReorder && _newOrder.Count > 0)
             {
                 _needReorder = false;
-                ProtoService.Send(new ReorderInstalledStickerSets(_masks, _newOrder));
+                ProtoService.Send(ModernTdlibCompatibility.ReorderInstalledStickerSets(_masks, _newOrder));
 
                 //_stickersService.CalculateNewHash(_type);
 
@@ -103,20 +103,24 @@ namespace Unigram.ViewModels.Settings
 
         public void Handle(UpdateInstalledStickerSets update)
         {
+#if MODERN_TDLIB
+            if (!ModernTdlibCompatibility.IsStickerType(_masks, update.StickerType))
+#else
             if (update.IsMasks != _masks)
+#endif
             {
                 return;
             }
 
-            ProtoService.Send(new GetInstalledStickerSets(_masks), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetInstalledStickerSets(_masks), result =>
             {
                 if (result is StickerSets stickerSets)
                 {
-                    ProtoService.Send(new GetRecentStickers(_masks), resultRecent =>
+                    ProtoService.Send(ModernTdlibCompatibility.GetRecentStickers(_masks), resultRecent =>
                     {
                         if (resultRecent is Stickers recents && recents.StickersValue.Count > 0)
                         {
-                            BeginOnUIThread(() => Items.ReplaceWith(new[] { new StickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, new ClosedVectorPath[0], false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
+                            BeginOnUIThread(() => Items.ReplaceWith(new[] { ModernTdlibCompatibility.CreateStickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, null, false, false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
                         }
                         else
                         {
@@ -144,15 +148,15 @@ namespace Unigram.ViewModels.Settings
                 return;
             }
 
-            ProtoService.Send(new GetInstalledStickerSets(_masks), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetInstalledStickerSets(_masks), result =>
             {
                 if (result is StickerSets stickerSets)
                 {
-                    ProtoService.Send(new GetRecentStickers(_masks), resultRecent =>
+                    ProtoService.Send(ModernTdlibCompatibility.GetRecentStickers(_masks), resultRecent =>
                     {
                         if (resultRecent is Stickers recents && recents.StickersValue.Count > 0)
                         {
-                            BeginOnUIThread(() => Items.ReplaceWith(new[] { new StickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, new ClosedVectorPath[0], false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
+                            BeginOnUIThread(() => Items.ReplaceWith(new[] { ModernTdlibCompatibility.CreateStickerSetInfo(0, Strings.Resources.RecentStickers, "tg/recentlyUsed", null, null, false, false, false, false, false, _masks, false, recents.StickersValue.Count, recents.StickersValue) }.Union(stickerSets.Sets)));
                         }
                         else
                         {
@@ -223,7 +227,7 @@ namespace Unigram.ViewModels.Settings
         private async void StickerSetHideExecute(StickerSetInfo stickerSet)
         {
             await ProtoService.SendAsync(new ChangeStickerSet(stickerSet.Id, false, true));
-            ProtoService.Send(new GetArchivedStickerSets(_masks, 0, 1), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetArchivedStickerSets(_masks, 0, 1), result =>
             {
                 if (result is StickerSets stickerSets)
                 {

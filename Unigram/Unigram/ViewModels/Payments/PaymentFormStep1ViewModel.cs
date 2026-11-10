@@ -79,7 +79,7 @@ namespace Unigram.ViewModels.Payments
         {
             get
             {
-                return _paymentForm != null && (_paymentForm.Invoice.NeedEmailAddress || _paymentForm.Invoice.NeedName || _paymentForm.Invoice.NeedPhoneNumber);
+                return PaymentInvoice != null && (PaymentInvoice.NeedEmailAddress || PaymentInvoice.NeedName || PaymentInvoice.NeedPhoneNumber);
             }
         }
 
@@ -103,39 +103,39 @@ namespace Unigram.ViewModels.Payments
 
             var save = _isSave ?? false;
             var info = new OrderInfo();
-            if (_paymentForm.Invoice.NeedName)
+            if (PaymentInvoice.NeedName)
             {
                 info.Name = _info.Name;
             }
-            if (_paymentForm.Invoice.NeedEmailAddress)
+            if (PaymentInvoice.NeedEmailAddress)
             {
                 info.EmailAddress = _info.EmailAddress;
             }
-            if (_paymentForm.Invoice.NeedPhoneNumber)
+            if (PaymentInvoice.NeedPhoneNumber)
             {
                 info.PhoneNumber = _info.PhoneNumber;
             }
-            if (_paymentForm.Invoice.NeedShippingAddress)
+            if (PaymentInvoice.NeedShippingAddress)
             {
                 info.ShippingAddress = _info.ShippingAddress;
                 info.ShippingAddress.CountryCode = _selectedCountry?.Code?.ToUpper();
             }
 
-            var response = await ProtoService.SendAsync(new ValidateOrderInfo(0, 0, info, save));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateValidateOrderInfo(_message?.ChatId ?? 0, _message?.Id ?? 0, info, save));
             if (response is ValidatedOrderInfo validated)
             {
                 IsLoading = false;
 
-                if (_paymentForm.SavedOrderInfo != null && !save)
+                if (SavedOrderInfo != null && !save)
                 {
                     ProtoService.Send(new DeleteSavedOrderInfo());
                 }
 
-                if (_paymentForm.Invoice.IsFlexible)
+                if (PaymentInvoice.IsFlexible)
                 {
                     //NavigationService.NavigateToPaymentFormStep2(_message, _paymentForm, info, response.Result);
                 }
-                else if (_paymentForm.SavedCredentials != null)
+                else if (HasSavedCredentials)
                 {
                     //if (ApplicationSettings.Current.TmpPassword != null)
                     //{

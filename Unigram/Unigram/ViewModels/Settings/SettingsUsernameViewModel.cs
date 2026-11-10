@@ -29,7 +29,7 @@ namespace Unigram.ViewModels.Settings
             var response = await ProtoService.SendAsync(new GetMe());
             if (response is User user)
             {
-                _username = user.Username;
+                _username = user.GetUsername();
             }
 
             RaisePropertyChanged(() => Username);

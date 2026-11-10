@@ -14,92 +14,100 @@ namespace Unigram.Services
 
         private void SetChatPositions(Chat chat, IList<ChatPosition> positions)
         {
-            Monitor.Enter(_chatList);
-            //Monitor.Enter(chat);
-
-            foreach (var position in chat.Positions)
+            lock (_chatList)
             {
-                var chatList = _chatList[position.List.ToId()];
-                if (chatList != null)
+                foreach (var position in chat.Positions)
                 {
-                    chatList.Remove(new OrderedChat(chat.Id, position));
+                    var chatList = _chatList[position.List.ToId()];
+                    if (chatList != null)
+                    {
+                        chatList.Remove(new OrderedChat(chat.Id, position));
+                    }
+                }
+
+                chat.Positions = positions;
+
+                foreach (var position in chat.Positions)
+                {
+                    var chatList = _chatList[position.List.ToId()];
+                    if (chatList != null)
+                    {
+                        chatList.Add(new OrderedChat(chat.Id, position));
+                    }
                 }
             }
-
-            chat.Positions = positions;
-
-            foreach (var position in chat.Positions)
-            {
-                var chatList = _chatList[position.List.ToId()];
-                if (chatList != null)
-                {
-                    chatList.Add(new OrderedChat(chat.Id, position));
-                }
-            }
-
-            //Monitor.Exit(chat);
-            Monitor.Exit(_chatList);
         }
 
         public async Task<Chats> GetChatListAsync(ChatList chatList, int offset, int limit)
         {
-            Monitor.Enter(_chatList);
-
-            var index = GetIdFromChatList(chatList);
-
-            var count = offset + limit;
-            var sorted = _chatList[index];
-
-            if (!_haveFullChatList[index] && count > sorted.Count)
+            var lockTaken = false;
+            try
             {
-                // have enough chats in the chat list or chat list is too small
-                long offsetOrder = long.MaxValue;
-                long offsetChatId = 0;
-                if (sorted.Count > 0)
-                {
-                    OrderedChat last = sorted.Max;
-                    offsetOrder = last.Position.Order;
-                    offsetChatId = last.ChatId;
-                }
+                Monitor.Enter(_chatList, ref lockTaken);
 
-                Monitor.Exit(_chatList);
+                var index = GetIdFromChatList(chatList);
 
-                var response = await _client.SendAsync(new LoadChats(chatList, count - sorted.Count));
-                if (response is Ok || response is Error)
+                var count = offset + limit;
+                var sorted = _chatList[index];
+
+                if (!_haveFullChatList[index] && count > sorted.Count)
                 {
-                    if (response is Error error && error.Code == 404)
+                    // have enough chats in the chat list or chat list is too small
+                    long offsetOrder = long.MaxValue;
+                    long offsetChatId = 0;
+                    if (sorted.Count > 0)
                     {
-                        _haveFullChatList[index] = true;
+                        OrderedChat last = sorted.Max;
+                        offsetOrder = last.Position.Order;
+                        offsetChatId = last.ChatId;
                     }
 
-                    // chats had already been received through updates, let's retry request
-                    return await GetChatListAsync(chatList, offset, limit);
+                    Monitor.Exit(_chatList);
+                    lockTaken = false;
+
+                    var response = await _client.SendAsync(new LoadChats(chatList, count - sorted.Count));
+                    if (response is Ok || response is Error)
+                    {
+                        if (response is Error error && error.Code == 404)
+                        {
+                            _haveFullChatList[index] = true;
+                        }
+
+                        // chats had already been received through updates, let's retry request
+                        return await GetChatListAsync(chatList, offset, limit);
+                    }
+
+                    return null;
                 }
 
-                return null;
-            }
+                // have enough chats in the chat list to answer request
+                var result = new long[Math.Max(0, Math.Min(limit, sorted.Count - offset))];
+                var pos = 0;
 
-            // have enough chats in the chat list to answer request
-            var result = new long[Math.Max(0, Math.Min(limit, sorted.Count - offset))];
-            var pos = 0;
-
-            using (var iter = sorted.GetEnumerator())
-            {
-                int max = Math.Min(count, sorted.Count);
-
-                for (int i = 0; i < max; i++)
+                using (var iter = sorted.GetEnumerator())
                 {
-                    iter.MoveNext();
+                    int max = Math.Min(count, sorted.Count);
 
-                    if (i >= offset)
+                    for (int i = 0; i < max; i++)
                     {
-                        result[pos++] = iter.Current.ChatId;
+                        iter.MoveNext();
+
+                        if (i >= offset)
+                        {
+                            result[pos++] = iter.Current.ChatId;
+                        }
                     }
                 }
-            }
 
-            Monitor.Exit(_chatList);
-            return new Chats(0, result);
+                return new Chats(0, result);
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    Monitor.Exit(_chatList);
+                }
+            }
         }
 
         private struct OrderedChat : IComparable<OrderedChat>

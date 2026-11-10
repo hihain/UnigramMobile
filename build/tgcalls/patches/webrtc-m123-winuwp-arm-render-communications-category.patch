@@ -1,0 +1,24 @@
+diff --git a/modules/audio_device/win/audio_device_core_win.cc b/modules/audio_device/win/audio_device_core_win.cc
+index 8d473e3e05..d6725184f2 100644
+--- a/modules/audio_device/win/audio_device_core_win.cc
++++ b/modules/audio_device/win/audio_device_core_win.cc
+@@ -595,11 +595,14 @@ struct AudioDeviceHelper : public DeviceHelper<DEVICE_CLASS> {
+     {
+       AudioClientProperties properties = {};
+       properties.cbSize = sizeof(AudioClientProperties);
+-      if constexpr (DEVICE_CLASS == DeviceClass::DeviceClass_AudioCapture) {
+-        properties.eCategory = AudioCategory_Communications;
+-      } else {
+-        properties.eCategory = AudioCategory_Other;
+-      }
++      // Both directions of a call must be tagged as communications. Windows treats a
++      // render stream tagged AudioCategory_Other as "other sounds" while a
++      // communications capture stream is live and ducks it; the Windows 10 Mobile call
++      // audio policy mutes it outright, so the call renders at full amplitude and is
++      // simply never heard. Tagging render as communications also puts the stream under
++      // AudioRoutingManager, which is what makes the earpiece/speakerphone toggle apply
++      // to it. Upstream's newer core audio implementation sets this unconditionally.
++      properties.eCategory = AudioCategory_Communications;
+ 
+       HRESULT hr = _audioClient->SetClientProperties(&properties);
+       if (FAILED(hr)) {

@@ -1,0 +1,59 @@
+diff --git a/modules/video_coding/BUILD.gn b/modules/video_coding/BUILD.gn
+index 012a0e9a8a..22da28787 100644
+--- a/modules/video_coding/BUILD.gn
++++ b/modules/video_coding/BUILD.gn
+@@ -578,12 +578,10 @@ rtc_library("webrtc_multiplex") {
+ # VP8 and VP9 wrappers below.
+ rtc_library("webrtc_libvpx_interface") {
+   visibility = [ "*" ]
+-  sources = [
+-    "codecs/interface/libvpx_interface.cc",
+-    "codecs/interface/libvpx_interface.h",
+-  ]
++  sources = [ "codecs/interface/libvpx_interface.h" ]
+   deps = [ "../../rtc_base:checks" ]
+   if (rtc_build_libvpx) {
++    sources += [ "codecs/interface/libvpx_interface.cc" ]
+     deps += [ rtc_libvpx_dir ]
+   }
+ }
+@@ -600,12 +598,17 @@ rtc_library("webrtc_vp8") {
+   visibility = [ "*" ]
+   poisonous = [ "software_video_codecs" ]
+   sources = [
++  ]
++
++  if (rtc_build_libvpx) {
++    sources += [
+     "codecs/vp8/include/vp8.h",
+     "codecs/vp8/libvpx_vp8_decoder.cc",
+     "codecs/vp8/libvpx_vp8_decoder.h",
+     "codecs/vp8/libvpx_vp8_encoder.cc",
+     "codecs/vp8/libvpx_vp8_encoder.h",
+-  ]
++    ]
++  }
+ 
+   deps = [
+     ":codec_globals_headers",
+@@ -720,6 +723,10 @@ rtc_library("webrtc_vp9") {
+   visibility = [ "*" ]
+   poisonous = [ "software_video_codecs" ]
+   sources = [
++  ]
++
++  if (rtc_build_libvpx) {
++    sources += [
+     "codecs/vp9/include/vp9.h",
+     "codecs/vp9/libvpx_vp9_decoder.cc",
+     "codecs/vp9/libvpx_vp9_decoder.h",
+@@ -728,7 +735,8 @@ rtc_library("webrtc_vp9") {
+     "codecs/vp9/vp9.cc",
+     "codecs/vp9/vp9_frame_buffer_pool.cc",
+     "codecs/vp9/vp9_frame_buffer_pool.h",
+-  ]
++    ]
++  }
+ 
+   deps = [
+     ":video_codec_interface",

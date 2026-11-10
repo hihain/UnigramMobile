@@ -358,6 +358,34 @@ namespace Unigram.ViewModels
 
 
         public RelayCommand SendCommand { get; }
+
+        private static SendMessage CreateShareMessage(long chatId, MessageSendOptions options, InputMessageContent content)
+        {
+#if MODERN_TDLIB
+            return new SendMessage(chatId, null, null, options, null, content);
+#else
+            return new SendMessage(chatId, 0, 0, options, null, content);
+#endif
+        }
+
+        private static InputMessageForwarded CreateForwardedMessage(long chatId, long messageId)
+        {
+#if MODERN_TDLIB
+            return new InputMessageForwarded(chatId, messageId, true, false, 0, new MessageCopyOptions(false, false, null, false));
+#else
+            return new InputMessageForwarded(chatId, messageId, true, new MessageCopyOptions(false, false, null));
+#endif
+        }
+
+        private static ForwardMessages CreateForwardMessages(long chatId, long fromChatId, IList<long> messageIds, MessageSendOptions options, bool sendCopy, bool removeCaption)
+        {
+#if MODERN_TDLIB
+            return new ForwardMessages(chatId, null, fromChatId, messageIds, options, sendCopy, removeCaption);
+#else
+            return new ForwardMessages(chatId, fromChatId, messageIds, options, sendCopy, removeCaption, false);
+#endif
+        }
+
         private async void SendExecute()
         {
             var chats = SelectedItems.ToList();
@@ -372,7 +400,7 @@ namespace Unigram.ViewModels
 
                 foreach (var chat in chats)
                 {
-                    var response = await ProtoService.SendAsync(new SendMessage(chat.Id, 0, 0, new MessageSendOptions(false, false, null), null, new InputMessageText(formatted, false, false)));
+                    var response = await ProtoService.SendAsync(CreateShareMessage(chat.Id, ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null), ModernTdlibCompatibility.CreateInputMessageText(formatted, false, false)));
                 }
             }
 
@@ -382,7 +410,7 @@ namespace Unigram.ViewModels
                 {
                     if (IsWithMyScore)
                     {
-                        var response = await ProtoService.SendAsync(new SendMessage(chat.Id, 0, 0, new MessageSendOptions(false, false, null), null, new InputMessageForwarded(_messages[0].ChatId, _messages[0].Id, true, new MessageCopyOptions(false, false, null))));
+                        var response = await ProtoService.SendAsync(CreateShareMessage(chat.Id, ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null), CreateForwardedMessage(_messages[0].ChatId, _messages[0].Id)));
                     }
                     else
                     {
@@ -394,7 +422,7 @@ namespace Unigram.ViewModels
                             album = first.MediaAlbumId != 0 && _messages.All(x => x.MediaAlbumId == first.MediaAlbumId);
                         }
 
-                        var response = await ProtoService.SendAsync(new ForwardMessages(chat.Id, _messages[0].ChatId, _messages.Select(x => x.Id).ToList(), new MessageSendOptions(false, false, null), _sendAsCopy || _removeCaptions, _removeCaptions, false));
+                        var response = await ProtoService.SendAsync(CreateForwardMessages(chat.Id, _messages[0].ChatId, _messages.Select(x => x.Id).ToList(), ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null), _sendAsCopy || _removeCaptions, _removeCaptions));
                     }
                 }
 
@@ -404,7 +432,7 @@ namespace Unigram.ViewModels
             {
                 foreach (var chat in chats)
                 {
-                    var response = await ProtoService.SendAsync(new SendMessage(chat.Id, 0, 0, new MessageSendOptions(false, false, null), null, _inputMedia));
+                    var response = await ProtoService.SendAsync(CreateShareMessage(chat.Id, ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null), _inputMedia));
                 }
 
                 //NavigationService.GoBack();
@@ -415,7 +443,7 @@ namespace Unigram.ViewModels
 
                 foreach (var chat in chats)
                 {
-                    var response = await ProtoService.SendAsync(new SendMessage(chat.Id, 0, 0, new MessageSendOptions(false, false, null), null, new InputMessageText(formatted, false, false)));
+                    var response = await ProtoService.SendAsync(CreateShareMessage(chat.Id, ModernTdlibCompatibility.CreateMessageSendOptions(false, false, null), ModernTdlibCompatibility.CreateInputMessageText(formatted, false, false)));
                 }
 
                 //NavigationService.GoBack();

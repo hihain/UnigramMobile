@@ -159,6 +159,9 @@ namespace Unigram.Converters
 
         public static ChatFilterIcon ParseFilter(ChatFilter filter)
         {
+#if MODERN_TDLIB
+            return ChatFilterIcon.Custom;
+#else
             var iconName = filter.IconName;
             if (string.IsNullOrEmpty(iconName))
             {
@@ -170,6 +173,7 @@ namespace Unigram.Converters
             }
 
             return ParseFilter(iconName);
+#endif
         }
 
         public static ChatFilterIcon ParseFilter(string iconName)

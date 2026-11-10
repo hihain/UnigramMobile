@@ -1,6 +1,7 @@
 ﻿using System;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -222,7 +223,9 @@ namespace Unigram.Controls.Messages
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
+#if !MODERN_TDLIB
                 case MessageChatSetTtl chatSetTtl:
+#endif
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:
@@ -402,7 +405,7 @@ namespace Unigram.Controls.Messages
                 ThumbRoot.Visibility = Visibility.Collapsed;
 
             TitleLabel.Text = GetFromLabel(message, title);
-            ServiceLabel.Text = invoice.Title;
+            ServiceLabel.Text = invoice.GetTitle();
             MessageLabel.Text = string.Empty;
 
             return true;
@@ -416,7 +419,7 @@ namespace Unigram.Controls.Messages
                 ThumbRoot.Visibility = Visibility.Collapsed;
 
             TitleLabel.Text = GetFromLabel(message, title);
-            ServiceLabel.Text = location.LivePeriod > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation;
+            ServiceLabel.Text = location.GetLivePeriod() > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation;
             MessageLabel.Text = string.Empty;
 
             return true;
@@ -531,7 +534,7 @@ namespace Unigram.Controls.Messages
                 ThumbRoot.Visibility = Visibility.Collapsed;
 
             TitleLabel.Text = GetFromLabel(message, title);
-            ServiceLabel.Text = $"\uD83D\uDCCA {poll.Poll.Question.Replace("\r\n", "\n").Replace('\n', ' ')}";
+            ServiceLabel.Text = $"\uD83D\uDCCA {ModernTdlibCompatibility.GetPollQuestion(poll.Poll).Replace("\r\n", "\n").Replace('\n', ' ')}";
             MessageLabel.Text = string.Empty;
 
             return true;
@@ -887,7 +890,7 @@ namespace Unigram.Controls.Messages
             }
             else if (message.Content is MessageInvoice invoice)
             {
-                return invoice.Title;
+                return invoice.GetTitle();
             }
             else if (message.Content is MessageContact)
             {
@@ -895,7 +898,7 @@ namespace Unigram.Controls.Messages
             }
             else if (message.Content is MessageLocation location)
             {
-                return (location.LivePeriod > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
+                return (location.GetLivePeriod() > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
             }
             else if (message.Content is MessageVenue vanue)
             {
@@ -907,7 +910,7 @@ namespace Unigram.Controls.Messages
             }
             else if (message.Content is MessagePoll poll)
             {
-                return $"\uD83D\uDCCA {poll.Poll.Question}";
+                return $"\uD83D\uDCCA {ModernTdlibCompatibility.GetPollQuestion(poll.Poll)}";
             }
             else if (message.Content is MessageCall call)
             {

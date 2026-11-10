@@ -19,6 +19,7 @@ namespace Unigram.Collections
         private readonly long _fromMessageId;
 
         private readonly SearchMessagesFilter _filter;
+        private bool _hasMoreItems = true;
 
         public SearchChatMessagesCollection(IProtoService protoService, long chatId, long threadId, string query, MessageSender sender, long fromMessageId, SearchMessagesFilter filter)
         {
@@ -50,19 +51,31 @@ namespace Unigram.Collections
                     offset = 0;
                 }
 
-                var response = await _protoService.SendAsync(new SearchChatMessages(_chatId, _query, _sender, fromMessageId, offset, (int)count, _filter, _threadId));
-                if (response is Messages messages)
+                var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                    ModernTdlibCompatibility.CreateSearchChatMessages(_chatId, ModernTdlibCompatibility.GetMessageTopic(_threadId), _query, _sender, fromMessageId, offset, (int)count, _filter)
+#else
+                    new SearchChatMessages(_chatId, _query, _sender, fromMessageId, offset, (int)count, _filter, _threadId)
+#endif
+                );
+                if (ModernTdlibCompatibility.TryGetSearchChatMessages(
+                    response,
+                    out var totalCount,
+                    out var messages,
+                    out _))
                 {
-                    TotalCount = messages.TotalCount;
-                    AddRange(messages.MessagesValue);
+                    TotalCount = totalCount;
+                    AddRange(messages);
+                    _hasMoreItems = messages.Count == (int)count && Count < TotalCount;
 
-                    return new LoadMoreItemsResult { Count = (uint)messages.MessagesValue.Count };
+                    return new LoadMoreItemsResult { Count = (uint)messages.Count };
                 }
 
+                _hasMoreItems = false;
                 return new LoadMoreItemsResult { Count = 0 };
             });
         }
 
-        public bool HasMoreItems => throw new NotImplementedException();
+        public bool HasMoreItems => _hasMoreItems;
     }
 }

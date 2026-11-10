@@ -112,6 +112,23 @@ namespace Unigram.Services.Settings
             }
         }
 
+        private bool? _showSecretChatOnLiveTiles;
+        public bool ShowSecretChatOnLiveTiles
+        {
+            get
+            {
+                if (_showSecretChatOnLiveTiles == null)
+                    _showSecretChatOnLiveTiles = GetValueOrDefault("ShowSecretChatOnLiveTiles", false);
+
+                return _showSecretChatOnLiveTiles ?? false;
+            }
+            set
+            {
+                _showSecretChatOnLiveTiles = value;
+                AddOrUpdateValue("ShowSecretChatOnLiveTiles", value);
+            }
+        }
+
         private bool? _isPinnedEnabled;
         public bool IsPinnedEnabled
         {

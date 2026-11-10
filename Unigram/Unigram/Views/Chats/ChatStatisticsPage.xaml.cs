@@ -1,4 +1,5 @@
-﻿using System.Linq;
+using System;
+using System.Linq;
 using System.Text;
 using Telegram.Td.Api;
 using Unigram.Charts;
@@ -10,10 +11,27 @@ using Unigram.ViewModels.Chats;
 using Unigram.ViewModels.Delegates;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Media;
 
 namespace Unigram.Views.Chats
 {
+    public sealed class ChatStatisticsChannelMeanConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            var channel = value as ChatStatisticsChannel;
+            return string.Equals(parameter as string, "shares", StringComparison.Ordinal)
+                ? channel.GetMeanMessageShareCount()
+                : channel.GetMeanMessageViewCount();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     public sealed partial class ChatStatisticsPage : HostedPage, IChatDelegate
     {
         public ChatStatisticsViewModel ViewModel => DataContext as ChatStatisticsViewModel;

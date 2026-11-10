@@ -88,17 +88,17 @@ namespace Unigram.ViewModels.Supergroups
 
                 if (member.Status is ChatMemberStatusAdministrator administrator)
                 {
-                    CanChangeInfo = administrator.CanChangeInfo;
-                    CanDeleteMessages = administrator.CanDeleteMessages;
-                    CanEditMessages = administrator.CanEditMessages;
-                    CanInviteUsers = administrator.CanInviteUsers;
-                    CanPinMessages = administrator.CanPinMessages;
-                    CanPostMessages = administrator.CanPostMessages;
-                    CanPromoteMembers = administrator.CanPromoteMembers;
-                    CanRestrictMembers = administrator.CanRestrictMembers;
-                    IsAnonymous = administrator.IsAnonymous;
+                    CanChangeInfo = ModernTdlibCompatibility.GetAdministratorCanChangeInfo(administrator);
+                    CanDeleteMessages = ModernTdlibCompatibility.GetAdministratorCanDeleteMessages(administrator);
+                    CanEditMessages = ModernTdlibCompatibility.GetAdministratorCanEditMessages(administrator);
+                    CanInviteUsers = ModernTdlibCompatibility.GetAdministratorCanInviteUsers(administrator);
+                    CanPinMessages = ModernTdlibCompatibility.GetAdministratorCanPinMessages(administrator);
+                    CanPostMessages = ModernTdlibCompatibility.GetAdministratorCanPostMessages(administrator);
+                    CanPromoteMembers = ModernTdlibCompatibility.GetAdministratorCanPromoteMembers(administrator);
+                    CanRestrictMembers = ModernTdlibCompatibility.GetAdministratorCanRestrictMembers(administrator);
+                    IsAnonymous = ModernTdlibCompatibility.GetAdministratorIsAnonymous(administrator);
 
-                    CustomTitle = administrator.CustomTitle;
+                    CustomTitle = ModernTdlibCompatibility.GetAdministratorCustomTitle(administrator);
                 }
                 else
                 {
@@ -115,7 +115,7 @@ namespace Unigram.ViewModels.Supergroups
                     {
                         IsAnonymous = creator.IsAnonymous;
 
-                        CustomTitle = creator.CustomTitle;
+                        CustomTitle = ModernTdlibCompatibility.GetCreatorCustomTitle(creator);
                     }
                     else
                     {
@@ -336,23 +336,26 @@ namespace Unigram.ViewModels.Supergroups
             ChatMemberStatus status;
             if (member.Status is ChatMemberStatusCreator creator)
             {
+#if MODERN_TDLIB
+                status = new ChatMemberStatusCreator(channel ? false : _isAnonymous, creator.IsMember);
+#else
                 status = new ChatMemberStatusCreator(_customTitle ?? string.Empty, channel ? false : _isAnonymous, creator.IsMember);
+#endif
             }
             else
             {
-                status = new ChatMemberStatusAdministrator
-                {
-                    IsAnonymous = channel ? false : _isAnonymous,
-                    CanChangeInfo = _canChangeInfo,
-                    CanDeleteMessages = _canDeleteMessages,
-                    CanEditMessages = channel ? _canEditMessages : false,
-                    CanInviteUsers = _canInviteUsers,
-                    CanPinMessages = channel ? false : _canPinMessages,
-                    CanPostMessages = channel ? _canPostMessages : false,
-                    CanPromoteMembers = _canPromoteMembers,
-                    CanRestrictMembers = channel ? false : _canRestrictMembers,
-                    CustomTitle = _customTitle ?? string.Empty
-                };
+                status = ModernTdlibCompatibility.CreateAdministratorStatus(
+                    true,
+                    _canChangeInfo,
+                    _canDeleteMessages,
+                    channel && _canEditMessages,
+                    _canInviteUsers,
+                    !channel && _canPinMessages,
+                    channel && _canPostMessages,
+                    _canPromoteMembers,
+                    !channel && _canRestrictMembers,
+                    !channel && _isAnonymous,
+                    _customTitle);
             }
 
             var response = await ProtoService.SendAsync(new SetChatMemberStatus(chat.Id, member.MemberId, status));
@@ -403,8 +406,8 @@ namespace Unigram.ViewModels.Supergroups
                 var builder = new StringBuilder();
                 builder.AppendFormat(supergroup.IsChannel ? Strings.Resources.EditChannelAdminTransferAlertText : Strings.Resources.EditAdminTransferAlertText, user.FirstName);
                 builder.AppendLine();
-                builder.AppendLine($"• {Strings.Resources.EditAdminTransferAlertText1}");
-                builder.AppendLine($"• {Strings.Resources.EditAdminTransferAlertText2}");
+                builder.AppendLine($"ï¿½ {Strings.Resources.EditAdminTransferAlertText1}");
+                builder.AppendLine($"ï¿½ {Strings.Resources.EditAdminTransferAlertText2}");
 
                 if (canTransfer is CanTransferOwnershipResultPasswordNeeded)
                 {

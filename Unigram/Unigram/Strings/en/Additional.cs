@@ -50,6 +50,72 @@ namespace Unigram.Strings
         }
         
         /// <summary>
+        /// Localized resource similar to "Double-tap on message"
+        /// </summary>
+        public static string DoubleTapAction
+        {
+            get
+            {
+                return Resource.GetString("DoubleTapAction");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Nothing"
+        /// </summary>
+        public static string DoubleTapActionNone
+        {
+            get
+            {
+                return Resource.GetString("DoubleTapActionNone");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Quick reaction"
+        /// </summary>
+        public static string DoubleTapActionReaction
+        {
+            get
+            {
+                return Resource.GetString("DoubleTapActionReaction");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "More reactions"
+        /// </summary>
+        public static string MoreReactions
+        {
+            get
+            {
+                return Resource.GetString("MoreReactions");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Select the messages you want to report, then choose Report."
+        /// </summary>
+        public static string ReportSelectMessages
+        {
+            get
+            {
+                return Resource.GetString("ReportSelectMessages");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Skip"
+        /// </summary>
+        public static string ReportSkip
+        {
+            get
+            {
+                return Resource.GetString("ReportSkip");
+            }
+        }
+        
+        /// <summary>
         /// Localized resource similar to "Play GIF previews on GIF selection"
         /// </summary>
         public static string PlayGifPreview

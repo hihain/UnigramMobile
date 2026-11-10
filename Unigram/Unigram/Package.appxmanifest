@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3" xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4" xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5" IgnorableNamespaces="uap uap3 uap4 uap5 mp">
-  <Identity Name="49197Wirdschon.UnigramMobile" Publisher="CN=DC409D7A-979D-42E5-AAA5-E9A0F674260F" Version="20.5.4950.0" />
-  <mp:PhoneIdentity PhoneProductId="bf16cc61-265a-4c8a-9ead-f4f77e6a0a97" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+  <Identity Name="ZuneTracks.UnigramMobileMessengerBETA" Publisher="CN=3ED86B18-5F5F-4AE0-AA9C-697B841F55A7"       Version="26.11.6288.0" />
+  <mp:PhoneIdentity PhoneProductId="586556a6-0101-4d72-b423-897b40137cf6" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
-    <DisplayName>Unigram Mobile Messenger</DisplayName>
-    <PublisherDisplayName>abaculi</PublisherDisplayName>
+    <DisplayName>Unigram Mobile Messenger BETA</DisplayName>
+    <PublisherDisplayName>ZuneTracks</PublisherDisplayName>
     <Logo>Assets\Logos\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
@@ -15,16 +15,16 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="Unigram.App">
-      <uap:VisualElements DisplayName="Unigram Mobile Messenger" Square150x150Logo="Assets\Logos\Square150x150Logo.png" Square44x44Logo="Assets\Logos\Square44x44Logo.png" Description="Unigram Mobile - a Telegram Messenger client for Windows 10 Mobile" BackgroundColor="transparent">
+      <uap:VisualElements DisplayName="Unigram Mobile Messenger BETA" Square150x150Logo="Assets\Logos\Square150x150Logo.png" Square44x44Logo="Assets\Logos\Square44x44Logo.png" Description="Unigram Mobile Messenger BETA" BackgroundColor="#0078D7">
         <uap:LockScreen Notification="badgeAndTileText" BadgeLogo="Assets\Logos\LockScreenLogo.png" />
-        <uap:DefaultTile Wide310x150Logo="Assets\Logos\Wide310x150Logo.png" Square71x71Logo="Assets\Logos\Square71x71Logo.png" Square310x310Logo="Assets\Logos\Square310x310Logo.png" ShortName="Unigram Mobile">
+        <uap:DefaultTile Wide310x150Logo="Assets\Logos\Wide310x150Logo.png" Square71x71Logo="Assets\Logos\Square71x71Logo.png" Square310x310Logo="Assets\Logos\Square310x310Logo.png" ShortName="Unigram Mobile Messenger BETA">
           <uap:ShowNameOnTiles>
             <uap:ShowOn Tile="square150x150Logo" />
             <uap:ShowOn Tile="wide310x150Logo" />
             <uap:ShowOn Tile="square310x310Logo" />
           </uap:ShowNameOnTiles>
         </uap:DefaultTile>
-        <uap:SplashScreen uap5:Optional="true" Image="Assets\Logos\SplashScreen.png" BackgroundColor="black" />
+        <uap:SplashScreen uap5:Optional="true" Image="Assets\Logos\SplashScreen.png" BackgroundColor="#0078D7" />
       </uap:VisualElements>
       <Extensions>
         <uap3:Extension Category="windows.appUriHandler">
@@ -95,6 +95,12 @@
       <InProcessServer>
         <Path>Unigram.Native.Media.dll</Path>
         <ActivatableClass ActivatableClassId="Unigram.Native.Media.OpusByteStreamHandler" ThreadingModel="both" />
+      </InProcessServer>
+    </Extension>
+    <Extension Category="windows.activatableClass.inProcessServer">
+      <InProcessServer>
+        <Path>Telegram.Td.dll</Path>
+        <ActivatableClass ActivatableClassId="Telegram.Td.Client" ThreadingModel="both" />
       </InProcessServer>
     </Extension>
   </Extensions>

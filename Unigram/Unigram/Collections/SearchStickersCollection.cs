@@ -40,7 +40,13 @@ namespace Unigram.Collections
                 {
                     _first = false;
 
-                    var response = await _protoService.SendAsync(new GetStickers(_query, 1000));
+                    var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                        new GetStickers(new StickerTypeRegular(), _query, 1000, 0)
+#else
+                        new GetStickers(_query, 1000)
+#endif
+                    );
                     if (response is Stickers stickers)
                     {
                         foreach (var sticker in stickers.StickersValue)
@@ -56,7 +62,13 @@ namespace Unigram.Collections
                 {
                     _hasMore = false;
 
-                    var response = await _protoService.SendAsync(new SearchStickers(_query, 20));
+                    var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                        new SearchStickers(new StickerTypeRegular(), _query, string.Empty, new string[0], 0, 20)
+#else
+                        new SearchStickers(_query, 20)
+#endif
+                    );
                     if (response is Stickers stickers)
                     {
                         foreach (var sticker in stickers.StickersValue)

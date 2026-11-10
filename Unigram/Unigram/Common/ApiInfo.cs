@@ -66,6 +66,55 @@ namespace Unigram.Common
         private static bool? _isMediaSupported;
         public static bool IsMediaSupported => (_isMediaSupported = _isMediaSupported ?? NativeUtils.IsMediaSupported()) ?? true;
 
+#if MODERN_TDLIB
+        private static int _capabilitiesWritten;
+
+        /// <summary>
+        /// Records which WinRT API contracts and individual composition members this device
+        /// actually exposes. Porting to a newer TDLib did not change the OS, but it did move
+        /// the app onto code paths whose availability was previously untested here, and a
+        /// missing member surfaces as a bare NullReferenceException under .NET Native rather
+        /// than as a typed error. This is API surface metadata only; it contains no user data.
+        /// </summary>
+        public static void WriteCapabilities()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _capabilitiesWritten, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var contract = 0;
+                for (ushort i = 4; i <= 12; i++)
+                {
+                    if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", i))
+                    {
+                        contract = i;
+                    }
+                }
+
+                var details =
+                    $"universal_contract={contract}" +
+                    $";family={Windows.System.Profile.AnalyticsInfo.VersionInfo.DeviceFamily}" +
+                    $";visual_relative_size={ApiInformation.IsPropertyPresent("Windows.UI.Composition.Visual", "RelativeSizeAdjustment")}" +
+                    $";window_compositor={ApiInformation.IsPropertyPresent("Windows.UI.Xaml.Window", "Compositor")}" +
+                    $";create_shape_visual={ApiInformation.IsMethodPresent("Windows.UI.Composition.Compositor", "CreateShapeVisual")}" +
+                    $";create_geometric_clip={ApiInformation.IsMethodPresent("Windows.UI.Composition.Compositor", "CreateGeometricClip")}" +
+                    $";create_spring_vector3={ApiInformation.IsMethodPresent("Windows.UI.Composition.Compositor", "CreateSpringVector3Animation")}" +
+                    $";create_linear_gradient={ApiInformation.IsMethodPresent("Windows.UI.Composition.Compositor", "CreateLinearGradientBrush")}" +
+                    $";set_is_translation_enabled={ApiInformation.IsMethodPresent("Windows.UI.Xaml.Hosting.ElementCompositionPreview", "SetIsTranslationEnabled")}" +
+                    $";uielement_shadow={ApiInformation.IsPropertyPresent("Windows.UI.Xaml.UIElement", "Shadow")}";
+
+                Logs.PushDiagnostics.Write("device.capabilities", details);
+            }
+            catch (System.Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("device.capabilities", ex);
+            }
+        }
+#endif
+
         public static TransitionCollection CreateSlideTransition()
         {
             //if (ApiInformation.IsPropertyPresent("Windows.UI.Xaml.Media.Animation.SlideNavigationTransitionInfo", "Effect"))

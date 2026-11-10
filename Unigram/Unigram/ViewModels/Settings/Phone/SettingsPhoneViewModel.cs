@@ -85,7 +85,11 @@ namespace Unigram.ViewModels.Settings
 
             await ProtoService.SendAsync(new SetOption("x_phonenumber", new OptionValueString(phoneNumber)));
 
+#if MODERN_TDLIB
+            var response = await ProtoService.SendAsync(new SetAuthenticationPhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, false, null, new string[0])));
+#else
             var response = await ProtoService.SendAsync(new ChangePhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, new string[0])));
+#endif
             if (response is AuthenticationCodeInfo info)
             {
                 App.Current.SessionState["x_codeinfo"] = info;

@@ -43,7 +43,20 @@ namespace Unigram.Controls
             DataContext = new object();
 
             var shadow = DropShadowEx.Attach(HeaderSeparator, 20, 0.25f);
+#if MODERN_TDLIB
+            // See EmojiDrawer: a throwing constructor surfaces as a XamlParseException and
+            // aborts navigation, so decorative composition is reported and skipped.
+            try
+            {
+                DropShadowEx.SetRelativeSize(shadow, HeaderSeparator);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("drawer.construct", ex, "drawer=panel");
+            }
+#else
             shadow.RelativeSizeAdjustment = Vector2.One;
+#endif
 
             var protoService = TLContainer.Current.Resolve<IProtoService>();
 
@@ -200,7 +213,7 @@ namespace Unigram.Controls
 
         public void UpdateChatPermissions(ICacheService cacheService, Chat chat)
         {
-            var emojisRights = DialogViewModel.VerifyRights(cacheService, chat, x => x.CanSendMessages, Strings.Resources.GlobalSendMessageRestricted, Strings.Resources.SendMessageRestrictedForever, Strings.Resources.SendMessageRestricted, out string emojisLabel);
+            var emojisRights = DialogViewModel.VerifyRights(cacheService, chat, x => x.GetCanSendMessages(), Strings.Resources.GlobalSendMessageRestricted, Strings.Resources.SendMessageRestrictedForever, Strings.Resources.SendMessageRestricted, out string emojisLabel);
             var stickersRights = DialogViewModel.VerifyRights(cacheService, chat, x => x.CanSendOtherMessages, Strings.Resources.GlobalAttachStickersRestricted, Strings.Resources.AttachStickersRestrictedForever, Strings.Resources.AttachStickersRestricted, out string stickersLabel);
             var animationsRights = DialogViewModel.VerifyRights(cacheService, chat, x => x.CanSendOtherMessages, Strings.Resources.GlobalAttachGifRestricted, Strings.Resources.AttachGifRestrictedForever, Strings.Resources.AttachGifRestricted, out string animationsLabel);
 

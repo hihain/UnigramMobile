@@ -78,7 +78,7 @@ namespace Unigram.Controls.Messages.Content
                 TimeoutLabel.Visibility = Visibility.Collapsed;
             }
 
-            Question.Text = poll.Poll.Question;
+            Question.Text = poll.Poll.GetQuestionText();
             Votes.Text = poll.Poll.TotalVoterCount > 0
                 ? Locale.Declension(poll.Poll.Type is PollTypeQuiz ? "Answer" : "Vote", poll.Poll.TotalVoterCount)
                 : poll.Poll.Type is PollTypeQuiz
@@ -89,7 +89,7 @@ namespace Unigram.Controls.Messages.Content
             {
                 Type.Text = poll.Poll.IsClosed ? Strings.Resources.FinalResults : poll.Poll.IsAnonymous ? Strings.Resources.AnonymousPoll : Strings.Resources.PublicPoll;
                 View.Visibility = results && poll.Poll.TotalVoterCount > 0 && !poll.Poll.IsAnonymous ? Visibility.Visible : Visibility.Collapsed;
-                Submit.Visibility = !results && reg.AllowMultipleAnswers ? Visibility.Visible : Visibility.Collapsed;
+                Submit.Visibility = !results && poll.Poll.GetAllowsMultipleAnswers() ? Visibility.Visible : Visibility.Collapsed;
                 Explanation.Visibility = Visibility.Collapsed;
             }
             else if (poll.Poll.Type is PollTypeQuiz quiz)
@@ -127,7 +127,7 @@ namespace Unigram.Controls.Messages.Content
                     {
                         button.UpdatePollOption(poll.Poll, poll.Poll.Options[i]);
 
-                        if (poll.Poll.Type is PollTypeRegular regular && regular.AllowMultipleAnswers)
+                        if (poll.Poll.GetAllowsMultipleAnswers())
                         {
                             button.Checked += Option_Toggled;
                             button.Unchecked += Option_Toggled;
@@ -147,7 +147,7 @@ namespace Unigram.Controls.Messages.Content
                     var button = new PollOptionControl();
                     button.UpdatePollOption(poll.Poll, poll.Poll.Options[i]);
 
-                    if (poll.Poll.Type is PollTypeRegular regular && regular.AllowMultipleAnswers)
+                    if (poll.Poll.GetAllowsMultipleAnswers())
                     {
                         button.Checked += Option_Toggled;
                         button.Unchecked += Option_Toggled;
@@ -163,7 +163,7 @@ namespace Unigram.Controls.Messages.Content
 
             RecentVoters.Children.Clear();
 
-            foreach (var id in poll.Poll.RecentVoterUserIds)
+            foreach (var id in poll.Poll.GetRecentVoterUserIds())
             {
                 var user = message.ProtoService.GetUser(id);
                 if (user == null)

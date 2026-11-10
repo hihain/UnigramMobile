@@ -1,0 +1,306 @@
+diff --git a/modules/video_capture/windows/help_functions_winrt.cc b/modules/video_capture/windows/help_functions_winrt.cc
+index 2884e43eb7..139f9f4aad 100644
+--- a/modules/video_capture/windows/help_functions_winrt.cc
++++ b/modules/video_capture/windows/help_functions_winrt.cc
+@@ -13,6 +13,7 @@
+ #include <Windows.ApplicationModel.core.h>
+ #include <Windows.ApplicationModel.h>
+
++#include <atomic>
+ #include <memory>
+
+ #include "rtc_base/logging.h"
+@@ -92,16 +93,30 @@ HRESULT GetMediaCaptureWithInitSettingsWin32(
+ HRESULT GetMediaCaptureWithInitSettingsUWP(
+     _In_ IMediaCaptureInitializationSettings* initialization_settings,
+     _COM_Outptr_ IMediaCapture** pp_media_capture) {
++  constexpr DWORD kUiDispatchTimeoutMs = 750;
++  constexpr DWORD kInitializationTimeoutMs = 1500;
++
++  struct InitializationState {
++    Event action_created;
++    Event action_completed;
++    AgileRef initialization_action;
++    AgileRef media_capture;
++    ComPtr<IMediaCaptureInitializationSettings> settings;
++    std::atomic<HRESULT> action_result{E_PENDING};
++    std::atomic<int> completion_status{
++        static_cast<int>(AsyncStatus::Started)};
++    std::atomic<bool> abandoned{false};
++  };
++
+   HRESULT hr = S_OK;
+   ComPtr<IMediaCapture> media_capture;
+   ComPtr<ICoreDispatcher> main_view_dispatcher;
+   ComPtr<IAsyncAction> async_action_ui_dispatcher;
+   ComPtr<IAsyncAction> async_action_media_capture;
+-  AgileRef async_action_media_capture_agile;
+-  AgileRef media_capture_agile;
+-  Event event_wait_for_media_capture_async_action;
+-  Event event_wait_for_media_capture_async_action_completion;
+   boolean has_thread_access;
++  auto state = std::make_shared<InitializationState>();
++
++  *pp_media_capture = nullptr;
+
+   // Acquires the main view dispacther (UI thread).
+   if (SUCCEEDED(hr)) {
+@@ -122,13 +137,22 @@ HRESULT GetMediaCaptureWithInitSettingsUWP(
+   // The following event is used for letting this thread know that
+   // async_action_media_capture has been created.
+   if (SUCCEEDED(hr)) {
+-    event_wait_for_media_capture_async_action =
++    state->action_created =
+         Event(::CreateEventEx(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET,
+                               WRITE_OWNER | EVENT_ALL_ACCESS));
+   }
+
+   if (SUCCEEDED(hr)) {
+-    hr = event_wait_for_media_capture_async_action.IsValid()
++    hr = state->action_created.IsValid()
++             ? S_OK
++             : HRESULT_FROM_WIN32(GetLastError());
++  }
++
++  if (SUCCEEDED(hr)) {
++    state->action_completed =
++        Event(::CreateEventEx(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET,
++                              WRITE_OWNER | EVENT_ALL_ACCESS));
++    hr = state->action_completed.IsValid()
+              ? S_OK
+              : HRESULT_FROM_WIN32(GetLastError());
+   }
+@@ -140,7 +164,11 @@ HRESULT GetMediaCaptureWithInitSettingsUWP(
+   }
+
+   if (SUCCEEDED(hr)) {
+-    hr = media_capture.AsAgile(&media_capture_agile);
++    hr = media_capture.AsAgile(&state->media_capture);
++  }
++
++  if (SUCCEEDED(hr)) {
++    state->settings = initialization_settings;
+   }
+
+   // Dispatches the media capture initialization to the main view
+@@ -150,31 +178,37 @@ HRESULT GetMediaCaptureWithInitSettingsUWP(
+         CoreDispatcherPriority::CoreDispatcherPriority_Normal,
+         Callback<Implements<RuntimeClassFlags<Delegate>, IDispatchedHandler,
+                             FtmBase>>(
+-            [&event_wait_for_media_capture_async_action,
+-             &async_action_media_capture_agile, &media_capture_agile,
+-             &initialization_settings]() -> HRESULT {
+-              HRESULT hr = S_OK;
++            [state]() -> HRESULT {
++              HRESULT action_result = E_ABORT;
+               ComPtr<IAsyncAction> media_capture_async;
+-              ComPtr<IMediaCapture> media_capture;
++              ComPtr<IMediaCapture> dispatched_media_capture;
+
+-              if (SUCCEEDED(hr)) {
+-                hr = media_capture_agile.As(&media_capture);
++              if (!state->abandoned.load(std::memory_order_acquire)) {
++                action_result = state->media_capture.As(&dispatched_media_capture);
+               }
+
+-              if (SUCCEEDED(hr)) {
+-                hr = media_capture->InitializeWithSettingsAsync(
+-                    initialization_settings,
++              if (SUCCEEDED(action_result)) {
++                action_result = dispatched_media_capture->InitializeWithSettingsAsync(
++                    state->settings.Get(),
+                     media_capture_async.ReleaseAndGetAddressOf());
+               }
+
+-              if (SUCCEEDED(hr)) {
+-                hr = media_capture_async.AsAgile(
+-                    &async_action_media_capture_agile);
++              if (SUCCEEDED(action_result)) {
++                action_result = media_capture_async.AsAgile(
++                    &state->initialization_action);
+               }
+
+-              ::SetEvent(event_wait_for_media_capture_async_action.Get());
++              if (state->abandoned.load(std::memory_order_acquire) &&
++                  SUCCEEDED(action_result)) {
++                ComPtr<IAsyncInfo> async_info;
++                if (SUCCEEDED(media_capture_async.As(&async_info))) {
++                  async_info->Cancel();
++                }
++              }
+
+-              return hr;
++              state->action_result.store(action_result, std::memory_order_release);
++              ::SetEvent(state->action_created.Get());
++              return action_result;
+             })
+             .Get(),
+         &async_action_ui_dispatcher);
+@@ -182,56 +216,72 @@ HRESULT GetMediaCaptureWithInitSettingsUWP(
+
+   // Waits for the UI thread to create async_action_media_capture.
+   if (SUCCEEDED(hr)) {
+-    hr =
+-        ::WaitForSingleObjectEx(event_wait_for_media_capture_async_action.Get(),
+-                                INFINITE, FALSE) == WAIT_OBJECT_0
+-            ? S_OK
+-            : E_FAIL;
+-  }
+-
+-  // Waits for user to approve (or not) access to the microphone and
+-  // camera.
+-  if (SUCCEEDED(hr)) {
+-    event_wait_for_media_capture_async_action_completion =
+-        Event(::CreateEventEx(nullptr, nullptr, CREATE_EVENT_MANUAL_RESET,
+-                              WRITE_OWNER | EVENT_ALL_ACCESS));
+-    hr = event_wait_for_media_capture_async_action_completion.IsValid()
+-             ? S_OK
+-             : HRESULT_FROM_WIN32(GetLastError());
++    const auto wait_result = ::WaitForSingleObjectEx(
++        state->action_created.Get(), kUiDispatchTimeoutMs, FALSE);
++    if (wait_result == WAIT_OBJECT_0) {
++      hr = state->action_result.load(std::memory_order_acquire);
++    } else {
++      state->abandoned.store(true, std::memory_order_release);
++      ComPtr<IAsyncInfo> dispatcher_action;
++      if (SUCCEEDED(async_action_ui_dispatcher.As(&dispatcher_action))) {
++        dispatcher_action->Cancel();
++      }
++      hr = wait_result == WAIT_TIMEOUT
++          ? HRESULT_FROM_WIN32(WAIT_TIMEOUT)
++          : HRESULT_FROM_WIN32(GetLastError());
++    }
+   }
+
+   // Waits until user grant (or deny) access to the camera.
+   if (SUCCEEDED(hr)) {
+-    hr = async_action_media_capture_agile.As(&async_action_media_capture);
++    hr = state->initialization_action.As(&async_action_media_capture);
+   }
+
+   if (SUCCEEDED(hr)) {
+     hr = async_action_media_capture->put_Completed(
+         Callback<IAsyncActionCompletedHandler>(
+-            [&event_wait_for_media_capture_async_action_completion](
++            [state](
+                 IAsyncAction*, AsyncStatus async_status) -> HRESULT {
+-              ::SetEvent(
+-                  event_wait_for_media_capture_async_action_completion.Get());
+-
+-              // Checks if user granted permission to access the camera.
+-              return async_status == AsyncStatus::Completed ? S_OK
+-                                                            : E_ACCESSDENIED;
++              state->completion_status.store(
++                  static_cast<int>(async_status), std::memory_order_release);
++              ::SetEvent(state->action_completed.Get());
++              return S_OK;
+             })
+             .Get());
+   }
+
+   if (SUCCEEDED(hr)) {
+-    hr = ::WaitForSingleObjectEx(
+-             event_wait_for_media_capture_async_action_completion.Get(),
+-             INFINITE, FALSE) == WAIT_OBJECT_0
+-             ? S_OK
+-             : E_FAIL;
++    const auto wait_result = ::WaitForSingleObjectEx(
++        state->action_completed.Get(), kInitializationTimeoutMs, FALSE);
++    if (wait_result == WAIT_OBJECT_0) {
++      if (static_cast<AsyncStatus>(
++              state->completion_status.load(std::memory_order_acquire)) ==
++          AsyncStatus::Completed) {
++        ComPtr<IAsyncInfo> async_info;
++        if (SUCCEEDED(async_action_media_capture.As(&async_info))) {
++          HRESULT async_error = S_OK;
++          hr = async_info->get_ErrorCode(&async_error);
++          if (SUCCEEDED(hr)) {
++            hr = async_error;
++          }
++        }
++      } else {
++        hr = E_ACCESSDENIED;
++      }
++    } else {
++      state->abandoned.store(true, std::memory_order_release);
++      ComPtr<IAsyncInfo> async_info;
++      if (SUCCEEDED(async_action_media_capture.As(&async_info))) {
++        async_info->Cancel();
++      }
++      hr = wait_result == WAIT_TIMEOUT
++          ? HRESULT_FROM_WIN32(WAIT_TIMEOUT)
++          : HRESULT_FROM_WIN32(GetLastError());
++    }
+   }
+
+   if (SUCCEEDED(hr)) {
+     *pp_media_capture = media_capture.Detach();
+-  } else {
+-    *pp_media_capture = nullptr;
+   }
+
+   return hr;
+diff --git a/modules/video_capture/windows/help_functions_winrt.h b/modules/video_capture/windows/help_functions_winrt.h
+index 3d20c65698..61a4e536cf 100644
+--- a/modules/video_capture/windows/help_functions_winrt.h
++++ b/modules/video_capture/windows/help_functions_winrt.h
+@@ -60,7 +60,8 @@ HRESULT WaitForAsyncAction(
+
+ template <typename T>
+ HRESULT WaitForAsyncOperation(
+-    _In_ ::ABI::Windows::Foundation::IAsyncOperation<T>* p_async_op) {
++    _In_ ::ABI::Windows::Foundation::IAsyncOperation<T>* p_async_op,
++    _In_ DWORD timeout_ms = 180000) {
+   using ::ABI::Windows::Foundation::AsyncStatus;
+   using ::ABI::Windows::Foundation::IAsyncInfo;
+   using ::ABI::Windows::Foundation::IAsyncOperation;
+@@ -70,7 +71,6 @@ HRESULT WaitForAsyncOperation(
+
+   HRESULT hr = S_OK;
+   HRESULT hr_async_error = S_OK;
+-  const DWORD timeout_ms = 180000;
+   Microsoft::WRL::ComPtr<IAsyncOperation<T>> async_op(p_async_op);
+   Microsoft::WRL::ComPtr<IAsyncInfo> async_info;
+   std::shared_ptr<HANDLE> event_completed_handle_ptr = NULL;
+diff --git a/modules/video_capture/windows/video_capture_winrt.cc b/modules/video_capture/windows/video_capture_winrt.cc
+index 706327bfc3..0dfd6ccee7 100644
+--- a/modules/video_capture/windows/video_capture_winrt.cc
++++ b/modules/video_capture/windows/video_capture_winrt.cc
+@@ -143,6 +143,8 @@ VideoCaptureWinRTInternal::~VideoCaptureWinRTInternal() {
+
+ HRESULT VideoCaptureWinRTInternal::StartCapture(
+     const VideoCaptureCapability& capability) {
++  constexpr DWORD kFrameReaderSetupTimeoutMs = 1250;
++
+   HRESULT hr = S_OK;
+   ComPtr<IMediaCaptureInitializationSettings> initialization_settings;
+   ComPtr<IMediaFrameSource> media_frame_source;
+@@ -338,7 +340,7 @@ HRESULT VideoCaptureWinRTInternal::StartCapture(
+       }
+
+       if (SUCCEEDED(hr)) {
+-        hr = WaitForAsyncAction(async_action.Get());
++        hr = WaitForAsyncAction(async_action.Get(), kFrameReaderSetupTimeoutMs);
+       }
+
+       break;
+@@ -369,7 +371,8 @@ HRESULT VideoCaptureWinRTInternal::StartCapture(
+   }
+
+   if (SUCCEEDED(hr)) {
+-    hr = WaitForAsyncOperation(async_operation.Get());
++    hr = WaitForAsyncOperation(async_operation.Get(),
++                               kFrameReaderSetupTimeoutMs);
+   }
+
+   // Assigns a new media frame reader
+@@ -397,7 +400,8 @@ HRESULT VideoCaptureWinRTInternal::StartCapture(
+   }
+
+   if (SUCCEEDED(hr)) {
+-    hr = WaitForAsyncOperation(async_media_frame_reader_start_status.Get());
++    hr = WaitForAsyncOperation(async_media_frame_reader_start_status.Get(),
++                               kFrameReaderSetupTimeoutMs);
+   }
+
+   if (SUCCEEDED(hr)) {

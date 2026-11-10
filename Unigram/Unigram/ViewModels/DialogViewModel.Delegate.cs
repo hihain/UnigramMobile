@@ -55,7 +55,7 @@ namespace Unigram.ViewModels
             }
             else if (content is MessageInvoice invoiceMessage)
             {
-                content = invoiceMessage.Photo;
+                content = invoiceMessage.GetPhoto();
             }
             else if (content is MessageLocation locationMessage)
             {
@@ -124,15 +124,15 @@ namespace Unigram.ViewModels
 
             if (content is Animation animation)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), animation.AnimationValue.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)Math.Min(int.MaxValue, animation.AnimationValue.Size));
             }
             else if (content is Audio audio)
             {
-                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), audio.AudioValue.Size);
+                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), (int)Math.Min(int.MaxValue, audio.AudioValue.Size));
             }
             else if (content is Document document)
             {
-                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), document.DocumentValue.Size);
+                return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), (int)Math.Min(int.MaxValue, document.DocumentValue.Size));
             }
             else if (content is Photo photo)
             {
@@ -151,11 +151,11 @@ namespace Unigram.ViewModels
             }
             else if (content is Video video)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), video.VideoValue.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)Math.Min(int.MaxValue, video.VideoValue.Size));
             }
             else if (content is VideoNote videoNote)
             {
-                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), videoNote.Video.Size);
+                return Settings.AutoDownload.ShouldDownloadVideo(GetChatType(chat), (int)Math.Min(int.MaxValue, videoNote.Video.Size));
             }
             else if (content is VoiceNote voiceNote)
             {
@@ -223,6 +223,85 @@ namespace Unigram.ViewModels
             MessageReplyCommand.Execute(message);
         }
 
+        public void DoubleTapMessage(MessageViewModel message)
+        {
+            if (message == null || message.Id == 0 || message.IsService())
+            {
+                return;
+            }
+
+            switch (Settings.DoubleTapAction)
+            {
+                case DoubleTapAction.Reply:
+                    ReplyToMessage(message);
+                    break;
+#if MODERN_TDLIB
+                case DoubleTapAction.React:
+                    ToggleQuickReaction(message);
+                    break;
+#endif
+            }
+        }
+
+#if MODERN_TDLIB
+        private void ToggleQuickReaction(MessageViewModel message)
+        {
+            if (message.SendingState != null || message.SchedulingState != null)
+            {
+                return;
+            }
+
+            ToggleMessageReaction(message, ProtoService.DefaultReactionType ?? new ReactionTypeEmoji("\U0001F44D"), "double_tap");
+        }
+
+        public void ToggleMessageReaction(MessageViewModel message, ReactionType type, string source)
+        {
+            if (message == null || message.Id == 0 || type == null)
+            {
+                return;
+            }
+
+            var chosen = IsReactionChosen(message, type);
+
+            Function function = chosen
+                ? new RemoveMessageReaction(message.ChatId, message.Id, type)
+                : (Function)new AddMessageReaction(message.ChatId, message.Id, type, false, true);
+
+            ProtoService.Send(function, result =>
+            {
+                if (result is Error error)
+                {
+                    Logs.PushDiagnostics.Write(
+                        "message.reaction",
+                        $"result=failed;operation={source}_{(chosen ? "remove" : "add")};code={error.Code};message={Logs.PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+                }
+            });
+        }
+
+        public static bool IsReactionChosen(MessageViewModel message, ReactionType type)
+        {
+            return message.InteractionInfo?.Reactions?.Reactions?.Any(x => x.IsChosen && AreSameReaction(x.Type, type)) == true;
+        }
+
+        private static bool AreSameReaction(ReactionType x, ReactionType y)
+        {
+            if (x is ReactionTypeEmoji xEmoji && y is ReactionTypeEmoji yEmoji)
+            {
+                return xEmoji.Emoji == yEmoji.Emoji;
+            }
+            else if (x is ReactionTypeCustomEmoji xCustom && y is ReactionTypeCustomEmoji yCustom)
+            {
+                return xCustom.CustomEmojiId == yCustom.CustomEmojiId;
+            }
+            else if (x is ReactionTypePaid && y is ReactionTypePaid)
+            {
+                return true;
+            }
+
+            return false;
+        }
+#endif
+
         public async void OpenReply(MessageViewModel message)
         {
             if (message.ReplyToMessageState == ReplyToMessageState.None)
@@ -280,9 +359,9 @@ namespace Unigram.ViewModels
                 NavigationService.NavigateToInstant(webPage.Url);
             }
             else if (MessageHelper.TryCreateUri(webPage.Url, out Uri uri) &&
-                    (string.Equals(webPage.Type, "telegram_megagroup", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(webPage.Type, "telegram_channel", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(webPage.Type, "telegram_message", StringComparison.OrdinalIgnoreCase)))
+                    (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_megagroup", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_channel", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_message", StringComparison.OrdinalIgnoreCase)))
             {
                 MessageHelper.OpenTelegramUrl(ProtoService, NavigationService, uri);
             }
@@ -345,7 +424,7 @@ namespace Unigram.ViewModels
             var updated = message.Content as MessagePoll;
             if (updated.Poll.Type is PollTypeQuiz quiz)
             {
-                if (quiz.CorrectOptionId == ids[0])
+                if (quiz.GetCorrectOptionId() == ids[0])
                 {
                     Aggregator.Publish(new UpdateConfetti());
                 }
@@ -426,8 +505,8 @@ namespace Unigram.ViewModels
             var user = ProtoService.GetUser(viaBotUserId);
             if (user != null)
             {
-                SetText($"@{user.Username} ");
-                ResolveInlineBot(user.Username);
+                SetText($"@{user.GetUsername()} ");
+                ResolveInlineBot(user.GetUsername());
             }
         }
 
@@ -619,7 +698,7 @@ namespace Unigram.ViewModels
                 var admin = value.FirstOrDefault(x => x.UserId == userId);
                 if (admin != null)
                 {
-                    if (string.IsNullOrEmpty(admin.CustomTitle))
+                    if (string.IsNullOrEmpty(ModernTdlibCompatibility.GetAdministratorCustomTitle(admin)))
                     {
                         if (admin.IsOwner)
                         {
@@ -629,7 +708,7 @@ namespace Unigram.ViewModels
                         return Strings.Resources.ChannelAdmin;
                     }
 
-                    return admin.CustomTitle;
+                    return ModernTdlibCompatibility.GetAdministratorCustomTitle(admin);
                 }
             }
 

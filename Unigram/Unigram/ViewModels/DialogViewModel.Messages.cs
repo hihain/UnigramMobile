@@ -6,6 +6,13 @@ using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using Telegram.Td.Api;
+#if MODERN_TDLIB
+using MessageForwardOriginUser = Telegram.Td.Api.MessageOriginUser;
+using MessageForwardOriginChat = Telegram.Td.Api.MessageOriginChat;
+using MessageForwardOriginChannel = Telegram.Td.Api.MessageOriginChannel;
+using MessageForwardOriginHiddenUser = Telegram.Td.Api.MessageOriginHiddenUser;
+using MessageForwardOriginMessageImport = Telegram.Td.Api.MessageOriginHiddenUser;
+#endif
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Converters;
@@ -20,6 +27,15 @@ using Windows.Storage.Streams;
 using Windows.System;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+
+#if !MODERN_TDLIB
+using ReportReason = Telegram.Td.Api.ChatReportReason;
+using ReportReasonSpam = Telegram.Td.Api.ChatReportReasonSpam;
+using ReportReasonViolence = Telegram.Td.Api.ChatReportReasonViolence;
+using ReportReasonPornography = Telegram.Td.Api.ChatReportReasonPornography;
+using ReportReasonChildAbuse = Telegram.Td.Api.ChatReportReasonChildAbuse;
+using ReportReasonCustom = Telegram.Td.Api.ChatReportReasonCustom;
+#endif
 
 namespace Unigram.ViewModels
 {
@@ -140,7 +156,15 @@ namespace Unigram.ViewModels
             }
 
             var sameUser = messages.All(x => x.SenderId.IsEqual(first.SenderId));
-            var dialog = new DeleteMessagesPopup(CacheService, items.Where(x => x != null).ToArray());
+            var valid = items.Where(x => x != null).ToArray();
+            var properties = new Dictionary<long, BaseObject>();
+
+            foreach (var item in valid)
+            {
+                properties[item.Id] = await ProtoService.SendAsync(new GetMessageProperties(item.ChatId, item.Id));
+            }
+
+            var dialog = new DeleteMessagesPopup(ProtoService, valid, properties);
 
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm != ContentDialogResult.Primary)
@@ -426,7 +450,7 @@ namespace Unigram.ViewModels
                     }
                     else if (message.Content is MessagePoll poll)
                     {
-                        builder.AppendLine($"[{Strings.Resources.Poll}: {poll.Poll.Question}");
+                        builder.AppendLine($"[{Strings.Resources.Poll}: {ModernTdlibCompatibility.GetPollQuestion(poll.Poll)}");
 
                         foreach (var option in poll.Poll.Options)
                         {
@@ -462,6 +486,19 @@ namespace Unigram.ViewModels
         public RelayCommand MessagesReportCommand { get; }
         private async void MessagesReportExecute()
         {
+#if MODERN_TDLIB
+            var chat = _chat;
+            if (chat == null || !MessagesReportCanExecute())
+            {
+                return;
+            }
+
+            var messages = SelectedItems.OrderBy(x => x.Id).Select(x => x.Id).ToArray();
+            if (await ReportChatAsync(chat.Id, messages, "messages"))
+            {
+                SelectionMode = ListViewSelectionMode.None;
+            }
+#else
             var chat = _chat;
             if (chat == null)
             {
@@ -479,11 +516,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -497,7 +534,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -522,11 +559,24 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            ProtoService.Send(new ReportChat(chat.Id, messages, reason, text));
+            ProtoService.Send(ModernTdlibCompatibility.CreateReportChat(chat.Id, messages, reason, text));
+#endif
         }
 
         private bool MessagesReportCanExecute()
         {
+#if MODERN_TDLIB
+            var chat = _chat;
+            if (chat == null)
+            {
+                return false;
+            }
+
+            var myId = CacheService.Options.MyId;
+            return SelectedItems.Count > 0
+                && SelectedItems.All(x => !x.IsService() && (x.SenderId is MessageSenderChat || (x.SenderId is MessageSenderUser senderUser && senderUser.UserId != myId)))
+                && (chat.CanBeReported || SelectedItems.All(x => x.CanReportChat));
+#else
             var chat = _chat;
             if (chat == null)
             {
@@ -536,6 +586,7 @@ namespace Unigram.ViewModels
             var myId = CacheService.Options.MyId;
             return chat.CanBeReported && SelectedItems.Count > 0
                 && SelectedItems.All(x => x.SenderId is MessageSenderChat || (x.SenderId is MessageSenderUser senderUser && senderUser.UserId != myId));
+#endif
         }
 
         #endregion
@@ -565,7 +616,7 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageRetryCommand { get; }
         private void MessageRetryExecute(MessageViewModel message)
         {
-            ProtoService.Send(new ResendMessages(message.ChatId, new[] { message.Id }));
+            ProtoService.Send(ModernTdlibCompatibility.CreateResendMessages(message.ChatId, new[] { message.Id }));
         }
 
         #endregion
@@ -695,7 +746,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var response = await ProtoService.SendAsync(new GetMessageLink(chat.Id, message.Id, 0, false, _threadId != 0));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetMessageLink(chat.Id, message.Id, 0, 0, string.Empty, false, _threadId != 0));
             if (response is MessageLink link)
             {
                 var dataPackage = new DataPackage();
@@ -716,7 +767,26 @@ namespace Unigram.ViewModels
         public RelayCommand MessageEditLastCommand { get; }
         private async void MessageEditLastExecute()
         {
+#if MODERN_TDLIB
+            // Edit permission comes from GetMessageProperties, which must be requested asynchronously.
+            MessageViewModel last = null;
+
+            foreach (var item in Enumerable.Reverse(Items).Where(x => x.IsOutgoing && x.Id != 0).ToList())
+            {
+                if (!item.HasMessageProperties)
+                {
+                    item.UpdateMessageProperties(await ProtoService.SendAsync(new GetMessageProperties(item.ChatId, item.Id)));
+                }
+
+                if (item.CanBeEdited)
+                {
+                    last = item;
+                    break;
+                }
+            }
+#else
             var last = Items.LastOrDefault(x => x.CanBeEdited);
+#endif
             if (last != null)
             {
                 MessageEditCommand.Execute(last);
@@ -881,6 +951,15 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageReportCommand { get; }
         private async void MessageReportExecute(MessageViewModel message)
         {
+#if MODERN_TDLIB
+            var chat = _chat;
+            if (chat == null || message == null || message.Id == 0)
+            {
+                return;
+            }
+
+            await ReportChatAsync(chat.Id, new[] { message.Id }, "message");
+#else
             var chat = _chat;
             if (chat == null)
             {
@@ -889,11 +968,11 @@ namespace Unigram.ViewModels
 
             var items = new[]
             {
-                new SelectRadioItem(new ChatReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
-                new SelectRadioItem(new ChatReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
-                new SelectRadioItem(new ChatReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
-                new SelectRadioItem(new ChatReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
-                new SelectRadioItem(new ChatReportReasonCustom(), Strings.Resources.ReportChatOther, false)
+                new SelectRadioItem(new ReportReasonSpam(), Strings.Resources.ReportChatSpam, true),
+                new SelectRadioItem(new ReportReasonViolence(), Strings.Resources.ReportChatViolence, false),
+                new SelectRadioItem(new ReportReasonPornography(), Strings.Resources.ReportChatPornography, false),
+                new SelectRadioItem(new ReportReasonChildAbuse(), Strings.Resources.ReportChatChild, false),
+                new SelectRadioItem(new ReportReasonCustom(), Strings.Resources.ReportChatOther, false)
             };
 
             var dialog = new SelectRadioPopup(items);
@@ -907,7 +986,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var reason = dialog.SelectedIndex as ChatReportReason;
+            var reason = dialog.SelectedIndex as ReportReason;
             if (reason == null)
             {
                 return;
@@ -932,7 +1011,8 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            ProtoService.Send(new ReportChat(chat.Id, new[] { message.Id }, reason, text));
+            ProtoService.Send(ModernTdlibCompatibility.CreateReportChat(chat.Id, new[] { message.Id }, reason, text));
+#endif
         }
 
         #endregion
@@ -1005,7 +1085,7 @@ namespace Unigram.ViewModels
                     var response = await ProtoService.SendAsync(new GetLoginUrlInfo(chat.Id, message.Id, loginUrl.Id));
                     if (response is LoginUrlInfoOpen infoOpen)
                     {
-                        OpenUrl(infoOpen.Url, !infoOpen.SkipConfirm);
+                        OpenUrl(infoOpen.Url, !ModernTdlibCompatibility.GetLoginUrlSkipConfirmation(infoOpen));
                     }
                     else if (response is LoginUrlInfoRequestConfirmation requestConfirmation)
                     {
@@ -1041,10 +1121,10 @@ namespace Unigram.ViewModels
                         return;
                     }
 
-                    if (switchInline.InCurrentChat)
+                    if (ModernTdlibCompatibility.GetSwitchInlineInCurrentChat(switchInline))
                     {
-                        SetText(string.Format("@{0} {1}", bot.Username, switchInline.Query), focus: true);
-                        ResolveInlineBot(bot.Username, switchInline.Query);
+                        SetText(string.Format("@{0} {1}", bot.GetUsername(), switchInline.Query), focus: true);
+                        ResolveInlineBot(bot.GetUsername(), switchInline.Query);
                     }
                     else
                     {
@@ -1076,7 +1156,7 @@ namespace Unigram.ViewModels
                     var bot = message.GetViaBotUser();
                     if (bot != null)
                     {
-                        InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, 0, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null), null));
+                        InformativeMessage = _messageFactory.Create(this, ModernTdlibCompatibility.CreateMessage(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, 0, ModernTdlibCompatibility.CreateMessageText(new FormattedText(Strings.Resources.Loading, new TextEntity[0]), null)));
                     }
 
                     var response = await ProtoService.SendAsync(new GetCallbackQueryAnswer(chat.Id, message.Id, new CallbackQueryPayloadData(callback.Data)));
@@ -1097,7 +1177,7 @@ namespace Unigram.ViewModels
                                     return;
                                 }
 
-                                InformativeMessage = _messageFactory.Create(this, new Message(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, false, false, false, true, false, false, false, false, false, false, false, false, 0, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageText(new FormattedText(answer.Text, new TextEntity[0]), null), null));
+                                InformativeMessage = _messageFactory.Create(this, ModernTdlibCompatibility.CreateMessage(0, new MessageSenderUser(bot.Id), 0, null, null, false, false, 0, ModernTdlibCompatibility.CreateMessageText(new FormattedText(answer.Text, new TextEntity[0]), null)));
                             }
                         }
                         else if (!string.IsNullOrEmpty(answer.Url))
@@ -1146,7 +1226,7 @@ namespace Unigram.ViewModels
                         var viaBot = message.GetViaBotUser();
                         if (viaBot != null)
                         {
-                            bundle.Add("username", viaBot.Username);
+                            bundle.Add("username", viaBot.GetUsername());
                         }
 
                         ChatActionManager.SetTyping(new ChatActionStartPlayingGame());
@@ -1198,7 +1278,7 @@ namespace Unigram.ViewModels
                                 return;
                             }
 
-                            await SendMessageAsync(chat, 0, new InputMessageLocation(location, 0, 0, 0), null);
+                            await SendMessageAsync(chat, 0, ModernTdlibCompatibility.CreateInputMessageLocation(location), null);
                         }
                     }
                 }
@@ -1445,7 +1525,7 @@ namespace Unigram.ViewModels
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm == ContentDialogResult.Primary)
             {
-                ProtoService.Send(new AddContact(new Telegram.Td.Api.Contact(user.PhoneNumber, dialog.FirstName, dialog.LastName, string.Empty, user.Id),
+                ProtoService.Send(ModernTdlibCompatibility.CreateAddContact(new Telegram.Td.Api.Contact(user.PhoneNumber, dialog.FirstName, dialog.LastName, string.Empty, user.Id),
                     fullInfo.NeedPhoneNumberPrivacyException ? dialog.SharePhoneNumber : true));
             }
         }

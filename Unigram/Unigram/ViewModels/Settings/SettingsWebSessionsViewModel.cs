@@ -109,7 +109,7 @@ namespace Unigram.ViewModels.Settings
                     Logs.Logger.Error(Logs.Target.API, "auth.resetWebAuthotization error " + error);
                 }
 
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(session.BotUserId), true));
+                ProtoService.Send(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(session.BotUserId), true));
             }
         }
 

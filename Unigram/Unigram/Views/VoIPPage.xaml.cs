@@ -1,13 +1,14 @@
 ﻿using libtgvoip;
-using Microsoft.Graphics.Canvas.Effects;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Numerics;
 using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Services;
+using Unigram.Views.Popups;
 using Windows.Foundation;
 using Windows.Foundation.Metadata;
 using Windows.Phone.Media.Devices;
@@ -23,18 +24,19 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Shapes;
 using Point = Windows.Foundation.Point;
+#if MODERN_TGCALLS
+using ModernCalls = Unigram.Native.Calls.Proof;
+#endif
 
 namespace Unigram.Views
 {
     public sealed partial class VoIPPage : Page, IDisposable
     {
-        private Visual _descriptionVisual;
-        private Visual _largeVisual;
-        private SpriteVisual _blurVisual;
-        private CompositionEffectBrush _blurBrush;
-        private Compositor _compositor;
+        private const double LocalPreviewSideMargin = 12;
+        private const double LocalPreviewBottomClearance = 60;
+        private const double LocalPreviewTopClearance = 148;
 
-        private bool _collapsed = true;
+        private Compositor _compositor;
 
         private readonly IProtoService _protoService;
         private readonly ICacheService _cacheService;
@@ -44,6 +46,11 @@ namespace Unigram.Views
         private Call _call;
 
         private libtgvoip.CallState _state;
+
+        // The modern tgcalls bridge replaces VoIPControllerWrapper, so Connect() is never
+        // called and OnCallStateChanged never fires. This tracks the bridge's transport
+        // state instead, so the duration timer and the state label behave the same way.
+        private bool _modernEstablished;
         private IList<string> _emojis;
         private DateTime _started;
 
@@ -52,14 +59,32 @@ namespace Unigram.Views
 
         private DispatcherTimer _debugTimer;
         private DispatcherTimer _durationTimer;
+        private AudioRoutingManager _audioRoutingManager;
+#if MODERN_TGCALLS
+        // AudioRoutingManager can acknowledge a request while leaving the TgCalls ADM on
+        // another physical output. Once the native selector has queued an indexed output,
+        // retain that known intent instead of letting the ineffective manager flip the
+        // glyph back on its next endpoint notification.
+        private bool? _modernAudioOutputSpeakerphone;
+#endif
 
         private bool _disposed;
+        private bool _isLoaded;
+        private uint? _localVideoPointerId;
+        private Point _localVideoPointerPosition;
+#if MODERN_TGCALLS
+        private SpriteVisual _localVideoVisual;
+        private SpriteVisual _remoteVideoVisual;
+        private string _modernCameraDeviceId;
+#endif
 
         public OverlayPage Dialog { get; set; }
 
         public VoIPPage(IProtoService protoService, ICacheService cacheService, IEventAggregator aggregator, Call call, VoIPControllerWrapper controller, DateTime started)
         {
+            Logs.PushDiagnostics.Write("voip.ui", "stage=construct_begin");
             this.InitializeComponent();
+            Logs.PushDiagnostics.Write("voip.ui", "stage=initialized");
 
             _protoService = protoService;
             _cacheService = cacheService;
@@ -79,89 +104,113 @@ namespace Unigram.Views
             LargeEmoji1.Source = null;
             LargeEmoji2.Source = null;
             LargeEmoji3.Source = null;
+            SmallEmoji0.Source = null;
+            SmallEmoji1.Source = null;
+            SmallEmoji2.Source = null;
+            SmallEmoji3.Source = null;
 
             #endregion
 
             #region Composition
 
-            _descriptionVisual = ElementCompositionPreview.GetElementVisual(DescriptionLabel);
-            _largeVisual = ElementCompositionPreview.GetElementVisual(LargePanel);
-            _compositor = _largeVisual.Compositor;
-
-            var graphicsEffect = new GaussianBlurEffect
-            {
-                Name = "Blur",
-                BlurAmount = 0,
-                BorderMode = EffectBorderMode.Hard,
-                Source = new CompositionEffectSourceParameter("backdrop")
-            };
-
-            var effectFactory = _compositor.CreateEffectFactory(graphicsEffect, new[] { "Blur.BlurAmount" });
-            var effectBrush = effectFactory.CreateBrush();
-            var backdrop = _compositor.CreateBackdropBrush();
-            effectBrush.SetSourceParameter("backdrop", backdrop);
-
-            _blurBrush = effectBrush;
-            _blurVisual = _compositor.CreateSpriteVisual();
-            _blurVisual.Brush = _blurBrush;
-
-            // Why does this crashes due to an access violation exception on certain devices?
-            ElementCompositionPreview.SetElementChildVisual(BlurPanel, _blurVisual);
+            _compositor = ElementCompositionPreview.GetElementVisual(LargePanel).Compositor;
+            Logs.PushDiagnostics.Write("voip.ui", "stage=composition_ready");
 
             #endregion
 
             var titleBar = ApplicationView.GetForCurrentView().TitleBar;
-            titleBar.ButtonBackgroundColor = Colors.Transparent;
-            titleBar.ButtonForegroundColor = Colors.White;
-            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-            titleBar.ButtonInactiveForegroundColor = Colors.White;
+            if (titleBar != null)
+            {
+                titleBar.ButtonBackgroundColor = Colors.Transparent;
+                titleBar.ButtonForegroundColor = Colors.White;
+                titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+                titleBar.ButtonInactiveForegroundColor = Colors.White;
+                Window.Current.SetTitleBar(BlurPanel);
+            }
+            else
+            {
+                Logs.PushDiagnostics.Write("voip.ui", "result=title_bar_unavailable");
+            }
 
-            Window.Current.SetTitleBar(BlurPanel);
+            Logs.PushDiagnostics.Write("voip.ui", "stage=chrome_ready");
 
             if (call != null)
             {
                 Update(call, started);
+                Logs.PushDiagnostics.Write("voip.ui", "stage=call_updated");
             }
 
             if (controller != null)
             {
                 Connect(controller);
+                Logs.PushDiagnostics.Write("voip.ui", "stage=controller_connected");
             }
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
+            _isLoaded = true;
+
             if (Routing == null)
             {
+                Logs.PushDiagnostics.Write("voip.ui", "result=routing_skipped;reason=control_unavailable");
                 return;
             }
 
-            if (ApiInfo.IsPhoneContractPresent)
-            {
-                Routing.Visibility = Visibility.Visible;
-                AudioRoutingManager.GetDefault().AudioEndpointChanged += AudioEndpointChanged;
-            }
-            else
+            if (!ApiInfo.IsPhoneContractPresent)
             {
                 Routing.Visibility = Visibility.Collapsed;
+                Logs.PushDiagnostics.Write("voip.ui", "result=routing_skipped;reason=no_phone_contract");
+                return;
             }
+
+            _audioRoutingManager = AudioRoutingManager.GetDefault();
+            if (_audioRoutingManager == null)
+            {
+                Routing.Visibility = Visibility.Collapsed;
+                Logs.PushDiagnostics.Write("voip.ui", "result=routing_unavailable");
+                return;
+            }
+
+            Routing.Visibility = Visibility.Visible;
+            _audioRoutingManager.AudioEndpointChanged += AudioEndpointChanged;
+            Logs.PushDiagnostics.Write(
+                "voip.ui",
+                $"result=routing_ready;endpoint={_audioRoutingManager.GetAudioEndpoint()};available={_audioRoutingManager.AvailableAudioEndpoints}");
+
+            // GetAudioEndpoint() reports Speakerphone on this handset while playout is
+            // audibly in the earpiece, so the toggle began every call out of step with the
+            // hardware and its first press appeared to do nothing. The starting endpoint is
+            // asserted rather than merely read, which also matches how a voice call should
+            // begin: in the earpiece, or a headset when one is connected.
+            ApplyAudioEndpoint(_audioRoutingManager, SelectPrivateAudioEndpoint(_audioRoutingManager), "ready");
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             Debug.WriteLine("Unloaded");
+            _isLoaded = false;
 
-            if (ApiInfo.IsPhoneContractPresent)
+            if (_audioRoutingManager != null)
             {
-                AudioRoutingManager.GetDefault().AudioEndpointChanged -= AudioEndpointChanged;
+                _audioRoutingManager.AudioEndpointChanged -= AudioEndpointChanged;
             }
         }
 
         public void Dispose()
         {
-            _disposed = true;
+            if (_disposed)
+            {
+                return;
+            }
+
+            Logs.PushDiagnostics.Write("voip.ui", "stage=dispose_begin");
             _debugTimer.Stop();
             _durationTimer.Stop();
+#if MODERN_TGCALLS
+            ClearModernVideoOutputVisualCore(true);
+            ClearModernVideoOutputVisualCore(false);
+#endif
 
             if (_controller != null)
             {
@@ -170,11 +219,279 @@ namespace Unigram.Views
                 _controller = null;
             }
 
-            if (ApiInfo.IsPhoneContractPresent)
+            if (_audioRoutingManager != null)
             {
-                AudioRoutingManager.GetDefault().AudioEndpointChanged -= AudioEndpointChanged;
+                _audioRoutingManager.AudioEndpointChanged -= AudioEndpointChanged;
+                _audioRoutingManager = null;
+            }
+
+            _disposed = true;
+            Logs.PushDiagnostics.Write("voip.ui", "stage=dispose_end");
+        }
+
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ClampLocalVideoPreview();
+        }
+
+        private void LocalVideoPanel_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (_disposed || _localVideoPointerId != null)
+            {
+                return;
+            }
+
+            if (!LocalVideoDragHandle.CapturePointer(e.Pointer))
+            {
+                return;
+            }
+
+            _localVideoPointerId = e.Pointer.PointerId;
+            _localVideoPointerPosition = e.GetCurrentPoint(this).Position;
+            Logs.PushDiagnostics.Write("voip.video", "result=preview_drag;state=pressed");
+            e.Handled = true;
+        }
+
+        private void LocalVideoPanel_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (_disposed || _localVideoPointerId != e.Pointer.PointerId)
+            {
+                return;
+            }
+
+            var position = e.GetCurrentPoint(this).Position;
+            LocalVideoTransform.X += position.X - _localVideoPointerPosition.X;
+            LocalVideoTransform.Y += position.Y - _localVideoPointerPosition.Y;
+            _localVideoPointerPosition = position;
+            ClampLocalVideoPreview();
+            e.Handled = true;
+        }
+
+        private void LocalVideoPanel_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            CompleteLocalVideoPointer(e);
+        }
+
+        private void LocalVideoPanel_PointerCanceled(object sender, PointerRoutedEventArgs e)
+        {
+            CompleteLocalVideoPointer(e);
+        }
+
+        private void LocalVideoPanel_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            if (_localVideoPointerId != e.Pointer.PointerId)
+            {
+                return;
+            }
+
+            _localVideoPointerId = null;
+            if (!_disposed)
+            {
+                Logs.PushDiagnostics.Write("voip.video", "result=preview_drag;state=capture_lost");
+                SnapLocalVideoPreview();
             }
         }
+
+        private void CompleteLocalVideoPointer(PointerRoutedEventArgs e)
+        {
+            if (_localVideoPointerId != e.Pointer.PointerId)
+            {
+                return;
+            }
+
+            LocalVideoDragHandle.ReleasePointerCapture(e.Pointer);
+            _localVideoPointerId = null;
+            if (!_disposed)
+            {
+                Logs.PushDiagnostics.Write("voip.video", "result=preview_drag;state=released");
+                SnapLocalVideoPreview();
+            }
+            e.Handled = true;
+        }
+
+        private void SnapLocalVideoPreview()
+        {
+            ClampLocalVideoPreview();
+            var minimumX = GetMinimumLocalPreviewTranslationX();
+            var minimumY = GetMinimumLocalPreviewTranslationY();
+            LocalVideoTransform.X = minimumX < 0 && LocalVideoTransform.X < minimumX / 2 ? minimumX : 0;
+            LocalVideoTransform.Y = minimumY < 0 && LocalVideoTransform.Y < minimumY / 2 ? minimumY : 0;
+        }
+
+        private void ClampLocalVideoPreview()
+        {
+            if (LocalVideoTransform == null || LocalVideoPanel == null ||
+                ActualWidth <= 0 || ActualHeight <= 0 ||
+                LocalVideoPanel.ActualWidth <= 0 || LocalVideoPanel.ActualHeight <= 0)
+            {
+                return;
+            }
+
+            LocalVideoTransform.X = Math.Max(
+                GetMinimumLocalPreviewTranslationX(),
+                Math.Min(0, LocalVideoTransform.X));
+            LocalVideoTransform.Y = Math.Max(
+                GetMinimumLocalPreviewTranslationY(),
+                Math.Min(0, LocalVideoTransform.Y));
+        }
+
+        private double GetMinimumLocalPreviewTranslationX()
+        {
+            return Math.Min(
+                0,
+                LocalPreviewSideMargin - (ActualWidth - LocalVideoPanel.ActualWidth - LocalPreviewSideMargin));
+        }
+
+        private double GetMinimumLocalPreviewTranslationY()
+        {
+            return Math.Min(
+                0,
+                LocalPreviewTopClearance - (ActualHeight - LocalVideoPanel.ActualHeight - LocalPreviewBottomClearance));
+        }
+
+#if MODERN_TGCALLS
+        public SpriteVisual CreateModernVideoOutputVisual(bool local)
+        {
+            if (_disposed || !_isLoaded || _compositor == null)
+            {
+                return null;
+            }
+
+            if (_call?.IsVideo != true)
+            {
+                Logs.PushDiagnostics.Write("voip.video", "result=preview_skipped;reason=audio_call");
+                return null;
+            }
+
+            ClearModernVideoOutputVisual(local);
+            var visual = _compositor.CreateSpriteVisual();
+            visual.RelativeSizeAdjustment = new Vector2(1.0f, 1.0f);
+
+            if (local)
+            {
+                _localVideoVisual = visual;
+                ElementCompositionPreview.SetElementChildVisual(LocalVideo, visual);
+                LocalVideoPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _remoteVideoVisual = visual;
+                ElementCompositionPreview.SetElementChildVisual(RemoteVideo, visual);
+                RemoteVideo.Visibility = Visibility.Visible;
+            }
+
+            return visual;
+        }
+
+        public void ClearModernVideoOutputVisual(bool local)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            ClearModernVideoOutputVisualCore(local);
+        }
+
+        private void ClearModernVideoOutputVisualCore(bool local)
+        {
+            if (local)
+            {
+                if (LocalVideo != null)
+                {
+                    ElementCompositionPreview.SetElementChildVisual(LocalVideo, null);
+                }
+                _localVideoVisual = null;
+                if (LocalVideoPanel != null)
+                {
+                    LocalVideoPanel.Visibility = Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                if (RemoteVideo != null)
+                {
+                    ElementCompositionPreview.SetElementChildVisual(RemoteVideo, null);
+                }
+                _remoteVideoVisual = null;
+                if (RemoteVideo != null)
+                {
+                    RemoteVideo.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        public void EnableModernVideoControls()
+        {
+            Camera.Visibility = Visibility.Visible;
+        }
+
+        public void SetModernVideoCaptureDevice(string deviceId)
+        {
+            _modernCameraDeviceId = deviceId;
+        }
+
+        public void CompleteModernVideoCaptureDeviceSwitch(string deviceId, bool succeeded)
+        {
+            _modernCameraSwitchPending = false;
+            if (succeeded)
+            {
+                _modernCameraDeviceId = deviceId;
+            }
+        }
+
+        private async void Camera_Click(object sender, RoutedEventArgs e)
+        {
+            if (_modernCameraSwitchPending)
+            {
+                Logs.PushDiagnostics.Write("voip.video", "result=camera_switch;state=pending");
+                return;
+            }
+
+            try
+            {
+                var devices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(
+                    Windows.Devices.Enumeration.DeviceClass.VideoCapture);
+                var current = devices.FirstOrDefault(x => x.Id == _modernCameraDeviceId);
+                var targetPanel = current?.EnclosureLocation?.Panel == Windows.Devices.Enumeration.Panel.Front
+                    ? Windows.Devices.Enumeration.Panel.Back
+                    : Windows.Devices.Enumeration.Panel.Front;
+                var target = devices.FirstOrDefault(x =>
+                        x.Id != _modernCameraDeviceId &&
+                        x.EnclosureLocation?.Panel == targetPanel)
+                    ?? devices.FirstOrDefault(x => x.Id != _modernCameraDeviceId);
+                if (target == null)
+                {
+                    Logs.PushDiagnostics.Write("voip.video", "result=camera_switch;state=no_alternate_camera");
+                    return;
+                }
+
+                var targetIsFront = target.EnclosureLocation?.Panel == Windows.Devices.Enumeration.Panel.Front;
+                _modernCameraSwitchPending = true;
+                if (ModernVideoDeviceRequested == null ||
+                    !ModernVideoDeviceRequested(target.Id, targetIsFront))
+                {
+                    _modernCameraSwitchPending = false;
+                    Logs.PushDiagnostics.Write("voip.video", "result=camera_switch;state=not_ready");
+                    return;
+                }
+
+                Logs.PushDiagnostics.Write("voip.video", $"result=camera_switch;front={(targetIsFront ? 1 : 0)}");
+            }
+            catch (Exception error)
+            {
+                Logs.PushDiagnostics.Write(
+                    "voip.video",
+                    $"result=camera_switch;state=failed;hresult=0x{error.HResult:X8}");
+            }
+        }
+#endif
+
+#if !MODERN_TGCALLS
+        private void Camera_Click(object sender, RoutedEventArgs e)
+        {
+        }
+#endif
 
         public void Connect(VoIPControllerWrapper controller)
         {
@@ -198,24 +515,7 @@ namespace Unigram.Views
         //    Debug.WriteLine("TitleBar height: " + sender.Height);
 
         //    SmallEmojiLabel.Margin = new Thickness(sender.SystemOverlayLeftInset, 20, sender.SystemOverlayRightInset, 0);
-        //    OnSizeChanged(null, null);
         //}
-
-        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            _blurVisual.Size = e.NewSize.ToVector2();
-
-            if (_collapsed)
-            {
-                var transform = SmallPanel.TransformToVisual(LargeEmojiLabel);
-                var position = transform.TransformPoint(new Point());
-
-                _descriptionVisual.Opacity = 0;
-                _largeVisual.Offset = new Vector3(position.ToVector2(), 0);
-                _largeVisual.Scale = new Vector3(0.5f);
-                _blurBrush.Properties.InsertScalar("Blur.BlurAmount", 0);
-            }
-        }
 
         public void Update(Call call, DateTime started)
         {
@@ -226,6 +526,18 @@ namespace Unigram.Views
 
             _call = call;
             _started = started;
+
+#if MODERN_TGCALLS
+            // The page is created from the initial pending Call update, several seconds
+            // before the modern native session exists. Visibility therefore belongs to the
+            // call model, not to the later session-start callback.
+            Camera.Visibility = call.IsVideo ? Visibility.Visible : Visibility.Collapsed;
+            if (!call.IsVideo)
+            {
+                ClearModernVideoOutputVisualCore(true);
+                ClearModernVideoOutputVisualCore(false);
+            }
+#endif
 
             //if (_state != call.State)
             //{
@@ -262,17 +574,22 @@ namespace Unigram.Views
                 if (user.ProfilePhoto != null)
                 {
                     var file = user.ProfilePhoto.Big;
-                    if (file.Local.IsDownloadingCompleted)
+                    if (file?.Local?.IsDownloadingCompleted == true)
                     {
                         Image.Source = new BitmapImage(new Uri("file:///" + file.Local.Path));
                         BackgroundPanel.Background = new SolidColorBrush(Colors.Transparent);
                     }
-                    else if (file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive)
+                    else if (file?.Local != null && file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive)
                     {
                         Image.Source = null;
                         BackgroundPanel.Background = PlaceholderHelper.GetBrush(user.Id);
 
                         _protoService?.DownloadFile(file.Id, 1, 0);
+                    }
+                    else
+                    {
+                        Image.Source = null;
+                        BackgroundPanel.Background = PlaceholderHelper.GetBrush(user.Id);
                     }
                 }
                 else
@@ -295,6 +612,8 @@ namespace Unigram.Views
                     var source = Emoji.BuildUri(_emojis[i]);
 
                     imageLarge.Source = new BitmapImage(new Uri(source));
+                    var imageSmall = FindName($"SmallEmoji{i}") as Image;
+                    imageSmall.Source = new BitmapImage(new Uri(source));
                 }
             }
 
@@ -353,10 +672,21 @@ namespace Unigram.Views
                 case CallStateExchangingKeys exchangingKeys:
                     StateLabel.Content = Strings.Resources.VoipExchangingKeys;
                     break;
+                case CallStateReady readyState:
+                    // TDLib has finished its part, but the transport is still being negotiated.
+                    // Only the libtgvoip controller used to advance the label past this point,
+                    // so without this the modern bridge leaves it on "exchanging keys" forever.
+                    if (!_modernEstablished)
+                    {
+                        StateLabel.Content = Strings.Resources.VoipConnecting;
+                    }
+                    break;
                 case CallStateHangingUp hangingUp:
+                    _modernEstablished = false;
                     StateLabel.Content = Strings.Resources.VoipHangingUp;
                     break;
                 case CallStateDiscarded discarded:
+                    _modernEstablished = false;
                     StateLabel.Content = discarded.Reason is CallDiscardReasonDeclined
                         ? Strings.Resources.VoipBusy
                         : Strings.Resources.VoipCallEnded;
@@ -421,11 +751,65 @@ namespace Unigram.Views
 
         public void SetSignalBars(int count)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             for (int i = 1; i < 5; i++)
             {
-                ((Rectangle)FindName($"Signal{i}")).Fill = Resources[count >= i ? "SignalBarForegroundBrush" : "SignalBarForegroundDisabledBrush"] as SolidColorBrush;
+                var bar = FindName($"Signal{i}") as Rectangle;
+                if (bar != null)
+                {
+                    bar.Fill = Resources[count >= i ? "SignalBarForegroundBrush" : "SignalBarForegroundDisabledBrush"] as SolidColorBrush;
+                }
             }
         }
+
+#if MODERN_TGCALLS
+        // Modern tgcalls replacement for OnCallStateChanged. CallsService routes the bridge's
+        // transport state here because VoIPControllerWrapper, which used to drive this, is
+        // never created when the modern engine is in use.
+        public void UpdateModernTransportState(ModernCalls.CallState state)
+        {
+            this.BeginOnUIThread(() =>
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                switch (state)
+                {
+                    case ModernCalls.CallState.WaitInit:
+                    case ModernCalls.CallState.WaitInitAck:
+                        if (!_modernEstablished)
+                        {
+                            StateLabel.Content = Strings.Resources.VoipConnecting;
+                        }
+                        break;
+                    case ModernCalls.CallState.Established:
+                        if (!_modernEstablished)
+                        {
+                            _modernEstablished = true;
+                            // VoIPService._callStarted is never reset between calls, so the
+                            // value passed into Update() can belong to a previous call. Take
+                            // the establishment time directly instead.
+                            _started = DateTime.Now;
+                            StateLabel.Content = "00:00";
+
+                            SignalBarsLabel.Visibility = Visibility.Visible;
+                            StartUpdatingCallDuration();
+                        }
+                        break;
+                    case ModernCalls.CallState.Failed:
+                        _modernEstablished = false;
+                        StateLabel.Content = Strings.Resources.VoipFailed;
+                        break;
+                }
+            });
+        }
+#endif
 
         private void StartUpdatingCallDuration()
         {
@@ -441,7 +825,7 @@ namespace Unigram.Views
                 StateLabel.Opacity = 0;
             }
 
-            if (_state == libtgvoip.CallState.Established)
+            if (_state == libtgvoip.CallState.Established || _modernEstablished)
             {
                 var duration = DateTime.Now - _started;
                 DurationLabel.Text = duration.ToString(duration.TotalHours >= 1 ? "hh\\:mm\\:ss" : "mm\\:ss");
@@ -454,80 +838,14 @@ namespace Unigram.Views
 
         private void SmallEmojiLabel_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            var transform = SmallPanel.TransformToVisual(LargeEmojiLabel);
-            var position = transform.TransformPoint(new Point());
-
-            _descriptionVisual.Opacity = 0;
-            _largeVisual.Offset = new Vector3(position.ToVector2(), 0);
-            _largeVisual.Scale = new Vector3(0.5f);
-            _blurBrush.Properties.InsertScalar("Blur.BlurAmount", 0);
-
-            var batch = _compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-            var opacityAnimation = _compositor.CreateScalarKeyFrameAnimation();
-            var offsetAnimation = _compositor.CreateVector3KeyFrameAnimation();
-            var scaleAnimation = _compositor.CreateVector3KeyFrameAnimation();
-            var blurAnimation = _compositor.CreateScalarKeyFrameAnimation();
-
-            opacityAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            offsetAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            scaleAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            blurAnimation.Duration = TimeSpan.FromMilliseconds(300);
-
-            opacityAnimation.InsertKeyFrame(1, 1);
-            offsetAnimation.InsertKeyFrame(1, new Vector3(0));
-            scaleAnimation.InsertKeyFrame(1, new Vector3(1));
-            blurAnimation.InsertKeyFrame(1, 20);
-
-            _descriptionVisual.StartAnimation("Opacity", opacityAnimation);
-            _largeVisual.StartAnimation("Offset", offsetAnimation);
-            _largeVisual.StartAnimation("Scale", scaleAnimation);
-            _blurBrush.Properties.StartAnimation("Blur.BlurAmount", blurAnimation);
-            _collapsed = false;
-
-            batch.End();
-
-            //var animation = ConnectedAnimationService.GetForCurrentView().PrepareToAnimate("EmojiAnimation", SmallEmojiLabel);
-            //if (animation != null)
-            //{
-            //    EmojifyPanel.Visibility = Visibility.Visible;
-            //    animation.TryStart(LargeEmojiLabel);
-            //}
+            CallDetailsPanel.Visibility = Visibility.Collapsed;
+            EmojifyPanel.Visibility = Visibility.Visible;
         }
 
         private void LargeEmojiLabel_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            if (_descriptionVisual.Opacity == 0)
-            {
-                SmallEmojiLabel_Tapped(null, null);
-                return;
-            }
-
-            var transform = SmallPanel.TransformToVisual(LargeEmojiLabel);
-            var position = transform.TransformPoint(new Point());
-
-            var batch = _compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-            var opacityAnimation = _compositor.CreateScalarKeyFrameAnimation();
-            var offsetAnimation = _compositor.CreateVector3KeyFrameAnimation();
-            var scaleAnimation = _compositor.CreateVector3KeyFrameAnimation();
-            var blurAnimation = _compositor.CreateScalarKeyFrameAnimation();
-
-            opacityAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            offsetAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            scaleAnimation.Duration = TimeSpan.FromMilliseconds(300);
-            blurAnimation.Duration = TimeSpan.FromMilliseconds(300);
-
-            opacityAnimation.InsertKeyFrame(1, 0);
-            offsetAnimation.InsertKeyFrame(1, new Vector3(position.ToVector2(), 0));
-            scaleAnimation.InsertKeyFrame(1, new Vector3(0.5f));
-            blurAnimation.InsertKeyFrame(1, 0);
-
-            _descriptionVisual.StartAnimation("Opacity", opacityAnimation);
-            _largeVisual.StartAnimation("Offset", offsetAnimation);
-            _largeVisual.StartAnimation("Scale", scaleAnimation);
-            _blurBrush.Properties.StartAnimation("Blur.BlurAmount", blurAnimation);
-            _collapsed = true;
-
-            batch.End();
+            EmojifyPanel.Visibility = Visibility.Collapsed;
+            CallDetailsPanel.Visibility = Visibility.Visible;
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -535,15 +853,28 @@ namespace Unigram.Views
             _aggregator.Publish(new UpdateCall(new Call { State = new CallStateDiscarded { Reason = new CallDiscardReasonEmpty() } }));
         }
 
-        private void Accept_Click(object sender, RoutedEventArgs e)
+        private async void Accept_Click(object sender, RoutedEventArgs e)
         {
-            if (_call.IsOutgoing && _call.State is CallStateDiscarded discarded && discarded.Reason is CallDiscardReasonDeclined)
+            try
             {
-                _protoService.Send(new CreateCall(_call.UserId, new CallProtocol(true, true, 65, 74, new string[0]), false));
+                Function request;
+                BaseObject response;
+                if (_call.IsOutgoing && _call.State is CallStateDiscarded discarded && discarded.Reason is CallDiscardReasonDeclined)
+                {
+                    request = ModernTdlibCompatibility.CreateCall(_call.UserId, ModernTdlibCompatibility.CreateAudioCallProtocol());
+                    response = await _protoService.SendAsync(request);
+                    ModernTdlibCompatibility.LogAudioCallRequestResult("retry", response);
+                    return;
+                }
+
+                request = ModernTdlibCompatibility.CreateAcceptCall(_call.Id, ModernTdlibCompatibility.CreateAudioCallProtocol());
+                response = await _protoService.SendAsync(request);
+                ModernTdlibCompatibility.LogAudioCallRequestResult("accept", response);
             }
-            else
+            catch (Exception ex)
             {
-                _protoService.Send(new AcceptCall(_call.Id, new CallProtocol(true, true, 65, 74, new string[0])));
+                ModernTdlibCompatibility.LogAudioCallRequestException("accept_exception", ex);
+                await MessagePopup.ShowAsync(Strings.Resources.VoipFailed, Strings.Resources.AppName, Strings.Resources.OK);
             }
         }
 
@@ -561,32 +892,96 @@ namespace Unigram.Views
                 relay = _controller.GetPreferredRelayID();
             }
 
-            var duration = _state == libtgvoip.CallState.Established ? DateTime.Now - _started : TimeSpan.Zero;
-            _protoService.Send(new DiscardCall(call.Id, false, (int)duration.TotalSeconds, false, relay));
+            var duration = _state == libtgvoip.CallState.Established || _modernEstablished ? DateTime.Now - _started : TimeSpan.Zero;
+            _protoService.Send(ModernTdlibCompatibility.CreateDiscardCall(call.Id, false, (int)duration.TotalSeconds, relay));
         }
 
         private void Routing_Click(object sender, RoutedEventArgs e)
         {
-            var routingManager = AudioRoutingManager.GetDefault();
-
-            var toggle = sender as ToggleButton;
-            toggle.IsChecked = !toggle.IsChecked;
-
-            if (toggle.IsChecked.Value)
+            var routingManager = _audioRoutingManager;
+            if (routingManager == null || Routing == null)
             {
-                routingManager.SetAudioEndpoint(AudioRoutingEndpoint.Speakerphone);
+                return;
             }
-            else
+
+            // GlyphToggleButton suppresses the base OnToggle unless IsOneWay is false, and
+            // this instance sets neither that nor an IsChecked binding, so the control does
+            // not flip itself when clicked. The handler owns the checked state, and every
+            // path below re-reads the endpoint afterwards so the glyph cannot drift away
+            // from the endpoint actually in force.
+            var requested = Routing.IsChecked == true
+                ? SelectPrivateAudioEndpoint(routingManager)
+                : AudioRoutingEndpoint.Speakerphone;
+
+            ApplyAudioEndpoint(routingManager, requested, "toggle");
+        }
+
+        /// <summary>
+        /// The endpoint a call falls back to when the loudspeaker is switched off: a
+        /// connected headset if there is one, otherwise the earpiece.
+        /// </summary>
+        private static AudioRoutingEndpoint SelectPrivateAudioEndpoint(AudioRoutingManager manager)
+        {
+            return manager.AvailableAudioEndpoints.HasFlag(AvailableAudioRoutingEndpoints.Bluetooth)
+                ? AudioRoutingEndpoint.Bluetooth
+                : AudioRoutingEndpoint.Earpiece;
+        }
+
+        /// <summary>
+        /// Applies a routing request and reconciles the toggle with the endpoint the
+        /// platform actually reports afterwards. The request is never assumed to have
+        /// succeeded: a switch that is silently refused is the failure being chased, and
+        /// it is only visible by reading the endpoint back.
+        /// </summary>
+        private void ApplyAudioEndpoint(AudioRoutingManager manager, AudioRoutingEndpoint requested, string stage)
+        {
+            AudioRoutingEndpoint actual;
+
+            try
             {
-                if (routingManager.AvailableAudioEndpoints.HasFlag(AvailableAudioRoutingEndpoints.Bluetooth))
-                {
-                    routingManager.SetAudioEndpoint(AudioRoutingEndpoint.Bluetooth);
-                }
-                else if (routingManager.AvailableAudioEndpoints.HasFlag(AvailableAudioRoutingEndpoints.Earpiece))
-                {
-                    routingManager.SetAudioEndpoint(AudioRoutingEndpoint.Earpiece);
-                }
+                manager.SetAudioEndpoint(requested);
+                actual = manager.GetAudioEndpoint();
             }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.Write(
+                    "voip.ui",
+                    $"result=routing_failed;stage={stage};requested={requested}" +
+                    $";error={Logs.PushDiagnostics.SanitizeErrorMessage(ex.Message)}");
+                return;
+            }
+
+#if MODERN_TGCALLS
+            var nativeQueued = false;
+            if (requested == AudioRoutingEndpoint.Earpiece || requested == AudioRoutingEndpoint.Speakerphone)
+            {
+                nativeQueued = ModernAudioOutputEndpointRequested?.Invoke(
+                    requested == AudioRoutingEndpoint.Speakerphone) == true;
+                _modernAudioOutputSpeakerphone = nativeQueued
+                    ? requested == AudioRoutingEndpoint.Speakerphone
+                    : (bool?)null;
+            }
+#endif
+
+            if (Routing != null)
+            {
+#if MODERN_TGCALLS
+                Routing.IsChecked = nativeQueued
+                    ? requested == AudioRoutingEndpoint.Speakerphone
+                    : actual == AudioRoutingEndpoint.Speakerphone;
+#else
+                Routing.IsChecked = actual == AudioRoutingEndpoint.Speakerphone;
+#endif
+            }
+
+            Logs.PushDiagnostics.Write(
+                "voip.ui",
+                $"result=routing_changed;stage={stage};requested={requested};actual={actual}" +
+                $";available={manager.AvailableAudioEndpoints}"
+#if MODERN_TGCALLS
+                + $";native_queued={(nativeQueued ? 1 : 0)}"
+#endif
+                );
         }
 
         private bool _isMuted;
@@ -604,8 +999,33 @@ namespace Unigram.Views
                 {
                     _controller.SetMicMute(value);
                 }
+#if MODERN_TGCALLS
+                else
+                {
+                    // The modern bridge owns the microphone instead of VoIPControllerWrapper,
+                    // and CallsService owns the session, so the toggle is forwarded there.
+                    ModernMuteRequested?.Invoke(value);
+                }
+#endif
             }
         }
+
+#if MODERN_TGCALLS
+        private bool _modernCameraSwitchPending;
+        /// <summary>
+        /// Supplied by CallsService so the mute toggle can reach the modern tgcalls session.
+        /// </summary>
+        public Action<bool> ModernMuteRequested { get; set; }
+
+        /// <summary>
+        /// Supplied by CallsService to select a physical earpiece or loudspeaker through
+        /// the active modern TgCalls session when AudioRoutingManager rejects the request.
+        /// A true return means the native media queue accepted the selection.
+        /// </summary>
+        public Func<bool, bool> ModernAudioOutputEndpointRequested { get; set; }
+
+        public Func<string, bool, bool> ModernVideoDeviceRequested { get; set; }
+#endif
 
         private async void AudioEndpointChanged(AudioRoutingManager sender, object args)
         {
@@ -616,8 +1036,15 @@ namespace Unigram.Views
 
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
-                var routingManager = AudioRoutingManager.GetDefault();
-                Routing.IsChecked = routingManager.GetAudioEndpoint() == AudioRoutingEndpoint.Speakerphone;
+                if (!_disposed && Routing != null && sender != null)
+                {
+#if MODERN_TGCALLS
+                    Routing.IsChecked = _modernAudioOutputSpeakerphone
+                        ?? sender.GetAudioEndpoint() == AudioRoutingEndpoint.Speakerphone;
+#else
+                    Routing.IsChecked = sender.GetAudioEndpoint() == AudioRoutingEndpoint.Speakerphone;
+#endif
+                }
             });
         }
 

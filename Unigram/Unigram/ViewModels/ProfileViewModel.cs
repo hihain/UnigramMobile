@@ -452,11 +452,11 @@ namespace Unigram.ViewModels
         {
             if (chat.Type is ChatTypePrivate privata)
             {
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(privata.UserId), blocked));
+                ProtoService.Send(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(privata.UserId), blocked));
             }
             else if (chat.Type is ChatTypeSecret secret)
             {
-                ProtoService.Send(new ToggleMessageSenderIsBlocked(new MessageSenderUser(secret.UserId), blocked));
+                ProtoService.Send(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(secret.UserId), blocked));
             }
         }
 
@@ -597,7 +597,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(user.Bio);
+                dataPackage.SetText(ModernTdlibCompatibility.GetUserFullInfoDescription(user, false));
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -620,7 +620,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText($"@{supergroup.Username}");
+                dataPackage.SetText($"@{supergroup.GetUsername()}");
                 ClipboardEx.TrySetContent(dataPackage);
             }
             else
@@ -632,7 +632,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText($"@{user.Username}");
+                dataPackage.SetText($"@{user.GetUsername()}");
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -655,7 +655,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, supergroup.Username));
+                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, supergroup.GetUsername()));
                 ClipboardEx.TrySetContent(dataPackage);
             }
             else
@@ -667,7 +667,7 @@ namespace Unigram.ViewModels
                 }
 
                 var dataPackage = new DataPackage();
-                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, user.Username));
+                dataPackage.SetText(MeUrlPrefixConverter.Convert(CacheService, user.GetUsername()));
                 ClipboardEx.TrySetContent(dataPackage);
             }
         }
@@ -774,9 +774,10 @@ namespace Unigram.ViewModels
                 }
 
                 var response = await ProtoService.SendAsync(new AddChatMember(chat.Id, user.Id, (int)CacheService.Options.ForwardedMessageCountMax));
-                if (response is Error error)
+                if (await ShowAddChatMemberResultAsync(response, user, (chat.Type as ChatTypeSupergroup)?.IsChannel ?? false) &&
+                    _supergroupMembersVieModel.Chat?.Id == chat.Id)
                 {
-
+                    _supergroupMembersVieModel.RefreshMembers();
                 }
             }
         }
@@ -843,17 +844,26 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            var response = await ProtoService.SendAsync(new CreateCall(user.Id, new CallProtocol(true, true, 65, 74, new string[0]), false));
-            if (response is Error error)
+            try
             {
-                if (error.Code == 400 && error.Message.Equals("PARTICIPANT_VERSION_OUTDATED"))
+                var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateCall(user.Id, ModernTdlibCompatibility.CreateAudioCallProtocol()));
+                ModernTdlibCompatibility.LogAudioCallRequestResult("create", response);
+                if (response is Error error)
                 {
-                    await MessagePopup.ShowAsync(string.Format(Strings.Resources.VoipPeerOutdated, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
+                    if (error.Code == 400 && error.Message.Equals("PARTICIPANT_VERSION_OUTDATED"))
+                    {
+                        await MessagePopup.ShowAsync(string.Format(Strings.Resources.VoipPeerOutdated, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
+                    }
+                    else if (error.Code == 400 && error.Message.Equals("USER_PRIVACY_RESTRICTED"))
+                    {
+                        await MessagePopup.ShowAsync(string.Format(Strings.Resources.CallNotAvailable, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
+                    }
                 }
-                else if (error.Code == 400 && error.Message.Equals("USER_PRIVACY_RESTRICTED"))
-                {
-                    await MessagePopup.ShowAsync(string.Format(Strings.Resources.CallNotAvailable, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
-                }
+            }
+            catch (Exception ex)
+            {
+                ModernTdlibCompatibility.LogAudioCallRequestException("create_exception", ex);
+                await MessagePopup.ShowAsync(string.Format(Strings.Resources.CallNotAvailable, user.GetFullName()), Strings.Resources.VoipFailed, Strings.Resources.OK);
             }
         }
 
@@ -885,8 +895,13 @@ namespace Unigram.ViewModels
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm == ContentDialogResult.Primary)
             {
+#if MODERN_TDLIB
+                ProtoService.Send(new AddContact(user.Id, new Telegram.Td.Api.ImportedContact(user.PhoneNumber.ToString(), dialog.FirstName, dialog.LastName, null),
+                    fullInfo.NeedPhoneNumberPrivacyException ? dialog.SharePhoneNumber : true));
+#else
                 ProtoService.Send(new AddContact(new Contact(user.PhoneNumber, dialog.FirstName, dialog.LastName, string.Empty, user.Id),
                     fullInfo.NeedPhoneNumberPrivacyException ? dialog.SharePhoneNumber : true));
+#endif
             }
         }
 
@@ -1034,7 +1049,7 @@ namespace Unigram.ViewModels
             }
 
             var dialog = new ChatTtlPopup(chat.Type is ChatTypeSecret);
-            dialog.Value = chat.MessageTtlSetting;
+            dialog.Value = ModernTdlibCompatibility.GetChatMessageTtlSetting(chat);
 
             var confirm = await dialog.ShowQueuedAsync();
             if (confirm != ContentDialogResult.Primary)
@@ -1042,7 +1057,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            ProtoService.Send(new SetChatMessageTtlSetting(chat.Id, dialog.Value));
+            ProtoService.Send(ModernTdlibCompatibility.CreateSetChatMessageTtlSetting(chat.Id, dialog.Value));
         }
 
         #endregion

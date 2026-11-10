@@ -1,4 +1,5 @@
 ﻿using Telegram.Td.Api;
+using Unigram.Common;
 using Unigram.Services;
 
 namespace Unigram.ViewModels.Payments
@@ -36,6 +37,9 @@ namespace Unigram.ViewModels.Payments
             }
         }
 
+        public string InvoiceTitle => Invoice?.GetTitle();
+        public string InvoiceDescription => Invoice?.GetDescription();
+
         protected PaymentForm _paymentForm;
         public PaymentForm PaymentForm
         {
@@ -48,5 +52,15 @@ namespace Unigram.ViewModels.Payments
                 Set(ref _paymentForm, value);
             }
         }
+
+        public Invoice PaymentInvoice => ModernTdlibCompatibility.GetPaymentFormInvoice(_paymentForm);
+
+        public OrderInfo SavedOrderInfo => ModernTdlibCompatibility.GetPaymentFormSavedOrderInfo(_paymentForm);
+
+        public bool HasSavedCredentials => ModernTdlibCompatibility.HasPaymentFormSavedCredentials(_paymentForm);
+
+        public bool CanSaveCredentials => ModernTdlibCompatibility.GetPaymentFormCanSaveCredentials(_paymentForm);
+
+        public string PaymentFormUrl => ModernTdlibCompatibility.GetPaymentFormUrl(_paymentForm);
     }
 }

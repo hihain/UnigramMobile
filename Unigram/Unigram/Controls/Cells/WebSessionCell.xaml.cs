@@ -25,7 +25,7 @@ namespace Unigram.Controls.Cells
 
             Domain.Text = session.DomainName;
             Title.Text = string.Format("{0}, {1}, {2}", bot.FirstName, session.Browser, session.Platform);
-            Subtitle.Text = string.Format("{0} — {1}", session.Ip, session.Location);
+            Subtitle.Text = string.Format("{0} — {1}", session.GetIpAddress(), session.Location);
 
             LastActiveDate.Text = BindConvert.Current.DateExtended(session.LastActiveDate);
         }

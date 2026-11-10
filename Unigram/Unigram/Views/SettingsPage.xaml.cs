@@ -127,7 +127,7 @@ namespace Unigram.Views
                     return;
                 }
 
-                var dialog = new EditYourAboutPopup(user.Bio);
+                var dialog = new EditYourAboutPopup(user.Bio?.Text);
 
                 var confirm = await dialog.ShowQueuedAsync();
                 if (confirm == ContentDialogResult.Primary)
@@ -278,7 +278,7 @@ namespace Unigram.Views
             Photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 64);
             Title.Text = user.GetFullName();
 
-            Verified.Visibility = user.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+            Verified.Visibility = user.VerificationStatus != null ? Visibility.Visible : Visibility.Collapsed;
 
 #if DEBUG
             PhoneNumber.Badge = "+42 --- --- ----";
@@ -293,12 +293,13 @@ namespace Unigram.Views
             }
 #endif
 
-            Username.Badge = string.IsNullOrEmpty(user.Username) ? Strings.Resources.UsernameEmpty : $"{user.Username}";
+            var username = user.Usernames?.EditableUsername;
+            Username.Badge = string.IsNullOrEmpty(username) ? Strings.Resources.UsernameEmpty : username;
         }
 
         public void UpdateUserFullInfo(Chat chat, User user, UserFullInfo fullInfo, bool secret, bool accessToken)
         {
-            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio) ? Strings.Resources.UserBioDetail : fullInfo.Bio;
+            Bio.Badge = string.IsNullOrEmpty(fullInfo.Bio?.Text) ? Strings.Resources.UserBioDetail : fullInfo.Bio.Text;
         }
 
         public void UpdateUserStatus(Chat chat, User user)

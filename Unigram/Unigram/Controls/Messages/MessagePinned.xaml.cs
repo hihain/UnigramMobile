@@ -30,6 +30,28 @@ namespace Unigram.Controls.Messages
 
         private bool _loading;
 
+#if MODERN_TDLIB
+        // The pinned banner is the one chat surface that reliably faulted on Windows 10 Mobile,
+        // and the fault unwinds through a WinRT frame so no managed stack survives. These traces
+        // are budgeted so a long session cannot push the diagnostics file past its size cap.
+        private static int _traceBudget = 60;
+
+        // The static path bakes the pinned index into the title, so it has to refresh when the
+        // index moves and not only when the message changes. These mirror what UpdateMessage last
+        // rendered so the no-op check above can tell the two apart.
+        private int _staticValue = int.MinValue;
+        private int _staticMaximum = int.MinValue;
+
+        private static void Trace(string step)
+        {
+            if (_traceBudget > 0)
+            {
+                _traceBudget--;
+                Logs.PushDiagnostics.Write("pinned.ui", step);
+            }
+        }
+#endif
+
         public MessagePinned()
         {
             InitializeComponent();
@@ -71,6 +93,30 @@ namespace Unigram.Controls.Messages
 
         public void UpdateMessage(Chat chat, MessageViewModel message, bool known, int value, int maximum, bool intermediate)
         {
+#if MODERN_TDLIB
+            // ViewVisibleMessages re-pushes the pinned message on every ScrollViewer.ViewChanged
+            // tick. The animated path below absorbs that through its own no-op check, but the
+            // static path returns before reaching it, so it needs an equivalent of its own.
+            // Without it every scroll frame would rebuild the banner, which for a pinned photo
+            // means decoding a fresh BitmapImage on the UI thread each time.
+            // UpdateHeaderDate passes ViewModel.Chat straight through and it can be null while a
+            // chat is being swapped, so chat must be tested before Id is read. The original code
+            // reached its first use of chat only after the "message == null && !known" early exit,
+            // so a null chat was previously harmless here.
+            if (!ApiInfo.CanUseDirectComposition
+                && !_loading
+                && _messageId != 0
+                && chat != null
+                && _chatId == chat.Id
+                && _messageId == (message?.Id ?? 0)
+                && _staticValue == value
+                && _staticMaximum == maximum)
+            {
+                return;
+            }
+
+            Trace($"step=enter;known={known};has_message={message != null};value={value};maximum={maximum}");
+#endif
             HideButton.Visibility = maximum > 1 ? Visibility.Collapsed : Visibility.Visible;
             ListButton.Visibility = maximum > 1 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -88,6 +134,9 @@ namespace Unigram.Controls.Messages
             {
                 ShowHide(true);
             }
+#if MODERN_TDLIB
+            Trace("step=shown");
+#endif
 
             string title;
             if (ApiInfo.CanUseDirectComposition)
@@ -98,6 +147,35 @@ namespace Unigram.Controls.Messages
             {
                 title = Strings.Resources.PinnedMessage + (value >= 0 && maximum > 1 ? $" #{value + 1}" : "");
             }
+
+#if MODERN_TDLIB
+            // Line and Number both disable themselves when direct composition is unavailable, so
+            // on those devices the cross-fade below animates nothing and only risks the scoped
+            // batch and visual animations it needs to set up. Update the banner in place instead.
+            // UpdateMessage already branches on the same capability for the title text.
+            if (!ApiInfo.CanUseDirectComposition)
+            {
+                Trace("step=static_begin");
+
+                _queue.Clear();
+
+                Line.UpdateIndex(value, maximum, 0);
+                Trace("step=static_line");
+
+                Number.Value = maximum > 1 ? value + 1 : -1;
+                Trace("step=static_number");
+
+                _chatId = chat.Id;
+                _messageId = message?.Id ?? 0;
+                _loading = known;
+                _staticValue = value;
+                _staticMaximum = maximum;
+
+                UpdateMessage(message, message == null, title);
+                Trace("step=static_done");
+                return;
+            }
+#endif
 
             if (_loading || (_chatId == chat.Id && _messageId == 0))
             {
@@ -236,6 +314,20 @@ namespace Unigram.Controls.Messages
 
             Visibility = Visibility.Visible;
 
+#if MODERN_TDLIB
+            Trace($"step=showhide;show={show};has_parent={_parent != null}");
+
+            // InitializeParent is called by the host view. If the banner is updated before that
+            // happens, GetElementVisual would be handed null and throw out through WinRT, so fall
+            // back to toggling visibility without the slide animation.
+            if (_parent == null)
+            {
+                _collapsed = !show;
+                Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                return;
+            }
+#endif
+
             var visual = ElementCompositionPreview.GetElementVisual(_parent);
             visual.Clip = visual.Compositor.CreateInsetClip();
 
@@ -269,6 +361,9 @@ namespace Unigram.Controls.Messages
             visual.StartAnimation("Offset", offset);
 
             batch.End();
+#if MODERN_TDLIB
+            Trace("step=showhide_done");
+#endif
         }
 
         public ICommand HideCommand

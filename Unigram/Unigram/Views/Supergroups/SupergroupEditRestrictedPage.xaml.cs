@@ -1,6 +1,7 @@
 ﻿using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Converters;
+using Unigram.Services;
 using Unigram.ViewModels.Delegates;
 using Unigram.ViewModels.Supergroups;
 using Windows.UI.Xaml;
@@ -44,7 +45,7 @@ namespace Unigram.Views.Supergroups
             Subtitle.Text = LastSeenConverter.GetLabel(user, true);
             Photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 64);
 
-            Verified.Visibility = user.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+            Verified.Visibility = ModernTdlibCompatibility.GetUserIsVerified(user) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public void UpdateUserStatus(Chat chat, User user)

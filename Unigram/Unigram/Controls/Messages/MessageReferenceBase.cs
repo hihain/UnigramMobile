@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -222,7 +223,9 @@ namespace Unigram.Controls.Messages
                 case MessageChatDeleteMember chatDeleteMember:
                 case MessageChatDeletePhoto chatDeletePhoto:
                 case MessageChatJoinByLink chatJoinByLink:
+#if !MODERN_TDLIB
                 case MessageChatSetTtl chatSetTtl:
+#endif
                 case MessageChatUpgradeFrom chatUpgradeFrom:
                 case MessageChatUpgradeTo chatUpgradeTo:
                 case MessageContactRegistered contactRegistered:
@@ -238,7 +241,9 @@ namespace Unigram.Controls.Messages
                 //case MessageVoiceChatEnded newTodo3:
                 //case MessageVoiceChatScheduled newTodo4:
                 //case MessageVoiceChatStarted newTodo5:
+#if !MODERN_TDLIB
                 case MessageWebsiteConnected newTodo6:
+#endif
                     return SetServiceTextTemplate(message, title);
                 case MessageExpiredPhoto expiredPhoto:
                 case MessageExpiredVideo expiredVideo:
@@ -316,7 +321,7 @@ namespace Unigram.Controls.Messages
             HideThumbnail();
 
             SetTitle(GetFromLabel(message, title));
-            SetService(invoice.Title);
+            SetService(invoice.GetTitle());
             SetMessage(string.Empty);
 
             return true;
@@ -329,7 +334,7 @@ namespace Unigram.Controls.Messages
             HideThumbnail();
 
             SetTitle(GetFromLabel(message, title));
-            SetService(location.LivePeriod > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
+            SetService(location.GetLivePeriod() > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
             SetMessage(string.Empty);
 
             return true;
@@ -435,7 +440,7 @@ namespace Unigram.Controls.Messages
             HideThumbnail();
 
             SetTitle(GetFromLabel(message, title));
-            SetService($"\uD83D\uDCCA {poll.Poll.Question.Replace("\r\n", "\n").Replace('\n', ' ')}");
+            SetService($"\uD83D\uDCCA {ModernTdlibCompatibility.GetPollQuestion(poll.Poll).Replace("\r\n", "\n").Replace('\n', ' ')}");
             SetMessage(string.Empty);
 
             return true;

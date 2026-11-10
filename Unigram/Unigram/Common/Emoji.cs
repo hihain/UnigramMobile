@@ -220,7 +220,30 @@ namespace Unigram.Common
         {
             var result = new List<EmojiData>();
 
-            var response = await protoService.SendAsync(new SearchEmojis(query, false, new[] { inputLanguage }));
+            var response = await protoService.SendAsync(
+#if MODERN_TDLIB
+                new SearchEmojis(query, new[] { inputLanguage })
+#else
+                new SearchEmojis(query, false, new[] { inputLanguage })
+#endif
+            );
+#if MODERN_TDLIB
+            if (response is EmojiKeywords suggestions)
+            {
+                foreach (var item in suggestions.EmojiKeywordsValue)
+                {
+                    var emoji = item.Emoji;
+                    if (EmojiGroupInternal._skinEmojis.Contains(emoji) || EmojiGroupInternal._skinEmojis.Contains(emoji.TrimEnd('\uFE0F')))
+                    {
+                        result.Add(new EmojiSkinData(emoji, skin));
+                    }
+                    else
+                    {
+                        result.Add(new EmojiData(emoji));
+                    }
+                }
+            }
+#else
             if (response is Emojis suggestions)
             {
                 foreach (var item in suggestions.EmojisValue)
@@ -236,6 +259,7 @@ namespace Unigram.Common
                     }
                 }
             }
+#endif
 
             return new List<EmojiGroup>
             {

@@ -1,0 +1,14 @@
+diff --git a/config/rust.gni b/config/rust.gni
+index 348226ee2c5e..ca7da23eb40a 100644
+--- a/config/rust.gni
++++ b/config/rust.gni
+@@ -275,6 +275,9 @@ else if (is_win) {
+     rust_abi_target = "x86_64-pc-windows-msvc"
+   } else if (current_cpu == "x86") {
+     rust_abi_target = "i686-pc-windows-msvc"
++  } else if (current_cpu == "arm" && !enable_rust) {
++    # The standalone UWP ARM WebRTC build has no Rust targets.
++    rust_abi_target = ""
+   } else {
+     assert(false, "Architecture not supported")
+   }

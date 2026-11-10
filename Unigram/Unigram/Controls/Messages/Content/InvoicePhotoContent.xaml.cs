@@ -30,15 +30,14 @@ namespace Unigram.Controls.Messages.Content
                 return;
             }
 
-            Title.Text = invoice.Title;
-            Description.Text = invoice.Description;
-
-            Photo.Constraint = invoice.Photo;
+            Title.Text = invoice.GetTitle();
+            Description.Text = invoice.GetDescription();
+            Photo.Constraint = invoice.GetPhoto();
             Texture.Source = null;
 
             Footer.UpdateMessage(message);
 
-            var small = invoice.Photo.GetSmall();
+            var small = invoice.GetPhoto().GetSmall();
             if (small != null)
             {
                 UpdateThumbnail(message, small.Photo);
@@ -55,7 +54,7 @@ namespace Unigram.Controls.Messages.Content
                 return;
             }
 
-            var small = invoice.Photo.GetSmall();
+            var small = invoice.GetPhoto().GetSmall();
             if (small != null && small.Photo.Id == file.Id)
             {
                 UpdateThumbnail(message, file);
@@ -76,7 +75,7 @@ namespace Unigram.Controls.Messages.Content
 
         public bool IsValid(MessageContent content, bool primary)
         {
-            return content is MessageInvoice invoice && invoice.Photo != null;
+            return content is MessageInvoice invoice && invoice.GetPhoto() != null;
         }
     }
 }

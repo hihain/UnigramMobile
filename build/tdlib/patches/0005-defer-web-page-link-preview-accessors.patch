@@ -1,0 +1,73 @@
+diff --git a/td/generate/tl_writer_dotnet.h b/td/generate/tl_writer_dotnet.h
+index 34f0de344..f699f5172 100644
+--- a/td/generate/tl_writer_dotnet.h
++++ b/td/generate/tl_writer_dotnet.h
+@@ -204,7 +204,24 @@ class TlWriterDotNet final : public TL_writer {
+     return prefix_ + "#include \"td/tl/tl_dotnet_object.h\"\n\n" + additional_imports +
+            "namespace Telegram {\n"
+            "namespace Td {\n"
+-           "namespace Api {\n";
++           "namespace Api {\n"
++           "ref class WebPage;\n"
++           "ref class Animation;\n"
++           "ref class Audio;\n"
++           "ref class Document;\n"
++           "ref class Photo;\n"
++           "ref class Sticker;\n"
++           "ref class Video;\n"
++           "ref class VideoNote;\n"
++           "ref class VoiceNote;\n"
++           "Animation^ GetWebPageAnimation(WebPage^ from);\n"
++           "Audio^ GetWebPageAudio(WebPage^ from);\n"
++           "Document^ GetWebPageDocument(WebPage^ from);\n"
++           "Photo^ GetWebPagePhoto(WebPage^ from);\n"
++           "Sticker^ GetWebPageSticker(WebPage^ from);\n"
++           "Video^ GetWebPageVideo(WebPage^ from);\n"
++           "VideoNote^ GetWebPageVideoNote(WebPage^ from);\n"
++           "VoiceNote^ GetWebPageVoiceNote(WebPage^ from);\n";
+   }
+ 
+   std::string gen_output_begin_once() const final {
+@@ -212,6 +229,19 @@ class TlWriterDotNet final : public TL_writer {
+   }
+ 
+   std::string gen_output_end() const final {
++    if (is_header_) {
++      return "inline ::Telegram::Td::Api::Animation^ GetWebPageAnimation(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeAnimation^>(from->Type); return value == nullptr ? nullptr : value->Animation; }\n"
++             "inline ::Telegram::Td::Api::Audio^ GetWebPageAudio(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeAudio^>(from->Type); return value == nullptr ? nullptr : value->Audio; }\n"
++             "inline ::Telegram::Td::Api::Document^ GetWebPageDocument(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeDocument^>(from->Type); return value == nullptr ? nullptr : value->Document; }\n"
++             "inline ::Telegram::Td::Api::Photo^ GetWebPagePhoto(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypePhoto^>(from->Type); return value == nullptr ? nullptr : value->Photo; }\n"
++             "inline ::Telegram::Td::Api::Sticker^ GetWebPageSticker(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeSticker^>(from->Type); return value == nullptr ? nullptr : value->Sticker; }\n"
++             "inline ::Telegram::Td::Api::Video^ GetWebPageVideo(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVideo^>(from->Type); return value == nullptr ? nullptr : value->Video; }\n"
++             "inline ::Telegram::Td::Api::VideoNote^ GetWebPageVideoNote(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVideoNote^>(from->Type); return value == nullptr ? nullptr : value->VideoNote; }\n"
++             "inline ::Telegram::Td::Api::VoiceNote^ GetWebPageVoiceNote(WebPage^ from) { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVoiceNote^>(from->Type); return value == nullptr ? nullptr : value->VoiceNote; }\n"
++             "}\n"
++             "}\n"
++             "}\n";
++    }
+     return "}\n"
+            "}\n"
+            "}\n";
+@@ -389,14 +419,14 @@ class TlWriterDotNet final : public TL_writer {
+     auto class_name = gen_class_name(t->name);
+     if (is_header_ && function_name == "ToUnmanaged") {
+       if (class_name == "WebPage") {
+-        ss << "  property ::Telegram::Td::Api::Animation^ Animation { ::Telegram::Td::Api::Animation^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeAnimation^>(Type); return value == nullptr ? nullptr : value->Animation; } }\n"
+-              "  property ::Telegram::Td::Api::Audio^ Audio { ::Telegram::Td::Api::Audio^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeAudio^>(Type); return value == nullptr ? nullptr : value->Audio; } }\n"
+-              "  property ::Telegram::Td::Api::Document^ Document { ::Telegram::Td::Api::Document^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeDocument^>(Type); return value == nullptr ? nullptr : value->Document; } }\n"
+-              "  property ::Telegram::Td::Api::Photo^ Photo { ::Telegram::Td::Api::Photo^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypePhoto^>(Type); return value == nullptr ? nullptr : value->Photo; } }\n"
+-              "  property ::Telegram::Td::Api::Sticker^ Sticker { ::Telegram::Td::Api::Sticker^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeSticker^>(Type); return value == nullptr ? nullptr : value->Sticker; } }\n"
+-              "  property ::Telegram::Td::Api::Video^ Video { ::Telegram::Td::Api::Video^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVideo^>(Type); return value == nullptr ? nullptr : value->Video; } }\n"
+-              "property ::Telegram::Td::Api::VideoNote^ VideoNote { ::Telegram::Td::Api::VideoNote^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVideoNote^>(Type); return value == nullptr ? nullptr : value->VideoNote; } }\n"
+-              "  property ::Telegram::Td::Api::VoiceNote^ VoiceNote { ::Telegram::Td::Api::VoiceNote^ get() { auto value = dynamic_cast<::Telegram::Td::Api::LinkPreviewTypeVoiceNote^>(Type); return value == nullptr ? nullptr : value->VoiceNote; } }\n"
++        ss << "  property ::Telegram::Td::Api::Animation^ Animation { ::Telegram::Td::Api::Animation^ get() { return GetWebPageAnimation(this); } }\n"
++              "  property ::Telegram::Td::Api::Audio^ Audio { ::Telegram::Td::Api::Audio^ get() { return GetWebPageAudio(this); } }\n"
++              "  property ::Telegram::Td::Api::Document^ Document { ::Telegram::Td::Api::Document^ get() { return GetWebPageDocument(this); } }\n"
++              "  property ::Telegram::Td::Api::Photo^ Photo { ::Telegram::Td::Api::Photo^ get() { return GetWebPagePhoto(this); } }\n"
++              "  property ::Telegram::Td::Api::Sticker^ Sticker { ::Telegram::Td::Api::Sticker^ get() { return GetWebPageSticker(this); } }\n"
++              "  property ::Telegram::Td::Api::Video^ Video { ::Telegram::Td::Api::Video^ get() { return GetWebPageVideo(this); } }\n"
++              "  property ::Telegram::Td::Api::VideoNote^ VideoNote { ::Telegram::Td::Api::VideoNote^ get() { return GetWebPageVideoNote(this); } }\n"
++              "  property ::Telegram::Td::Api::VoiceNote^ VoiceNote { ::Telegram::Td::Api::VoiceNote^ get() { return GetWebPageVoiceNote(this); } }\n"
+               "  property int32 EmbedWidth { int32 get() { return 0; } }\n"
+               "  property int32 EmbedHeight { int32 get() { return 0; } }\n";
+       }

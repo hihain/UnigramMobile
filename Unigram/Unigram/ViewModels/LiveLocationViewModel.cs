@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
+using Unigram.Common;
 using Unigram.Collections;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
@@ -84,7 +85,7 @@ namespace Unigram.ViewModels
                 return;
             }
 
-            if (update.Message.Content is MessageLocation location && location.LivePeriod > 0)
+            if (update.Message.Content is MessageLocation location && location.GetLivePeriod() > 0)
             {
                 Items.Add(update.Message);
             }

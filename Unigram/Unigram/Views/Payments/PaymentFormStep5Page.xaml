@@ -66,7 +66,7 @@
     </Page.Resources>
 
     <local:HostedPage.Header>
-        <controls:PageHeader Text="{x:Bind ConvertTitle(ViewModel.PaymentForm.Invoice.IsTest), FallbackValue=Checkout}"/>
+        <controls:PageHeader Text="{x:Bind ConvertTitle(ViewModel.PaymentInvoice.IsTest), FallbackValue=Checkout}"/>
     </local:HostedPage.Header>
     
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
@@ -95,17 +95,17 @@
                     </Border>
 
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="{x:Bind ViewModel.Invoice.Title, FallbackValue=Empty}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Style="{StaticResource BaseTextBlockStyle}"/>
-                        <TextBlock Text="{x:Bind ViewModel.Invoice.Description, FallbackValue=Empty}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextBlockStyle}"/>
+                        <TextBlock Text="{x:Bind ViewModel.InvoiceTitle, FallbackValue=Empty}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Style="{StaticResource BaseTextBlockStyle}"/>
+                        <TextBlock Text="{x:Bind ViewModel.InvoiceDescription, FallbackValue=Empty}" TextTrimming="CharacterEllipsis" Style="{StaticResource BodyTextBlockStyle}"/>
                         <TextBlock Text="{x:Bind ViewModel.Bot.FirstName, FallbackValue=Empty}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"/>
                     </StackPanel>
                 </Grid>
 
                 <payments:LabeledPricesPanel
-                    Currency="{x:Bind ViewModel.PaymentForm.Invoice.Currency}"
-                    Prices="{x:Bind ViewModel.PaymentForm.Invoice.PriceParts}"/>
+                    Currency="{x:Bind ViewModel.PaymentInvoice.Currency}"
+                    Prices="{x:Bind ViewModel.PaymentInvoice.PriceParts}"/>
                 <payments:LabeledPricesPanel
-                    Currency="{x:Bind ViewModel.PaymentForm.Invoice.Currency}"
+                    Currency="{x:Bind ViewModel.PaymentInvoice.Currency}"
                     Prices="{x:Bind ViewModel.Shipping.PriceParts}"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -113,7 +113,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="{CustomResource PaymentTransactionTotal}" Margin="12,4,0,8" Style="{StaticResource BaseTextBlockStyle}"/>
-                    <TextBlock Text="{x:Bind Convert.FormatAmount(ViewModel.TotalAmount, ViewModel.PaymentForm.Invoice.Currency), FallbackValue=Empty}" Margin="8,4,12,8" Style="{StaticResource BaseTextBlockStyle}" Grid.Column="1"/>
+                    <TextBlock Text="{x:Bind Convert.FormatAmount(ViewModel.TotalAmount, ViewModel.PaymentInvoice.Currency), FallbackValue=Empty}" Margin="8,4,12,8" Style="{StaticResource BaseTextBlockStyle}" Grid.Column="1"/>
                 </Grid>
 
                 <StackPanel Padding="12,8">
@@ -157,7 +157,7 @@
         <Grid Background="{ThemeResource PageHeaderBackgroundBrush}"
               Height="{ThemeResource AppBarThemeCompactHeight}"
               Grid.Row="1">
-            <Button Content="{x:Bind ConvertPay(ViewModel.TotalAmount, ViewModel.PaymentForm.Invoice.Currency), FallbackValue=Empty}" Command="{x:Bind ViewModel.SendCommand}" Style="{StaticResource SendButtonStyle}"/>
+            <Button Content="{x:Bind ConvertPay(ViewModel.TotalAmount, ViewModel.PaymentInvoice.Currency), FallbackValue=Empty}" Command="{x:Bind ViewModel.SendCommand}" Style="{StaticResource SendButtonStyle}"/>
         </Grid>
     </Grid>
 </local:HostedPage>

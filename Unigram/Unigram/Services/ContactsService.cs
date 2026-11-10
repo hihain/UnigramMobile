@@ -167,7 +167,7 @@ namespace Unigram.Services
                 }
             }
 
-            var importingContacts = new List<Telegram.Td.Api.Contact>();
+            var importingContacts = new List<(string PhoneNumber, string FirstName, string LastName)>();
 
             foreach (var phone in importedPhones.Keys.ToList())
             {
@@ -187,18 +187,11 @@ namespace Unigram.Services
 
                 if (!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName))
                 {
-                    var item = new Telegram.Td.Api.Contact
-                    {
-                        PhoneNumber = phone,
-                        FirstName = firstName,
-                        LastName = lastName
-                    };
-
-                    importingContacts.Add(item);
+                    importingContacts.Add((phone, firstName, lastName));
                 }
             }
 
-            return await _protoService.SendAsync(new Telegram.Td.Api.ChangeImportedContacts(importingContacts));
+            return await _protoService.SendAsync(ModernTdlibCompatibility.CreateChangeImportedContacts(importingContacts));
         }
 
         #endregion

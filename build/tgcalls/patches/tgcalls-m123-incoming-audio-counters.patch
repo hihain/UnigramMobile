@@ -1,0 +1,421 @@
+diff --git a/tgcalls/MediaManager.cpp b/tgcalls/MediaManager.cpp
+index 9ee2939..3d77445 100644
+--- a/tgcalls/MediaManager.cpp
++++ b/tgcalls/MediaManager.cpp
+@@ -1,5 +1,9 @@
+ #include "MediaManager.h"
+ 
++#include <algorithm>
++#include <atomic>
++#include <cmath>
++
+ #include "Instance.h"
+ #include "VideoCaptureInterfaceImpl.h"
+ #include "VideoCapturerInterface.h"
+@@ -160,6 +164,8 @@ private:
+ 
+ } // namespace
+ 
++void RecordAudioProcessingDiagnostics(webrtc::AudioProcessing* audioProcessing);
++
+ class VideoSinkInterfaceProxyImpl : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
+ public:
+     VideoSinkInterfaceProxyImpl(bool rewriteRotation) :
+@@ -335,7 +341,8 @@ _enableHighBitrateVideo(enableHighBitrateVideo) {
+         });
+     }, &_externalAudioSamples, &_externalAudioSamplesMutex);
+     builder.SetCapturePostProcessing(std::move(audioProcessor));
+-    peerConnectionFactoryDeps.audio_processing = builder.Create();
++    _audioProcessing = builder.Create();
++    peerConnectionFactoryDeps.audio_processing = _audioProcessing;
+ 
+     StaticThreads::getWorkerThread()->BlockingCall([&] {
+         _audioDeviceModule = this->createAudioDeviceModule();
+@@ -403,6 +410,7 @@ _enableHighBitrateVideo(enableHighBitrateVideo) {
+         audioSendPrameters.rtcp.reduced_size = true;
+         audioSendPrameters.rtcp.remote_estimate = true;
+         _audioSendChannel->SetSenderParameters(audioSendPrameters);
++        RecordAudioProcessingDiagnostics(_audioProcessing.get());
+         _audioSendChannel->AddSendStream(cricket::StreamParams::CreateLegacy(_ssrcAudio.outgoing));
+         _audioSendChannel->SetInterface(_audioNetworkInterface.get());
+ 
+@@ -532,10 +540,14 @@ MediaManager::~MediaManager() {
+         _videoSendChannel.reset();
+         _videoReceiveChannel.reset();
+ 
++#if defined(WINUWP)
++        setOutputVolume(1.0f);
++#endif
+         _audioDeviceModule = nullptr;
+ 
+         _call.reset();
+         _mediaEngine.reset();
++        _audioProcessing = nullptr;
+     });
+ }
+ 
+@@ -613,6 +625,7 @@ void MediaManager::collectStats() {
+     webrtc::Call::Stats stats;
+     StaticThreads::getWorkerThread()->BlockingCall([&] {
+         stats = _call->GetStats();
++        RecordAudioProcessingDiagnostics(_audioProcessing.get());
+     });
+ 
+     float bitrateNorm = 16.0f;
+@@ -990,12 +1003,143 @@ void MediaManager::setIncomingVideoOutput(std::weak_ptr<rtc::VideoSinkInterface<
+     _incomingVideoSinkProxy->setSink(sink);
+ }
+ 
++// Privacy-safe receive-path counters for the experimental Windows 10 Mobile bridge.
++// Audio can be silent for three very different reasons that look identical from the
++// playout buffer: no media arrives at all, media arrives but cannot be parsed, or it
++// parses but no receive stream claims it. Counting each separately is what tells a
++// transport fault apart from an SSRC or payload mismatch. Only packet counts are kept;
++// nothing derived from packet contents is recorded.
++std::atomic<uint32_t> g_diagIncomingAudioRtp{0};
++std::atomic<uint32_t> g_diagIncomingAudioRtcp{0};
++std::atomic<uint32_t> g_diagIncomingAudioParseFailed{0};
++std::atomic<uint32_t> g_diagIncomingAudioUndemuxed{0};
++
++// When a peer delivers RTCP but no RTP at all, the remaining question is whether the
++// peer believes it is transmitting. A sender report is only emitted by a peer that has
++// an active send stream, and transport feedback is only emitted by a peer that is
++// receiving our media, so the two together place the fault on one side of the link.
++std::atomic<uint32_t> g_diagIncomingAudioRtcpSenderReport{0};
++std::atomic<uint32_t> g_diagIncomingAudioRtcpFeedback{0};
++std::atomic<uint32_t> g_diagIncomingAudioMaxBytes{0};
++std::atomic<uint32_t> g_diagOutgoingAudioRtp{0};
++std::atomic<uint32_t> g_diagOutgoingAudioRtcp{0};
++std::atomic<int> g_diagAecEnabled{-1};
++std::atomic<int> g_diagAecMobileMode{-1};
++std::atomic<int> g_diagNoiseSuppressionEnabled{-1};
++std::atomic<int> g_diagGainControlEnabled{-1};
++std::atomic<int> g_diagAecResidualLikelihoodPermille{-1};
++std::atomic<int> g_diagAecResidualLikelihoodRecentMaxPermille{-1};
++std::atomic<int> g_diagAecEchoReturnLossDecibelTenths{-10000};
++std::atomic<int> g_diagAecEchoReturnLossEnhancementDecibelTenths{-10000};
++std::atomic<int> g_diagAecDelayMilliseconds{-1};
++
++static int diagQuantizeProbability(const absl::optional<double>& value) {
++    if (!value.has_value() || !std::isfinite(*value)) {
++        return -1;
++    }
++    if (*value <= 0.0) {
++        return 0;
++    }
++    if (*value >= 1.0) {
++        return 1000;
++    }
++    return static_cast<int>(std::lround(*value * 1000.0));
++}
++
++static int diagQuantizeDecibels(const absl::optional<double>& value) {
++    if (!value.has_value() || !std::isfinite(*value)) {
++        return -10000;
++    }
++    if (*value <= -999.9) {
++        return -9999;
++    }
++    if (*value >= 999.9) {
++        return 9999;
++    }
++    return static_cast<int>(std::lround(*value * 10.0));
++}
++
++void RecordAudioProcessingDiagnostics(webrtc::AudioProcessing* audioProcessing) {
++    if (audioProcessing == nullptr) {
++        return;
++    }
++
++    const auto config = audioProcessing->GetConfig();
++    g_diagAecEnabled.store(config.echo_canceller.enabled ? 1 : 0, std::memory_order_relaxed);
++    g_diagAecMobileMode.store(config.echo_canceller.mobile_mode ? 1 : 0, std::memory_order_relaxed);
++    g_diagNoiseSuppressionEnabled.store(config.noise_suppression.enabled ? 1 : 0, std::memory_order_relaxed);
++    g_diagGainControlEnabled.store(
++        config.gain_controller1.enabled || config.gain_controller2.enabled ? 1 : 0,
++        std::memory_order_relaxed);
++
++    const auto statistics = audioProcessing->GetStatistics();
++    g_diagAecResidualLikelihoodPermille.store(
++        diagQuantizeProbability(statistics.residual_echo_likelihood),
++        std::memory_order_relaxed);
++    g_diagAecResidualLikelihoodRecentMaxPermille.store(
++        diagQuantizeProbability(statistics.residual_echo_likelihood_recent_max),
++        std::memory_order_relaxed);
++    g_diagAecEchoReturnLossDecibelTenths.store(
++        diagQuantizeDecibels(statistics.echo_return_loss),
++        std::memory_order_relaxed);
++    g_diagAecEchoReturnLossEnhancementDecibelTenths.store(
++        diagQuantizeDecibels(statistics.echo_return_loss_enhancement),
++        std::memory_order_relaxed);
++    g_diagAecDelayMilliseconds.store(
++        statistics.delay_ms.value_or(-1),
++        std::memory_order_relaxed);
++}
++
++// Compound RTCP interleaves several report blocks in one packet, so the presence of a
++// sender report cannot be read from the leading payload type alone. Only the kind of
++// each report block is recorded; no identifier, timestamp or payload is inspected.
++static void diagScanIncomingAudioRtcp(const rtc::CopyOnWriteBuffer &packet) {
++    const uint8_t *const bytes = packet.cdata();
++    size_t offset = 0;
++    while (offset + 4 <= packet.size()) {
++        const uint8_t payloadType = bytes[offset + 1];
++        const size_t blockSize =
++            (static_cast<size_t>((bytes[offset + 2] << 8) | bytes[offset + 3]) + 1) * 4;
++        if (offset + blockSize > packet.size()) {
++            break;
++        }
++        if (payloadType == 200) {
++            g_diagIncomingAudioRtcpSenderReport.fetch_add(1, std::memory_order_relaxed);
++        } else if (payloadType == 205 || payloadType == 206) {
++            g_diagIncomingAudioRtcpFeedback.fetch_add(1, std::memory_order_relaxed);
++        }
++        offset += blockSize;
++    }
++}
++
++// A transport that silently drops anything above a size threshold would look exactly
++// like a peer that never sends audio, so the largest message accepted is recorded too.
++static void diagRecordIncomingAudioSize(size_t size) {
++    const uint32_t observed = static_cast<uint32_t>(size);
++    uint32_t previous = g_diagIncomingAudioMaxBytes.load(std::memory_order_relaxed);
++    while (observed > previous &&
++           !g_diagIncomingAudioMaxBytes.compare_exchange_weak(previous, observed, std::memory_order_relaxed)) {
++    }
++}
++
++void RecordIncomingAudioRtpDiagnostics(const rtc::CopyOnWriteBuffer &packet) {
++    diagRecordIncomingAudioSize(packet.size());
++    g_diagIncomingAudioRtp.fetch_add(1, std::memory_order_relaxed);
++}
++
++void RecordIncomingAudioRtcpDiagnostics(const rtc::CopyOnWriteBuffer &packet) {
++    diagRecordIncomingAudioSize(packet.size());
++    g_diagIncomingAudioRtcp.fetch_add(1, std::memory_order_relaxed);
++    diagScanIncomingAudioRtcp(packet);
++}
++
+ void MediaManager::receiveMessage(DecryptedMessage &&message) {
+ 	const auto data = &message.message.data;
+ 	if (const auto formats = absl::get_if<VideoFormatsMessage>(data)) {
+ 		setPeerVideoFormats(std::move(*formats));
+ 	} else if (const auto audio = absl::get_if<AudioDataMessage>(data)) {
+         if (webrtc::IsRtcpPacket(audio->data)) {
++            RecordIncomingAudioRtcpDiagnostics(audio->data);
+             RTC_LOG(LS_VERBOSE) << "Deliver audio RTCP";
+         }
+         StaticThreads::getWorkerThread()->BlockingCall([&] {
+@@ -1004,12 +1148,18 @@ void MediaManager::receiveMessage(DecryptedMessage &&message) {
+             } else {
+                 webrtc::RtpPacketReceived parsedPacket(&_audioRtpHeaderExtensionMap, webrtc::Timestamp::Micros(rtc::TimeUTCMicros()));
+                 if (!parsedPacket.Parse(audio->data)) {
++                  diagRecordIncomingAudioSize(audio->data.size());
++                  g_diagIncomingAudioParseFailed.fetch_add(1, std::memory_order_relaxed);
+                   RTC_LOG(LS_ERROR)
+                       << "Failed to parse the incoming RTP packet before demuxing. Drop it.";
+                   return;
+                 }
+-                
+-                _call->Receiver()->DeliverRtpPacket(webrtc::MediaType::AUDIO, parsedPacket, [](const webrtc::RtpPacketReceived &) { return false; });
++
++                RecordIncomingAudioRtpDiagnostics(audio->data);
++                _call->Receiver()->DeliverRtpPacket(webrtc::MediaType::AUDIO, parsedPacket, [](const webrtc::RtpPacketReceived &) {
++                    g_diagIncomingAudioUndemuxed.fetch_add(1, std::memory_order_relaxed);
++                    return false;
++                });
+             }
+         });
+ 	} else if (const auto video = absl::get_if<VideoDataMessage>(data)) {
+@@ -1106,22 +1256,63 @@ void MediaManager::setInputVolume(float level) {
+ }
+ 
+ void MediaManager::setOutputVolume(float level) {
+-	// This is not what we want, it changes OS volume on macOS.
+-//	auto min = uint32_t();
+-//	auto max = uint32_t();
+-//	if (const auto result = _audioDeviceModule->MinSpeakerVolume(&min)) {
+-//		RTC_LOG(LS_ERROR) << "setOutputVolume(" << level << "): MinSpeakerVolume failed: " << result << ".";
+-//		return;
+-//	} else if (const auto result = _audioDeviceModule->MaxSpeakerVolume(&max)) {
+-//		RTC_LOG(LS_ERROR) << "setOutputVolume(" << level << "): MaxSpeakerVolume failed: " << result << ".";
+-//		return;
+-//	}
+-//	const auto volume = min + uint32_t(std::round((max - min) * std::min(std::max(level, 0.f), 1.f)));
+-//	if (const auto result = _audioDeviceModule->SetSpeakerVolume(volume)) {
+-//		RTC_LOG(LS_ERROR) << "setOutputVolume(" << level << "): SetSpeakerVolume(" << volume << ") failed: " << result << ".";
+-//	} else {
+-//		RTC_LOG(LS_INFO) << "setOutputVolume(" << level << ") volume " << volume << " success.";
+-//	}
++#if defined(WINUWP)
++    if (_audioDeviceModule == nullptr || !std::isfinite(level)) {
++        return;
++    }
++
++    if (level >= 1.0f) {
++        if (!_hasSavedOutputVolume) {
++            return;
++        }
++
++        const auto result = _audioDeviceModule->SetSpeakerVolume(_savedOutputVolume);
++        if (result != 0) {
++            RTC_LOG(LS_ERROR) << "restoreOutputVolume failed: " << result << ".";
++            return;
++        }
++
++        _hasSavedOutputVolume = false;
++        RTC_LOG(LS_INFO) << "restoreOutputVolume success.";
++        return;
++    }
++
++    bool available = false;
++    if (_audioDeviceModule->SpeakerVolumeIsAvailable(&available) != 0 || !available) {
++        RTC_LOG(LS_ERROR) << "setOutputVolume unavailable.";
++        return;
++    }
++
++    uint32_t minimum = 0;
++    uint32_t maximum = 0;
++    uint32_t current = 0;
++    if (_audioDeviceModule->MinSpeakerVolume(&minimum) != 0 ||
++        _audioDeviceModule->MaxSpeakerVolume(&maximum) != 0 ||
++        _audioDeviceModule->SpeakerVolume(&current) != 0 ||
++        maximum < minimum) {
++        RTC_LOG(LS_ERROR) << "setOutputVolume state unavailable.";
++        return;
++    }
++
++    if (!_hasSavedOutputVolume) {
++        _savedOutputVolume = current;
++        _hasSavedOutputVolume = true;
++    }
++
++    const auto baseline = std::clamp(_savedOutputVolume, minimum, maximum);
++    const auto clamped = std::max(0.0f, level);
++    const auto target = minimum + static_cast<uint32_t>(std::round(
++        static_cast<float>(baseline - minimum) * clamped));
++    const auto result = _audioDeviceModule->SetSpeakerVolume(target);
++    if (result != 0) {
++        RTC_LOG(LS_ERROR) << "setOutputVolume failed: " << result << ".";
++        return;
++    }
++
++    RTC_LOG(LS_INFO) << "setOutputVolume success.";
++#else
++    (void)level;
++#endif
+ }
+ 
+ void MediaManager::addExternalAudioSamples(std::vector<uint8_t> &&samples) {
+@@ -1157,6 +1348,10 @@ bool MediaManager::NetworkInterfaceImpl::SendRtcp(rtc::CopyOnWriteBuffer *packet
+ bool MediaManager::NetworkInterfaceImpl::sendTransportMessage(rtc::CopyOnWriteBuffer *packet, const rtc::PacketOptions& options) {
+     if (_isVideo) {
+         RTC_LOG(LS_VERBOSE) << "Send video packet";
++    } else if (webrtc::IsRtcpPacket(*packet)) {
++        g_diagOutgoingAudioRtcp.fetch_add(1, std::memory_order_relaxed);
++    } else {
++        g_diagOutgoingAudioRtp.fetch_add(1, std::memory_order_relaxed);
+     }
+ 	_mediaManager->_sendTransportMessage(_isVideo
+ 		? Message{ VideoDataMessage{ *packet } }
+diff --git a/tgcalls/MediaManager.h b/tgcalls/MediaManager.h
+index fbac021..cfa5b73 100644
+--- a/tgcalls/MediaManager.h
++++ b/tgcalls/MediaManager.h
+@@ -10,6 +10,7 @@
+ #include "media/base/media_channel.h"
+ #include "pc/media_factory.h"
+ #include "api/environment/environment.h"
++#include "modules/audio_processing/include/audio_processing.h"
+ 
+ #include "Instance.h"
+ #include "Message.h"
+@@ -38,6 +39,9 @@ namespace tgcalls {
+ 
+ class VideoSinkInterfaceProxyImpl;
+ 
++void RecordIncomingAudioRtpDiagnostics(const rtc::CopyOnWriteBuffer &packet);
++void RecordIncomingAudioRtcpDiagnostics(const rtc::CopyOnWriteBuffer &packet);
++
+ class MediaManager : public sigslot::has_slots<>, public std::enable_shared_from_this<MediaManager> {
+ public:
+ 	static rtc::Thread *getWorkerThread();
+@@ -155,6 +159,7 @@ private:
+ 
+     webrtc::Environment _webrtcEnvironment;
+     std::unique_ptr<webrtc::MediaFactory> _mediaFactory;
++    webrtc::scoped_refptr<webrtc::AudioProcessing> _audioProcessing;
+     std::unique_ptr<cricket::MediaEngineInterface> _mediaEngine;
+ 	std::unique_ptr<webrtc::Call> _call;
+ 	webrtc::LocalAudioSinkAdapter _audioSource;
+@@ -180,6 +185,10 @@ private:
+ 
+     float _currentAudioLevel = 0.0f;
+     float _currentMyAudioLevel = 0.0f;
++#if defined(WINUWP)
++    uint32_t _savedOutputVolume = 0;
++    bool _hasSavedOutputVolume = false;
++#endif
+ 
+ 	std::unique_ptr<MediaManager::NetworkInterfaceImpl> _audioNetworkInterface;
+ 	std::unique_ptr<MediaManager::NetworkInterfaceImpl> _videoNetworkInterface;
+diff --git a/tgcalls/platform/PlatformInterface.h b/tgcalls/platform/PlatformInterface.h
+index f643408..515cc34 100644
+--- a/tgcalls/platform/PlatformInterface.h
++++ b/tgcalls/platform/PlatformInterface.h
+@@ -88,11 +88,9 @@ public:
+         return _impl->SetPlayoutDevice(index);
+     }
+ 
+-#ifdef TGCALLS_UWP_DESKTOP
+     virtual int32_t SetPlayoutDevice(std::string deviceId) override {
+         return _impl->SetPlayoutDevice(deviceId);
+     }
+-#endif
+ 
+     virtual int32_t SetPlayoutDevice(WindowsDeviceType device) override {
+         return _impl->SetPlayoutDevice(device);
+@@ -102,11 +100,9 @@ public:
+         return _impl->SetRecordingDevice(index);
+     }
+ 
+-#ifdef TGCALLS_UWP_DESKTOP
+     virtual int32_t SetRecordingDevice(std::string deviceId) override {
+         return _impl->SetRecordingDevice(deviceId);
+     }
+-#endif
+ 
+     virtual int32_t SetRecordingDevice(WindowsDeviceType device) override {
+         return _impl->SetRecordingDevice(device);
+diff --git a/tgcalls/v2/NativeNetworkingImpl.cpp b/tgcalls/v2/NativeNetworkingImpl.cpp
+index b067cf5..3421f8a 100644
+--- a/tgcalls/v2/NativeNetworkingImpl.cpp
++++ b/tgcalls/v2/NativeNetworkingImpl.cpp
+@@ -25,6 +25,7 @@
+ #include "ReflectorPort.h"
+ #include "FieldTrialsConfig.h"
+ #include "EncryptedConnection.h"
++#include "MediaManager.h"
+ #include "v2/CustomParameters.h"
+ 
+ namespace tgcalls {
+@@ -997,12 +998,19 @@ void NativeNetworkingImpl::candidatePairChanged(cricket::CandidatePairChangeEven
+ }
+ 
+ void NativeNetworkingImpl::RtpPacketReceived_n(rtc::CopyOnWriteBuffer *packet, int64_t packet_time_us, bool isUnresolved) {
++    // V2 receives already-decrypted RTP here, after the selected SRTP transport has
++    // classified the datagram. Keep the experimental aggregate media counter aligned
++    // with the V1 receive path without retaining packet contents or identifiers.
++    RecordIncomingAudioRtpDiagnostics(*packet);
+     if (_transportMessageReceived) {
+         _transportMessageReceived(*packet, isUnresolved);
+     }
+ }
+ 
+ void NativeNetworkingImpl::OnRtcpPacketReceived_n(rtc::CopyOnWriteBuffer *packet, int64_t packet_time_us) {
++    // RTCP is delivered separately by the SRTP transport, so aggregate sender-report
++    // and feedback totals remain meaningful for V2 calls as well as V1 calls.
++    RecordIncomingAudioRtcpDiagnostics(*packet);
+     if (_rtcpPacketReceived) {
+         _rtcpPacketReceived(*packet, packet_time_us);
+     }

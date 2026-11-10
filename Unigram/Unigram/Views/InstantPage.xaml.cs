@@ -206,7 +206,7 @@ namespace Unigram.Views
             PageBlock previousBlock = null;
             FrameworkElement previousElement = null;
             FrameworkElement firstElement = null;
-            foreach (var block in instantView.PageBlocks)
+            foreach (var block in instantView.GetPageBlocks())
             {
                 var element = ProcessBlock(block);
                 var spacing = SpacingBetweenBlocks(previousBlock, block);
@@ -541,7 +541,7 @@ namespace Unigram.Views
             panel.Children.Add(header);
             panel.Children.Add(inner);
 
-            foreach (var block in details.PageBlocks)
+            foreach (var block in details.GetPageBlocks())
             {
                 inner.Children.Add(ProcessBlock(block));
             }
@@ -643,7 +643,11 @@ namespace Unigram.Views
                     text = preformatted.Text;
                     break;
                 case PageBlockBlockQuote blockquote:
+#if MODERN_TDLIB
+                    text = caption ? blockquote.Credit : null;
+#else
                     text = caption ? blockquote.Credit : blockquote.Text;
+#endif
                     break;
                 case PageBlockPullQuote pullquote:
                     text = caption ? pullquote.Credit : pullquote.Text;
@@ -839,7 +843,7 @@ namespace Unigram.Views
                 var label = new TextBlock { Text = item.Label, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 0, 8, 0) };
                 var stack = new StackPanel();
 
-                foreach (var inner in item.PageBlocks)
+                foreach (var inner in item.GetPageBlocks())
                 {
                     var child = ProcessBlock(inner);
                     if (child != null)
@@ -866,8 +870,19 @@ namespace Unigram.Views
         {
             var element = new StackPanel { Style = Resources["BlockBlockquoteStyle"] as Style };
 
+#if MODERN_TDLIB
+            foreach (var childBlock in block.GetPageBlocks())
+            {
+                var child = ProcessBlock(childBlock);
+                if (child != null)
+                {
+                    element.Children.Add(child);
+                }
+            }
+#else
             var text = ProcessText(block, false);
             if (text != null) element.Children.Add(text);
+#endif
 
             var caption = ProcessText(block, true);
             if (caption != null) element.Children.Add(caption);
@@ -893,7 +908,7 @@ namespace Unigram.Views
             var galleryItem = new GalleryPhoto(ViewModel.ProtoService, block.Photo, block.Caption.ToPlainText());
             ViewModel.Gallery.Items.Add(galleryItem);
 
-            var message = GetMessage(new MessagePhoto(block.Photo, null, false));
+            var message = GetMessage(ModernTdlibCompatibility.CreateMessagePhoto(block.Photo, null));
             var element = new StackPanel { Style = Resources["BlockPhotoStyle"] as Style };
 
             var content = new PhotoContent(message);
@@ -924,7 +939,11 @@ namespace Unigram.Views
             var galleryItem = new GalleryVideo(ViewModel.ProtoService, block.Video, block.Caption.ToPlainText());
             ViewModel.Gallery.Items.Add(galleryItem);
 
+#if MODERN_TDLIB
+            var message = GetMessage(new MessageVideo(block.Video, null, null, null, 0, null, false, false, false));
+#else
             var message = GetMessage(new MessageVideo(block.Video, null, false));
+#endif
             var element = new StackPanel { Style = Resources["BlockVideoStyle"] as Style };
 
             var content = new VideoContent(message);
@@ -957,7 +976,11 @@ namespace Unigram.Views
             var galleryItem = new GalleryAnimation(ViewModel.ProtoService, block.Animation, block.Caption.ToPlainText());
             ViewModel.Gallery.Items.Add(galleryItem);
 
+#if MODERN_TDLIB
+            var message = GetMessage(new MessageAnimation(block.Animation, null, false, false, false));
+#else
             var message = GetMessage(new MessageAnimation(block.Animation, null, false));
+#endif
             var element = new StackPanel { Style = Resources["BlockVideoStyle"] as Style };
 
             var content = new AnimationContent(message);
@@ -1069,14 +1092,14 @@ namespace Unigram.Views
             var element = new StackPanel { Style = Resources["BlockSlideshowStyle"] as Style };
 
             var items = new List<FrameworkElement>();
-            foreach (var item in block.PageBlocks)
+            foreach (var item in block.GetPageBlocks())
             {
                 if (item is PageBlockPhoto photoBlock)
                 {
                     var galleryItem = new GalleryPhoto(ViewModel.ProtoService, photoBlock.Photo, block.Caption.ToPlainText());
                     ViewModel.Gallery.Items.Add(galleryItem);
 
-                    var message = GetMessage(new MessagePhoto(photoBlock.Photo, null, false));
+                    var message = GetMessage(ModernTdlibCompatibility.CreateMessagePhoto(photoBlock.Photo, null));
 
                     var content = new PhotoContent(message);
                     content.Tag = galleryItem;
@@ -1096,7 +1119,11 @@ namespace Unigram.Views
                     var galleryItem = new GalleryVideo(ViewModel.ProtoService, videoBlock.Video, block.Caption.ToPlainText());
                     ViewModel.Gallery.Items.Add(galleryItem);
 
+#if MODERN_TDLIB
+                    var message = GetMessage(new MessageVideo(videoBlock.Video, null, null, null, 0, null, false, false, false));
+#else
                     var message = GetMessage(new MessageVideo(videoBlock.Video, null, false));
+#endif
 
                     var content = new VideoContent(message);
                     content.Tag = galleryItem;
@@ -1136,7 +1163,7 @@ namespace Unigram.Views
             var element = new StackPanel { Style = Resources["BlockCollageStyle"] as Style };
 
             var items = new List<ImageView>();
-            foreach (var item in block.PageBlocks)
+            foreach (var item in block.GetPageBlocks())
             {
                 if (item is PageBlockPhoto photoBlock)
                 {
@@ -1250,7 +1277,7 @@ namespace Unigram.Views
 
             PageBlock previousBlock = null;
             FrameworkElement previousElement = null;
-            foreach (var subBlock in block.PageBlocks)
+            foreach (var subBlock in block.GetPageBlocks())
             {
                 var subLayout = ProcessBlock(subBlock);
                 var spacing = SpacingBetweenBlocks(previousBlock, block);

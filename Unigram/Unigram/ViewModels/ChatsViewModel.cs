@@ -8,6 +8,9 @@ using Telegram.Td.Api;
 using Unigram.Collections;
 using Unigram.Common;
 using Unigram.Controls;
+#if MODERN_TDLIB
+using Unigram.Logs;
+#endif
 using Unigram.Navigation.Services;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
@@ -254,7 +257,7 @@ namespace Unigram.ViewModels
         {
             if (chat.UnreadCount > 0)
             {
-                ProtoService.Send(new ViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
+                ProtoService.Send(ModernTdlibCompatibility.CreateViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
 
                 if (chat.UnreadMentionCount > 0)
                 {
@@ -282,7 +285,7 @@ namespace Unigram.ViewModels
                 {
                     if (chat.UnreadCount > 0)
                     {
-                        ProtoService.Send(new ViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
+                        ProtoService.Send(ModernTdlibCompatibility.CreateViewMessages(chat.Id, 0, new[] { chat.LastMessage.Id }, true));
                     }
                     else if (chat.IsMarkedAsUnread)
                     {
@@ -392,7 +395,7 @@ namespace Unigram.ViewModels
                     {
                         if (delete.Type is ChatTypePrivate privata && check)
                         {
-                            await ProtoService.SendAsync(new ToggleMessageSenderIsBlocked(new MessageSenderUser(privata.UserId), true));
+                            await ProtoService.SendAsync(ModernTdlibCompatibility.SetMessageSenderBlocked(new MessageSenderUser(privata.UserId), true));
                         }
 
                         ProtoService.Send(new DeleteChatHistory(delete.Id, true, false));
@@ -576,7 +579,11 @@ namespace Unigram.ViewModels
         public RelayCommand<(int, Chat)> FolderAddCommand { get; }
         private async void FolderAddExecute((int ChatFilterId, Chat Chat) data)
         {
+#if MODERN_TDLIB
+            var filter = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetChatFolder(data.ChatFilterId)) as ChatFolder;
+#else
             var filter = await ProtoService.SendAsync(new GetChatFilter(data.ChatFilterId)) as ChatFilter;
+#endif
             if (filter == null)
             {
                 return;
@@ -598,7 +605,11 @@ namespace Unigram.ViewModels
             filter.ExcludedChatIds.Remove(data.Chat.Id);
             filter.IncludedChatIds.Add(data.Chat.Id);
 
+#if MODERN_TDLIB
+            ProtoService.Send(ModernTdlibCompatibility.CreateEditChatFolder(data.ChatFilterId, filter));
+#else
             ProtoService.Send(new EditChatFilter(data.ChatFilterId, filter));
+#endif
         }
 
         #endregion
@@ -608,7 +619,11 @@ namespace Unigram.ViewModels
         public RelayCommand<(int, Chat)> FolderRemoveCommand { get; }
         private async void FolderRemoveExecute((int ChatFilterId, Chat Chat) data)
         {
+#if MODERN_TDLIB
+            var filter = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetChatFolder(data.ChatFilterId)) as ChatFolder;
+#else
             var filter = await ProtoService.SendAsync(new GetChatFilter(data.ChatFilterId)) as ChatFilter;
+#endif
             if (filter == null)
             {
                 return;
@@ -630,7 +645,11 @@ namespace Unigram.ViewModels
             filter.IncludedChatIds.Remove(data.Chat.Id);
             filter.ExcludedChatIds.Add(data.Chat.Id);
 
+#if MODERN_TDLIB
+            ProtoService.Send(ModernTdlibCompatibility.CreateEditChatFolder(data.ChatFilterId, filter));
+#else
             ProtoService.Send(new EditChatFilter(data.ChatFilterId, filter));
+#endif
         }
 
         #endregion

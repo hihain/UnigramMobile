@@ -4,6 +4,11 @@ using System.Numerics;
 using Unigram.Services.Settings;
 using Windows.Globalization;
 using Windows.Storage;
+#if MODERN_TDLIB
+using DataSavingMode = Unigram.Services.DataSavingMode;
+#else
+using DataSavingMode = libtgvoip.DataSavingMode;
+#endif
 
 namespace Unigram.Services
 {
@@ -61,6 +66,8 @@ namespace Unigram.Services
 
         DistanceUnits DistanceUnits { get; set; }
 
+        DoubleTapAction DoubleTapAction { get; set; }
+
         bool AutocorrectWords { get; set; }
         bool HighlightWords { get; set; }
 
@@ -75,7 +82,7 @@ namespace Unigram.Services
 
         string PushToken { get; set; }
 
-        libtgvoip.DataSavingMode UseLessData { get; set; }
+        DataSavingMode UseLessData { get; set; }
 
         void SetChatPinnedMessage(long chatId, long messageId);
         long GetChatPinnedMessage(long chatId);
@@ -88,6 +95,13 @@ namespace Unigram.Services
         Automatic,
         Kilometers,
         Miles
+    }
+
+    public enum DoubleTapAction
+    {
+        None,
+        Reply,
+        React
     }
 
     public class SettingsServiceBase
@@ -196,9 +210,8 @@ namespace Unigram.Services
 
         #region App version
 
-        //public const ulong CurrentVersion = (4UL << 48) | (0UL << 32) | (5072UL << 16);
-        //public const string CurrentChangelog = "• Chat folders.\r\n• Stream Videos and Audio files.\r\n• Improved stickers, GIFs and emojis.\r\n\r\nRead more: https://telegra.ph/Unigram-40-05-28";
-        public static readonly string CurrentChangelog = $"• Pinned Messages 2.0: Pin multiple messages in any chat and see them all on a separate page\r\n• Comment on posts in channels that have a discussion group.\r\n• Get notified about replies to your comments via the new \"Replies\" chat (if you are not a member in the discussion group).\r\n• Anonymous group admins: Turn on \"Remain Anonymous\" in an admin's permissions (edit group -> admins -> tap on an admin) to let them post on behalf of the group and become invisible in the list of members.\r\n• Added a context menu button to the chat (in touch mode) for easier access to some context menus\r\n• Added in-app volume control.\r\n• Increased music player slider.\r\n• Send music playlists\r\n• Improved live locations";
+        // Keep this in sync with Package.appxmanifest for every shipped build.
+        public static readonly string CurrentChangelog = "• Branding: the app now uses an original Metro-style message icon, with the BETA tag retained across tiles and app-list icons.\r\n• Privacy: Secret Chat notifications are excluded from Live Tiles by default, including when the app is closed. You can enable them in Settings > Notifications (also searchable in Settings); sender profile images are never shown on Secret Chat tiles or toasts.\r\n• Reactions: Emoji & People now opens in a compact five-column grid instead of a clipped one-column list.\r\n• Reactions: different reactions on a message are shown side by side again instead of stacked and clipped.\r\n• Store: fixed the upload package so Microsoft Store compilation succeeds.\r\n• Notifications: background push access is refreshed after each update so closed-app notifications keep working.\r\n• Diagnostics: added Copy WNS channel URI for testing push delivery.\r\n• Notifications: fixed push registration failing for the first account after restarting the app.\r\n• Selection: Delete and Forward work again when multiple messages are selected, and the delete dialog offers Delete for everyone again.\r\n• Chats: tapping a reply quote jumps to the original message without also opening the message menu.\r\n• Keyboard: pressing Up in an empty message box edits your last message again.\r\n• Report: reporting messages, selected messages, chats and spam works again.\r\n• Double-tap: double-tap a message to reply or send a quick reaction; choose the action in Settings > Appearance.\r\n• Reactions: the message menu now shows quick reactions at the bottom, with More for the full list.\r\n• Swipe: swiping a message left to forward it works again.\r\n• Channels: the comments button is shown again on channel posts with discussions.\r\n• Chats: pinned message, screenshot, group upgrade, auto-delete and other service notices show their text again instead of an empty circle.\r\n• Notifications: new optional background check for new messages every 15 minutes while instant push notifications are unavailable (Settings > Notifications). It pauses automatically once push notifications work.";
 
         public int Session => _session;
 
@@ -221,17 +234,23 @@ namespace Unigram.Services
 
         public void UpdateVersion()
         {
-            var version = GetAppVersion();
-            VersionLastStart = ((ulong)version.Major << 48) | ((ulong)version.Minor << 32);
+            VersionLastStart = GetVersionMarker(GetAppVersion());
         }
 
         public static ulong CurrentVersion
         {
             get
             {
-                var version = GetAppVersion();
-                return ((ulong)version.Major << 48) | ((ulong)version.Minor << 32);
+                return GetVersionMarker(GetAppVersion());
             }
+        }
+
+        private static ulong GetVersionMarker(Windows.ApplicationModel.PackageVersion version)
+        {
+            return ((ulong)version.Major << 48)
+                | ((ulong)version.Minor << 32)
+                | ((ulong)version.Build << 16)
+                | version.Revision;
         }
 
         public static Windows.ApplicationModel.PackageVersion GetAppVersion()
@@ -411,7 +430,7 @@ namespace Unigram.Services
             get
             {
                 if (_userId == null)
-                    _userId = GetValueOrDefault(_own, "UserId", 0);
+                    _userId = GetValueOrDefault(_own, "UserId", 0L);
 
                 return _userId ?? 0;
             }
@@ -435,8 +454,22 @@ namespace Unigram.Services
             }
             set
             {
+                var previous = PushReceiverId;
+                if (previous != 0 && previous != value)
+                {
+                    var key = $"PushReceiverId{previous}";
+                    if (_local.Values.ContainsKey(key) && _local.Values[key] is int session && session == Session)
+                    {
+                        _local.Values.Remove(key);
+                    }
+                }
+
                 _pushReceiverId = value;
-                AddOrUpdateValue(_local, $"PushReceiverId{value}", Session);
+                if (value != 0)
+                {
+                    AddOrUpdateValue(_local, $"PushReceiverId{value}", Session);
+                }
+
                 AddOrUpdateValue(_own, "PushReceiverId", value);
             }
         }
@@ -455,6 +488,23 @@ namespace Unigram.Services
             {
                 _distanceUnits = (int)value;
                 AddOrUpdateValue("DistanceUnits", (int)value);
+            }
+        }
+
+        private static int? _doubleTapAction;
+        public DoubleTapAction DoubleTapAction
+        {
+            get
+            {
+                if (_doubleTapAction == null)
+                    _doubleTapAction = GetValueOrDefault("DoubleTapAction", (int)DoubleTapAction.Reply);
+
+                return (DoubleTapAction)(_doubleTapAction ?? (int)DoubleTapAction.Reply);
+            }
+            set
+            {
+                _doubleTapAction = (int)value;
+                AddOrUpdateValue("DoubleTapAction", (int)value);
             }
         }
 
@@ -1041,15 +1091,15 @@ namespace Unigram.Services
             }
         }
 
-        private libtgvoip.DataSavingMode? _useLessData;
-        public libtgvoip.DataSavingMode UseLessData
+        private DataSavingMode? _useLessData;
+        public DataSavingMode UseLessData
         {
             get
             {
                 if (_useLessData == null)
-                    _useLessData = (libtgvoip.DataSavingMode)GetValueOrDefault("UseLessData", 0);
+                    _useLessData = (DataSavingMode)GetValueOrDefault("UseLessData", 0);
 
-                return _useLessData ?? libtgvoip.DataSavingMode.Never;
+                return _useLessData ?? DataSavingMode.Never;
             }
             set
             {

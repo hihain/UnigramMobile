@@ -146,6 +146,37 @@ namespace Unigram.Services
 
             var messageType = message.GetType();
 
+#if MODERN_TDLIB
+            // Handlers are invoked through MethodInfo.Invoke. The original deferred LINQ
+            // query stopped at the first handler that threw, so one broken subscriber kept
+            // every later subscriber - root navigation included - from ever seeing the
+            // update, leaving the UI frozen on whatever it last rendered. Each handler is
+            // now isolated and its failure recorded instead of ending the dispatch.
+            var dead = new List<Handler>();
+
+            foreach (var handler in toNotify)
+            {
+                try
+                {
+                    if (!handler.Handle(messageType, message))
+                    {
+                        dead.Add(handler);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException($"aggregator.{messageType.Name}", ex);
+                }
+            }
+
+            if (dead.Count > 0)
+            {
+                lock (handlers)
+                {
+                    handlers.RemoveAll(x => dead.Contains(x));
+                }
+            }
+#else
             var dead = toNotify
                 .Where(handler => !handler.Handle(messageType, message))
                 .ToImmutableHashSet();
@@ -157,6 +188,7 @@ namespace Unigram.Services
                     handlers.RemoveAll(x => dead.Contains(x));
                 }
             }
+#endif
         }
 
         class Handler

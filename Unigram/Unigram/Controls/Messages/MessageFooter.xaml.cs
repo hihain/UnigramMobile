@@ -2,6 +2,14 @@
 using System.Numerics;
 using Telegram.Td.Api;
 using Unigram.Common;
+
+#if MODERN_TDLIB
+using MessageForwardOriginUser = Telegram.Td.Api.MessageOriginUser;
+using MessageForwardOriginChat = Telegram.Td.Api.MessageOriginChat;
+using MessageForwardOriginChannel = Telegram.Td.Api.MessageOriginChannel;
+using MessageForwardOriginHiddenUser = Telegram.Td.Api.MessageOriginHiddenUser;
+using MessageForwardOriginMessageImport = Telegram.Td.Api.MessageOriginHiddenUser;
+#endif
 using Unigram.Converters;
 using Unigram.ViewModels;
 using Windows.Foundation;
@@ -49,7 +57,7 @@ namespace Unigram.Controls.Messages
             {
                 DateLabel.Text = string.Empty;
             }
-            else if (message.ForwardInfo?.Origin is MessageForwardOriginMessageImport)
+            else if (message.ForwardInfo.IsImportedForward())
             {
                 var original = Utils.UnixTimestampToDateTime(message.ForwardInfo.Date);
                 var date = BindConvert.Current.ShortDate.Format(original);
@@ -263,6 +271,7 @@ namespace Unigram.Controls.Messages
         private CompositionSpriteShape[] _shapes;
 
         private ContainerVisual _container;
+        private bool? _ticksReadState;
 
         #region Stroke
 
@@ -278,18 +287,38 @@ namespace Unigram.Controls.Messages
         private static void OnStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var sender = d as MessageFooter;
-            var solid = e.NewValue as SolidColorBrush;
+            sender?.UpdateTickBrush();
+        }
 
-            if (solid == null || sender._container == null)
+        public Brush ReadStroke
+        {
+            get { return (Brush)GetValue(ReadStrokeProperty); }
+            set { SetValue(ReadStrokeProperty, value); }
+        }
+
+        public static readonly DependencyProperty ReadStrokeProperty =
+            DependencyProperty.Register("ReadStroke", typeof(Brush), typeof(MessageFooter), new PropertyMetadata(null, OnReadStrokeChanged));
+
+        private static void OnReadStrokeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var sender = d as MessageFooter;
+            sender?.UpdateTickBrush();
+        }
+
+        private void UpdateTickBrush()
+        {
+            var brush = (_ticksReadState == true ? ReadStroke : Stroke) as SolidColorBrush;
+            StateLabel.Foreground = brush;
+
+            if (brush == null || _container == null)
             {
                 return;
             }
 
-            var brush = Window.Current.Compositor.CreateColorBrush(solid.Color);
-
-            foreach (var shape in sender._shapes)
+            var compositionBrush = Window.Current.Compositor.CreateColorBrush(brush.Color);
+            foreach (var shape in _shapes)
             {
-                shape.StrokeBrush = brush;
+                shape.StrokeBrush = compositionBrush;
             }
         }
 
@@ -383,6 +412,9 @@ namespace Unigram.Controls.Messages
 
         private void UpdateTicks(bool? read, bool animate = false)
         {
+            _ticksReadState = read;
+            UpdateTickBrush();
+
             if (_container == null)
             {
                 return;

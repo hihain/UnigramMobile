@@ -126,7 +126,7 @@ namespace Unigram.Collections
                         }
                     }
 
-                    var response = await _protoService.SendAsync(new SearchChats(_query, 100));
+                    var response = await _protoService.SendAsync(ModernTdlibCompatibility.CreateSearchChats(_query, 100));
                     if (response is Chats chats)
                     {
                         foreach (var id in chats.ChatIds)
@@ -184,7 +184,7 @@ namespace Unigram.Collections
                 }
                 else if (phase == 2 && (!hasChat || (hasContent && !hasChat && !empty)))
                 {
-                    var response = await _protoService.SendAsync(new SearchChatsOnServer(_query, 100));
+                    var response = await _protoService.SendAsync(ModernTdlibCompatibility.CreateSearchChatsOnServer(_query, 100));
                     if (response is Chats chats && _local != null)
                     {
                         foreach (var id in chats.ChatIds)
@@ -220,7 +220,7 @@ namespace Unigram.Collections
                 }
                 else if (phase == 3 && !hasChat && !hasContent)
                 {
-                    var response = await _protoService.SendAsync(new SearchPublicChats(_query));
+                    var response = await _protoService.SendAsync(ModernTdlibCompatibility.CreateSearchPublicChats(_query));
                     if (response is Chats chats)
                     {
                         foreach (var id in chats.ChatIds)
@@ -264,11 +264,11 @@ namespace Unigram.Collections
                     Function function;
                     if (chat != null)
                     {
-                        function = new SearchChatMessages(chat.Id, _query, null, 0, 0, 100, content?.Filter, 0);
+                        function = ModernTdlibCompatibility.CreateSearchChatMessages(chat.Id, null, _query, null, 0, 0, 100, content?.Filter);
                     }
                     else
                     {
-                        function = new SearchMessages(_chatList, _query, int.MaxValue, 0, 0, 100, content?.Filter, minDate, maxDate);
+                        function = ModernTdlibCompatibility.CreateSearchMessages(_chatList, _query, content?.Filter, minDate, maxDate);
                     }
 
                     var response = await _protoService.SendAsync(function);

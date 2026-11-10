@@ -1,0 +1,55 @@
+diff --git a/modules/audio_device/win/audio_device_core_win.cc b/modules/audio_device/win/audio_device_core_win.cc
+index b46c0f8..fdb22ee 100644
+--- a/modules/audio_device/win/audio_device_core_win.cc
++++ b/modules/audio_device/win/audio_device_core_win.cc
+@@ -1292,6 +1292,22 @@ struct CaptureDeviceInternal
+         break;
+     }
+ 
++    // On Windows Mobile, a shared endpoint may reject every direct candidate,
++    // including its advertised mix descriptor. Request a fixed raw 16-bit PCM
++    // stream and let the shared audio engine perform the endpoint conversion.
++    bool useAutoConvert = false;
++    if (hr != S_OK) {
++      Wfx.Format.nChannels = 1;
++      Wfx.Format.nSamplesPerSec = 48000;
++      Wfx.Format.nBlockAlign =
++          Wfx.Format.nChannels * Wfx.Format.wBitsPerSample / 8;
++      Wfx.Format.nAvgBytesPerSec =
++          Wfx.Format.nSamplesPerSec * Wfx.Format.nBlockAlign;
++      useAutoConvert = true;
++      hr = S_OK;
++      RTC_LOG(LS_INFO) << "Using shared-mode PCM conversion for capture";
++    }
++
+     if (hr == S_OK) {
+       _audioFrameSize = Wfx.Format.nBlockAlign;
+       _sampleRate = Wfx.Format.nSamplesPerSec;
+@@ -1318,19 +1334,20 @@ struct CaptureDeviceInternal
+     }
+ 
+     // Create a capturing stream.
+-    InterlockedExchange(&g_unigram_webrtc_capture_init_stage, 8);
++    InterlockedExchange(&g_unigram_webrtc_capture_init_stage,
++                        useAutoConvert ? 11 : 8);
+     hr = _audioClient->Initialize(
+         AUDCLNT_SHAREMODE_SHARED,  // share Audio Engine with other applications
+-        AUDCLNT_STREAMFLAGS_EVENTCALLBACK |  // processing of the audio buffer
+-                                             // by the client will be event
+-        // driven
+-            AUDCLNT_STREAMFLAGS_NOPERSIST,   // volume and mute settings for an
+-                                             // audio session will not persist
+-                                             // across system restarts
++        AUDCLNT_STREAMFLAGS_EVENTCALLBACK |  // event-driven client processing
++            AUDCLNT_STREAMFLAGS_NOPERSIST |  // do not persist volume or mute
++            (useAutoConvert ? AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
++                                  AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
++                            : 0),
+         0,                    // required for event-driven shared mode
+         0,                    // periodicity
+         (WAVEFORMATEX*)&Wfx,  // selected wave format
+         nullptr);             // session GUID
++
+     if (hr != S_OK) {
+       RTC_LOG(LS_ERROR) << "IAudioClient::Initialize() failed:";
+     }

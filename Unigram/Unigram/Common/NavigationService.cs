@@ -178,12 +178,33 @@ namespace Unigram.Common
 
                 if (args.Content is MainPage page)
                 {
+#if MODERN_TDLIB
+                    Logs.PushDiagnostics.Write("startup.navigate.main", "step=activate");
+#endif
                     page.Activate(parameter);
                 }
             };
 
             service.Frame.Navigated += handler;
+#if MODERN_TDLIB
+            // This is the launch-time path to MainPage (the post-login path lives in
+            // TLRootNavigationService). Both reach Frame.Navigate from an async void
+            // caller, so a failure here is reported by Application.UnhandledException
+            // with no indication of where it came from. Bracket it explicitly.
+            Logs.PushDiagnostics.Write("startup.navigate.main", "step=navigate");
+            try
+            {
+                service.Navigate(typeof(MainPage));
+                Logs.PushDiagnostics.Write("startup.navigate.main", "step=done;result=ok");
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("startup.navigate.main", ex);
+                throw;
+            }
+#else
             service.Navigate(typeof(MainPage));
+#endif
         }
 
         public static void NavigateToPasscode(this INavigationService service)

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
+using Unigram.Common;
 using Unigram.Services;
 using Unigram.Views.Payments;
 using Windows.UI.Xaml.Navigation;
@@ -26,7 +27,7 @@ namespace Unigram.ViewModels.Payments
             if (response is PaymentReceipt receipt)
             {
                 Receipt = receipt;
-                Bot = ProtoService.GetUser(receipt.PaymentsProviderUserId);
+                Bot = ProtoService.GetUser(ModernTdlibCompatibility.GetPaymentReceiptPaymentProviderUserId(receipt));
 
                 var second = await ProtoService.SendAsync(new GetMessage(navigation.ChatId, navigation.ReceiptMessageId));
                 if (second is Message message1 && message1.Content is MessagePaymentSuccessful payment)
@@ -103,5 +104,19 @@ namespace Unigram.ViewModels.Payments
                 Set(ref _bot, value);
             }
         }
+
+        public Invoice ReceiptInvoice => ModernTdlibCompatibility.GetPaymentReceiptInvoice(_receipt);
+
+        public OrderInfo ReceiptOrderInfo => ModernTdlibCompatibility.GetPaymentReceiptOrderInfo(_receipt);
+
+        public ShippingOption ReceiptShippingOption => ModernTdlibCompatibility.GetPaymentReceiptShippingOption(_receipt);
+
+        public string ReceiptCredentialsTitle => ModernTdlibCompatibility.GetPaymentReceiptCredentialsTitle(_receipt);
+
+        public bool ReceiptIsTest => ReceiptInvoice?.IsTest == true;
+
+        public string InvoiceTitle => Invoice?.GetTitle();
+
+        public string InvoiceDescription => Invoice?.GetDescription();
     }
 }

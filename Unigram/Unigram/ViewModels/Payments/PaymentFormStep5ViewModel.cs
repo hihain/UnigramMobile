@@ -154,7 +154,7 @@ namespace Unigram.ViewModels.Payments
         {
             var disclaimer = await MessagePopup.ShowAsync(string.Format(Strings.Resources.PaymentWarningText, _bot.FirstName, _provider.FirstName), Strings.Resources.PaymentWarning, Strings.Resources.OK);
 
-            var confirm = await MessagePopup.ShowAsync(string.Format(Strings.Resources.PaymentTransactionMessage, Locale.FormatCurrency(_totalAmount, _paymentForm.Invoice.Currency), _bot.FirstName, _invoice.Title), Strings.Resources.PaymentTransactionReview, Strings.Resources.OK, Strings.Resources.Cancel);
+            var confirm = await MessagePopup.ShowAsync(string.Format(Strings.Resources.PaymentTransactionMessage, Locale.FormatCurrency(_totalAmount, PaymentInvoice.Currency), _bot.FirstName, _invoice.GetTitle()), Strings.Resources.PaymentTransactionReview, Strings.Resources.OK, Strings.Resources.Cancel);
             if (confirm != Windows.UI.Xaml.Controls.ContentDialogResult.Primary)
             {
                 return;

@@ -1,10 +1,15 @@
-﻿using libtgvoip;
+﻿using Unigram.Services;
 using System.Text;
 using Unigram.Converters;
 using Unigram.Services.Settings;
 using Unigram.ViewModels.Settings;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+#if MODERN_TDLIB
+using DataSavingMode = Unigram.Services.DataSavingMode;
+#else
+using DataSavingMode = libtgvoip.DataSavingMode;
+#endif
 
 namespace Unigram.Views.Settings
 {

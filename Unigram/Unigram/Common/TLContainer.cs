@@ -7,6 +7,61 @@ using Unigram.ViewModels.Delegates;
 
 namespace Unigram.Views
 {
+    /// <summary>
+    /// Single source of truth for where per-session TDLib databases live on disk.
+    /// The modern TDLib build isolates them under a dedicated subfolder so the
+    /// experimental package can never touch the stable app's production database.
+    /// Every consumer must resolve paths through here, otherwise sessions that
+    /// exist on disk are silently never registered at startup.
+    /// </summary>
+    public static class SessionStorage
+    {
+        public static string Root
+        {
+            get
+            {
+#if MODERN_TDLIB
+                return System.IO.Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path, "tdlib-experimental");
+#else
+                return Windows.Storage.ApplicationData.Current.LocalFolder.Path;
+#endif
+            }
+        }
+
+        public static string GetSessionDirectory(int session)
+        {
+            return System.IO.Path.Combine(Root, session.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        public static IEnumerable<int> EnumerateStoredSessions()
+        {
+            string[] folders;
+
+            try
+            {
+                var root = Root;
+                if (!System.IO.Directory.Exists(root))
+                {
+                    yield break;
+                }
+
+                folders = System.IO.Directory.GetDirectories(root);
+            }
+            catch
+            {
+                yield break;
+            }
+
+            foreach (var folder in folders)
+            {
+                if (int.TryParse(System.IO.Path.GetFileName(folder), out int session))
+                {
+                    yield return session;
+                }
+            }
+        }
+    }
+
     public class TLContainer
     {
         private static TLContainer _instance = new TLContainer();

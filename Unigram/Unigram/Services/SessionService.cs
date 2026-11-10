@@ -23,9 +23,10 @@ namespace Unigram.Services
         IEventAggregator Aggregator { get; }
 
         Task<BaseObject> SetAuthenticationPhoneNumberAsync(SetAuthenticationPhoneNumber function);
+        void RequestQrCodeAuthentication();
     }
 
-    public class SessionService : TLViewModelBase, ISessionService, IHandle<UpdateUnreadMessageCount>, IHandle<UpdateUnreadChatCount>, IHandle<UpdateAuthorizationState>, IHandle<UpdateConnectionState>
+    public class SessionService : TLViewModelBase, ISessionService, IHandle<UpdateUser>, IHandle<UpdateUnreadMessageCount>, IHandle<UpdateUnreadChatCount>, IHandle<UpdateAuthorizationState>, IHandle<UpdateConnectionState>
     {
         private readonly ILifetimeService _lifetimeService;
         private readonly int _id;
@@ -70,8 +71,7 @@ namespace Unigram.Services
             }
             set
             {
-                //Set(ref _isActive, value);
-                _isActive = value;
+                Set(ref _isActive, value);
 
                 if (!value)
                 {
@@ -131,7 +131,7 @@ namespace Unigram.Services
         #region Lifecycle
 
         private bool _loggingOut;
-        private SetAuthenticationPhoneNumber _continueOnLogOut;
+        private Function _continueOnLogOut;
         private TaskCompletionSource<BaseObject> _continueResult;
 
         public Task<BaseObject> SetAuthenticationPhoneNumberAsync(SetAuthenticationPhoneNumber function)
@@ -143,6 +143,15 @@ namespace Unigram.Services
             ProtoService.Send(new LogOut());
 
             return _continueResult.Task;
+        }
+
+        public void RequestQrCodeAuthentication()
+        {
+            _loggingOut = false;
+            _continueOnLogOut = new RequestQrCodeAuthentication();
+            _continueResult = new TaskCompletionSource<BaseObject>();
+
+            ProtoService.Send(new LogOut());
         }
 
         private async void ContinueOnLogOut()
@@ -160,6 +169,7 @@ namespace Unigram.Services
             }
 
             _continueOnLogOut = null;
+            _continueResult = null;
 
             var response = await ProtoService.SendAsync(function);
             source.SetResult(response);

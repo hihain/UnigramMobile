@@ -68,7 +68,7 @@ namespace Unigram.ViewModels.Settings
                 }
             });
 
-            ProtoService.Send(new GetBlockedMessageSenders(0, 1), result =>
+            ProtoService.Send(new GetBlockedMessageSenders(new BlockListMain(), 0, 1), result =>
             {
                 if (result is MessageSenders senders)
                 {

@@ -82,6 +82,37 @@ namespace Unigram.ViewModels.SignIn
                 return;
             }
 
+#if MODERN_TDLIB
+            IsLoading = true;
+
+            var response = await ProtoService.SendAsync(new CheckAuthenticationPassword(_password));
+
+            // Cleared on every path. RelayCommand re-checks CanExecute before invoking and
+            // nothing raises CanExecuteChanged here, so leaving this set would drop every
+            // later press while the button still looked enabled.
+            IsLoading = false;
+
+            if (response is Error error)
+            {
+                if (error.TypeEquals(ErrorType.PASSWORD_HASH_INVALID))
+                {
+                    Password = string.Empty;
+                    RaisePropertyChanged("PASSWORD_INVALID");
+                }
+                else if (error.CodeEquals(ErrorCode.FLOOD))
+                {
+                    AlertsService.ShowFloodWaitAlert(error.Message);
+                }
+                else
+                {
+                    // Every other failure used to be swallowed, which left the page looking
+                    // inert after the user pressed the button. Surface it instead.
+                    await MessagePopup.ShowAsync(error.Message, Strings.Resources.AppName, Strings.Resources.OK);
+                }
+
+                Logs.Logger.Error(Logs.Target.API, "account.checkPassword error " + error);
+            }
+#else
             var response = await ProtoService.SendAsync(new CheckAuthenticationPassword(_password));
             if (response is Error error)
             {
@@ -97,6 +128,7 @@ namespace Unigram.ViewModels.SignIn
 
                 Logs.Logger.Error(Logs.Target.API, "account.checkPassword error " + error);
             }
+#endif
         }
 
         public RelayCommand ForgotCommand { get; }
@@ -134,7 +166,11 @@ namespace Unigram.ViewModels.SignIn
             {
                 IsLoading = true;
 
-                var response = await ProtoService.SendAsync(new DeleteAccount("Forgot password"));
+                var response = await ProtoService.SendAsync(new DeleteAccount("Forgot password"
+#if MODERN_TDLIB
+                    , string.Empty
+#endif
+                ));
                 if (response is Ok)
                 {
                     //var logout = await LegacyService.LogOutAsync();

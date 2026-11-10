@@ -3,6 +3,7 @@ using System.Linq;
 using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Entities;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.Foundation;
 using Windows.UI.Xaml;
@@ -57,7 +58,7 @@ namespace Unigram.Controls
             }
             else if (constraint is Message message)
             {
-                ttl = message.Ttl > 0;
+                ttl = ModernTdlibCompatibility.GetMessageTtl(message) > 0;
                 constraint = message.Content;
 
                 if (message.MediaAlbumId != 0 && Tag is true)
@@ -79,7 +80,7 @@ namespace Unigram.Controls
             }
             else if (constraint is MessageInvoice invoiceMessage)
             {
-                constraint = invoiceMessage.Photo;
+                constraint = invoiceMessage.GetPhoto();
             }
             else if (constraint is MessageGame gameMessage)
             {
@@ -106,7 +107,7 @@ namespace Unigram.Controls
             }
             else if (constraint is MessageText textMessage)
             {
-                if (string.Equals(textMessage?.WebPage?.Type, "telegram_background", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(textMessage?.WebPage), "telegram_background", StringComparison.OrdinalIgnoreCase))
                 {
                     width = 900;
                     height = 1600;

@@ -144,7 +144,13 @@ namespace Unigram.Views.Popups
         {
             if (file.Local.IsDownloadingCompleted)
             {
-                if (sticker.IsAnimated)
+                if (
+#if MODERN_TDLIB
+                    sticker.Format is StickerFormatTgs || sticker.Format is StickerFormatWebm
+#else
+                    sticker.GetIsAnimated()
+#endif
+                )
                 {
                     Thumbnail.Opacity = 0;
                     Texture.Source = null;

@@ -114,7 +114,7 @@ namespace Unigram.ViewModels.Supergroups
 
         public override Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
-            ProtoService.Send(new GetInstalledStickerSets(false), result =>
+            ProtoService.Send(ModernTdlibCompatibility.GetInstalledStickerSets(false), result =>
             {
                 if (result is StickerSets sets)
                 {
@@ -183,7 +183,30 @@ namespace Unigram.ViewModels.Supergroups
                 var response = await ProtoService.SendAsync(new GetStickerSet(fullInfo.StickerSetId));
                 if (response is StickerSet set)
                 {
-                    SelectedItem = new StickerSetInfo(set.Id, set.Title, set.Name, set.Thumbnail, set.ThumbnailOutline, set.IsInstalled, set.IsArchived, set.IsOfficial, set.IsAnimated, set.IsMasks, set.IsViewed, set.Stickers.Count, set.Stickers);
+                    SelectedItem = ModernTdlibCompatibility.CreateStickerSetInfo(
+                        set.Id,
+                        set.Title,
+                        set.Name,
+                        set.Thumbnail,
+                        set.ThumbnailOutline,
+#if MODERN_TDLIB
+                        set.IsOwned,
+#else
+                        false,
+#endif
+                        set.IsInstalled,
+                        set.IsArchived,
+                        set.IsOfficial,
+#if MODERN_TDLIB
+                        set.Stickers.Any(x => x.Format is StickerFormatTgs || x.Format is StickerFormatWebm),
+                        set.StickerType is StickerTypeMask,
+#else
+                        ModernTdlibCompatibility.GetStickerSetIsAnimated(set),
+                        set.IsMasks,
+#endif
+                        set.IsViewed,
+                        set.Stickers.Count,
+                        set.Stickers);
                     ShortName = set.Name;
                 }
             }
@@ -235,12 +258,35 @@ namespace Unigram.ViewModels.Supergroups
         {
             IsLoading = true;
 
-            var response = await ProtoService.SendAsync(new SearchStickerSet(shortName));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.SearchStickerSet(shortName));
             if (response is StickerSet stickerSet)
             {
                 IsLoading = false;
                 IsAvailable = true;
-                SelectedItem = new StickerSetInfo(stickerSet.Id, stickerSet.Title, stickerSet.Name, stickerSet.Thumbnail, stickerSet.ThumbnailOutline, stickerSet.IsInstalled, stickerSet.IsArchived, stickerSet.IsOfficial, stickerSet.IsAnimated, stickerSet.IsMasks, stickerSet.IsViewed, stickerSet.Stickers.Count, stickerSet.Stickers);
+                SelectedItem = ModernTdlibCompatibility.CreateStickerSetInfo(
+                    stickerSet.Id,
+                    stickerSet.Title,
+                    stickerSet.Name,
+                    stickerSet.Thumbnail,
+                    stickerSet.ThumbnailOutline,
+#if MODERN_TDLIB
+                    stickerSet.IsOwned,
+#else
+                    false,
+#endif
+                    stickerSet.IsInstalled,
+                    stickerSet.IsArchived,
+                    stickerSet.IsOfficial,
+#if MODERN_TDLIB
+                    stickerSet.Stickers.Any(x => x.Format is StickerFormatTgs || x.Format is StickerFormatWebm),
+                    stickerSet.StickerType is StickerTypeMask,
+#else
+                    ModernTdlibCompatibility.GetStickerSetIsAnimated(stickerSet),
+                    stickerSet.IsMasks,
+#endif
+                    stickerSet.IsViewed,
+                    stickerSet.Stickers.Count,
+                    stickerSet.Stickers);
                 ShortName = stickerSet.Name;
             }
             else

@@ -83,13 +83,55 @@ namespace Unigram.Views
 
         public MainPage()
         {
+#if MODERN_TDLIB
+            // .NET Native inlines aggressively, so the captured stack names only this
+            // constructor. Step through it so the failing statement is identified, and
+            // report which x:Name fields are null, since an element that is not realized
+            // by InitializeComponent leaves its generated field null.
+            Logs.PushDiagnostics.Write("main.construct", "step=initialize_component");
+#endif
             InitializeComponent();
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=elements"
+                + $";settingsView={Null(SettingsView)}"
+                + $";chatsList={Null(ChatsList)}"
+                + $";pageHeader={Null(PageHeader)}"
+                + $";folderShadow={Null(FolderShadow)}"
+                + $";archivedPanel={Null(ArchivedChatsPanel)}"
+                + $";archivedCompact={Null(ArchivedChatsCompactPanel)}"
+                + $";archivedChats={Null(ArchivedChats)}"
+                + $";masterDetail={Null(MasterDetail)}"
+                + $";settingsFlyout={Null(SettingsFlyout)}"
+                + $";titleBar={Null(TitleBarrr)}"
+                + $";stateLabel={Null(StateLabel)}");
+
+            Logs.PushDiagnostics.Write("main.construct", "step=resolve_viewmodel");
+#endif
             DataContext = TLContainer.Current.Resolve<MainViewModel>();
+
+#if MODERN_TDLIB
+            // TLContainer.Resolve returns default(T) rather than throwing when no container
+            // is registered for the active session, so every member access below would fail
+            // as a bare NullReferenceException with no indication of the cause.
+            if (ViewModel == null)
+            {
+                Logs.PushDiagnostics.Write("main.construct", $"result=error;reason=viewmodel_unresolved;dataContext={Null(DataContext)}");
+                throw new InvalidOperationException("MainViewModel could not be resolved for the active session.");
+            }
+
+            Logs.PushDiagnostics.Write("main.construct", "step=cache_service");
+#endif
 
             _cacheService = ViewModel.CacheService;
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=settings_view");
+#endif
             SettingsView.DataContext = ViewModel.Settings;
             ViewModel.Settings.Delegate = SettingsView;
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=chats_delegate");
+#endif
             ViewModel.Chats.Delegate = this;
             ViewModel.Chats.SelectedItems.CollectionChanged += SelectedItems_CollectionChanged;
             ViewModel.ArchivedChats.Delegate = this;
@@ -97,11 +139,26 @@ namespace Unigram.Views
 
             NavigationCacheMode = NavigationCacheMode.Enabled;
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=title_bar");
+#endif
             InitializeTitleBar();
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=localization");
+#endif
             InitializeLocalization();
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=search");
+#endif
             InitializeSearch();
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=lock");
+#endif
             InitializeLock();
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=connection_state");
+#endif
             var update = new UpdateConnectionState(ViewModel.CacheService.GetConnectionState());
             if (update.State != null)
             {
@@ -114,24 +171,75 @@ namespace Unigram.Views
             var updateShadow = DropShadowEx.Attach(UpdateShadow, 20, 0.25f);
             updateShadow.RelativeSizeAdjustment = Vector2.One;
 #endif
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=folder_shadow");
+
+            // Composition interop is the only part of this constructor that is purely
+            // decorative, so a device-side failure here is reported and the page is still
+            // allowed to load. Everything else below is required for a usable chat list.
+            try
+            {
+                var folderShadow = DropShadowEx.Attach(FolderShadow, 20, 0.25f);
+                DropShadowEx.SetRelativeSize(folderShadow, FolderShadow);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("main.construct.folder_shadow", ex);
+            }
+#else
             var folderShadow = DropShadowEx.Attach(FolderShadow, 20, 0.25f);
             folderShadow.RelativeSizeAdjustment = Vector2.One;
+#endif
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=flyout_placement");
+#endif
             if (ApiInfo.CanUseNewFlyoutPlacementMode)
             {
                 SettingsFlyout.Placement = FlyoutPlacementMode.BottomEdgeAlignedRight;
             }
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=chats_list_callback");
+#endif
             ChatsList.RegisterPropertyChangedCallback(ChatsListView.SelectionMode2Property, List_SelectionModeChanged);
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=page_header_visual");
+
+            // Same rationale as the folder shadow: the header inset clip is cosmetic.
+            try
+            {
+                var header = ElementCompositionPreview.GetElementVisual(PageHeader);
+                header.Clip = header.Compositor.CreateInsetClip();
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("main.construct.page_header_visual", ex);
+            }
+#else
             var header = ElementCompositionPreview.GetElementVisual(PageHeader);
             header.Clip = header.Compositor.CreateInsetClip();
+#endif
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "step=archived_panels");
+#endif
             var show = !((TLViewModelBase)ViewModel).Settings.CollapseArchivedChats;
 
             ArchivedChatsPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             ArchivedChatsCompactPanel.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.construct", "result=ok");
+#endif
         }
+
+#if MODERN_TDLIB
+        private static string Null(object value)
+        {
+            return value == null ? "null" : "ok";
+        }
+#endif
 
         public void Dispose()
         {
@@ -779,7 +887,11 @@ namespace Unigram.Views
                 SetFolder(new ChatListMain());
                 args.Handled = true;
             }
+#if MODERN_TDLIB
+            else if (ViewModel.Chats.Items.ChatList is ChatListFolder)
+#else
             else if (ViewModel.Chats.Items.ChatList is ChatListFilter)
+#endif
             {
                 ViewModel.SelectedFilter = ChatFilterViewModel.Main;
                 ConvertFilter(ChatFilterViewModel.Main);
@@ -1185,27 +1297,65 @@ namespace Unigram.Views
 
         public void Initialize()
         {
+#if MODERN_TDLIB
+            // Reached from OnNavigatedTo, so this runs on both routes to MainPage (launch
+            // and post-login) while still inside Frame.Navigate. Every dereference below is
+            // a crash candidate and none of them are otherwise visible, so step through it.
+            Logs.PushDiagnostics.Write("main.initialize", "step=begin");
+
+            if (ViewModel == null)
+            {
+                Logs.PushDiagnostics.Write("main.initialize", "result=error;reason=viewmodel_null");
+                throw new InvalidOperationException("MainPage.Initialize ran without a MainViewModel.");
+            }
+
+            Logs.PushDiagnostics.Write("main.initialize", $"step=backstack;frame={(Frame == null ? "null" : "ok")}");
+#endif
             Frame.BackStack.Clear();
 
             if (MasterDetail.NavigationService == null)
             {
+#if MODERN_TDLIB
+                Logs.PushDiagnostics.Write("main.initialize", "step=master_detail_initialize");
+#endif
                 MasterDetail.Initialize("Main", Frame, ViewModel.ProtoService.SessionId);
                 MasterDetail.NavigationService.FrameFacade.Navigating += OnNavigating;
                 MasterDetail.NavigationService.FrameFacade.Navigated += OnNavigated;
             }
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.initialize", "step=navigation_services");
+#endif
             ViewModel.NavigationService = MasterDetail.NavigationService;
             ViewModel.Chats.NavigationService = MasterDetail.NavigationService;
             ViewModel.Contacts.NavigationService = MasterDetail.NavigationService;
             ViewModel.Calls.NavigationService = MasterDetail.NavigationService;
             ViewModel.Settings.NavigationService = MasterDetail.NavigationService;
 
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.initialize", "step=archived_chats");
+#endif
             ArchivedChats.UpdateChatList(ViewModel.ProtoService, ViewModel.Chats, new ChatListArchive());
+#if MODERN_TDLIB
+            Logs.PushDiagnostics.Write("main.initialize", "step=done;result=ok");
+#endif
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
+#if MODERN_TDLIB
+            try
+            {
+                Initialize();
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("main.navigated_to", ex);
+                throw;
+            }
+#else
             Initialize();
+#endif
         }
 
         public async void Activate(string parameter)
@@ -2047,12 +2197,12 @@ namespace Unigram.Views
                     if (result.User != null || result.Chat.Type is ChatTypePrivate || result.Chat.Type is ChatTypeSecret)
                     {
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
-                        verified.Visibility = user != null && user.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+                        verified.Visibility = user != null && ModernTdlibCompatibility.GetUserIsVerified(user) ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else if (result.Chat != null && result.Chat.Type is ChatTypeSupergroup supergroup)
                     {
                         var group = ViewModel.ProtoService.GetSupergroup(supergroup.SupergroupId);
-                        verified.Visibility = group != null && group.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+                        verified.Visibility = group != null && ModernTdlibCompatibility.GetSupergroupIsVerified(group) ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else
                     {
@@ -2067,7 +2217,7 @@ namespace Unigram.Views
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
                         if (result.IsPublic)
                         {
-                            subtitle.Text = $"@{user.Username}";
+                            subtitle.Text = $"@{user.GetUsername()}";
                         }
                         else
                         {
@@ -2081,11 +2231,11 @@ namespace Unigram.Views
                         {
                             if (supergroup.MemberCount > 0)
                             {
-                                subtitle.Text = string.Format("@{0}, {1}", supergroup.Username, Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
+                                subtitle.Text = string.Format("@{0}, {1}", supergroup.GetUsername(), Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
                             }
                             else
                             {
-                                subtitle.Text = $"@{supergroup.Username}";
+                                subtitle.Text = $"@{supergroup.GetUsername()}";
                             }
                         }
                         else if (supergroup.MemberCount > 0)
@@ -2275,7 +2425,7 @@ namespace Unigram.Views
                 var subtitle = content.Children[2] as TextBlock;
                 if (result.IsPublic)
                 {
-                    subtitle.Text = $"@{user.Username}";
+                    subtitle.Text = $"@{user.GetUsername()}";
                 }
                 else
                 {
@@ -2440,7 +2590,11 @@ namespace Unigram.Views
 
         private void ChatsNearby_Click(object sender, RoutedEventArgs e)
         {
+#if !MODERN_TDLIB
             MasterDetail.NavigationService.Navigate(typeof(ChatsNearbyPage));
+#else
+            Unigram.Logs.PushDiagnostics.Write("chats_nearby.disabled", "result=unsupported;feature=experimental_tdlib");
+#endif
         }
 
         private void LogOut_Click(object sender, RoutedEventArgs e)
@@ -2702,6 +2856,25 @@ namespace Unigram.Views
             await ArchivedChatsPanel.UpdateLayoutAsync();
 
             var element = VisualTreeHelper.GetChild(ChatsList, 0) as UIElement;
+
+#if MODERN_TDLIB
+            if (element == null)
+            {
+                // The chat list template is not realized yet, so there is nothing to
+                // animate. Apply the end state directly instead of dereferencing a null
+                // visual, which on this async void path would terminate the process.
+                Logs.PushDiagnostics.Write("main.archive", $"step=show_hide;result=skipped;reason=visual_tree_not_realized;show={show}");
+
+                ChatsList.Margin = new Thickness();
+
+                if (!show)
+                {
+                    ArchivedChatsPresenter.Visibility = Visibility.Collapsed;
+                }
+
+                return;
+            }
+#endif
 
             var parent = ElementCompositionPreview.GetElementVisual(ChatsList);
 
@@ -3033,13 +3206,28 @@ namespace Unigram.Views
                     compare = items[index + 1];
                 }
 
+#if MODERN_TDLIB
+                if (compare.ChatList is ChatListFolder)
+                {
+                    var chatFolderIds = items
+                        .Where(x => x.ChatList is ChatListFolder)
+                        .Select(x => x.ChatFilterId)
+                        .ToList();
+                    ViewModel.ProtoService.Send(new ReorderChatFolders(chatFolderIds, 0));
+                }
+#else
                 if (compare.ChatList is ChatListFilter)
                 {
                     ViewModel.ProtoService.Send(new ReorderChatFilters(items.Where(x => x.ChatList is ChatListFilter).Select(x => x.ChatFilterId).ToArray()));
                 }
+#endif
                 else
                 {
+#if MODERN_TDLIB
+                    ViewModel.Handle(new UpdateChatFilters { ChatFilters = ViewModel.CacheService.ChatFilters });
+#else
                     ViewModel.Handle(new UpdateChatFilters(ViewModel.CacheService.ChatFilters));
+#endif
                 }
             }
         }

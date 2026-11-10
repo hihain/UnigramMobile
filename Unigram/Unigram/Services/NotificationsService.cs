@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Td;
 using Telegram.Td.Api;
@@ -13,10 +15,12 @@ using Unigram.Controls.Messages;
 using Unigram.Converters;
 using Unigram.Navigation;
 using Unigram.Views;
+using Windows.ApplicationModel;
 using Windows.ApplicationModel.AppService;
 using Windows.Data.Xml.Dom;
 using Windows.Foundation.Collections;
 using Windows.Networking.PushNotifications;
+using Windows.Storage;
 using Windows.UI.Notifications;
 using Windows.UI.Xaml.Controls;
 
@@ -47,6 +51,7 @@ namespace Unigram.Services
         IHandle<UpdateServiceNotification>,
         IHandle<UpdateTermsOfService>,
         IHandle<UpdateAuthorizationState>,
+        IHandle<UpdateOption>,
         IHandle<UpdateUser>,
         IHandle<UpdateNotification>,
         IHandle<UpdateNotificationGroup>,
@@ -61,7 +66,15 @@ namespace Unigram.Services
 
         private readonly DisposableMutex _registrationLock;
         private bool _alreadyRegistered;
+        private PushNotificationChannel _channel;
+        private DateTimeOffset _nextRegistrationAttempt;
+        private CancellationTokenSource _registrationRetryCancellation;
 
+        private static readonly TimeSpan RegistrationRetryDelay = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan NotificationReconciliationDelay = TimeSpan.FromSeconds(5);
+        private static int _foregroundTileDiagnosticBudget = 48;
+
+        private readonly ConcurrentDictionary<string, byte> _pendingNotificationKeys = new ConcurrentDictionary<string, byte>();
         private bool _suppress;
 
         public NotificationsService(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, ISessionService sessionService, IEventAggregator aggregator)
@@ -98,7 +111,86 @@ namespace Unigram.Services
 
                 updater.Update(new BadgeNotification(document));
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logs.Logger.Error(Logs.Target.Notifications, $"Unable to update badge: {ex.Message}");
+            }
+        }
+
+        private bool UpdateTile(string caption, string message, string launch, string picture)
+        {
+            try
+            {
+                var safeCaption = EscapeXml(caption);
+                var safeMessage = EscapeXml(message);
+                var safePicture = EscapeXml(picture);
+                var image = string.IsNullOrEmpty(safePicture)
+                    ? string.Empty
+                    : $"<image hint-crop='circle' src='{safePicture}'/>";
+
+                var body = $"<text hint-style='body'>{safeCaption}</text><text hint-style='captionSubtle' hint-wrap='true'>{safeMessage}</text>";
+                var xml = $"<tile><visual arguments='{launch}'><binding template='TileMedium' branding='name'>{image}{body}</binding><binding template='TileWide' branding='nameAndLogo'><group><subgroup hint-weight='18'>{image}</subgroup><subgroup>{body}</subgroup></group></binding><binding template='TileLarge' branding='nameAndLogo'><group><subgroup hint-weight='18'>{image}</subgroup><subgroup>{body}</subgroup></group></binding></visual></tile>";
+
+                var document = new XmlDocument();
+                document.LoadXml(xml);
+
+                var updater = TileUpdateManager.CreateTileUpdaterForApplication("App");
+                updater.EnableNotificationQueue(false);
+                updater.Update(new TileNotification(document));
+                WriteForegroundTileDiagnostic("managed.tile.update", $"session={_sessionService.Id};result=success");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logs.Logger.Error(Logs.Target.Notifications, $"Unable to update Live Tile: {ex.Message}");
+                WriteForegroundTileDiagnosticException("managed.tile.update.failed", ex);
+                return false;
+            }
+        }
+
+        private void UpdateManagedTile(string caption, string message, string launch, string picture)
+        {
+            var active = _sessionService.IsActive;
+            var pictureAvailable = !string.IsNullOrEmpty(picture);
+            if (!active)
+            {
+                WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};active=false;picture_available={pictureAvailable.ToString().ToLowerInvariant()};result=skipped");
+                return;
+            }
+
+            var applied = UpdateTile(caption, message, launch, picture);
+            WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};active=true;picture_available={pictureAvailable.ToString().ToLowerInvariant()};result={(applied ? "applied" : "failed")}");
+        }
+
+        private static bool CanWriteForegroundTileDiagnostic()
+        {
+            return Interlocked.Decrement(ref _foregroundTileDiagnosticBudget) >= 0;
+        }
+
+        private static void WriteForegroundTileDiagnostic(string eventName, string details)
+        {
+            if (CanWriteForegroundTileDiagnostic())
+            {
+                Logs.PushDiagnostics.Write(eventName, details);
+            }
+        }
+
+        private static void WriteForegroundTileDiagnosticException(string eventName, Exception exception)
+        {
+            if (CanWriteForegroundTileDiagnostic())
+            {
+                Logs.PushDiagnostics.WriteException(eventName, exception);
+            }
+        }
+
+        private static string EscapeXml(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("&", "&amp;")
+                .Replace("\"", "&quot;")
+                .Replace("'", "&apos;")
+                .Replace("<", "&lt;")
+                .Replace(">", "&gt;");
         }
 
         public async void Handle(UpdateTermsOfService update)
@@ -127,7 +219,11 @@ namespace Unigram.Services
                         return;
                     }
 
+#if MODERN_TDLIB
+                    _protoService.Send(new DeleteAccount("Decline ToS update", string.Empty));
+#else
                     _protoService.Send(new DeleteAccount("Decline ToS update"));
+#endif
                 }
 
                 await Task.Delay(2000);
@@ -281,6 +377,7 @@ namespace Unigram.Services
             if (update.User.Id == _protoService.Options.MyId)
             {
                 CreateToastCollection(update.User);
+                _ = RegisterAsync();
             }
         }
 
@@ -315,8 +412,18 @@ namespace Unigram.Services
                 {
                     foreach (var notification in group.Notifications)
                     {
-                        if (hash.Contains($"{notification.Id}_{group.Id}"))
+                        var key = GetNotificationKey(group.Id, notification.Id);
+                        if (hash.Contains(key))
                         {
+                            continue;
+                        }
+
+                        // A new notification's toast is written asynchronously. Do not
+                        // remove it from TDLib merely because the OS history snapshot
+                        // was collected before that write completed.
+                        if (_pendingNotificationKeys.ContainsKey(key))
+                        {
+                            WriteForegroundTileDiagnostic("managed.notification.reconcile", "result=deferred;reason=toast_write_pending");
                             continue;
                         }
 
@@ -352,19 +459,30 @@ namespace Unigram.Services
             if (_suppress)
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
+                WriteForegroundTileDiagnostic("managed.tile.group", "result=skipped;reason=suppressed");
                 return;
             }
 
             var connectionState = _protoService.GetConnectionState();
-            if (connectionState is ConnectionStateUpdating)
+            if (connectionState is ConnectionStateUpdating && !BackgroundSync.IsActiveInBackground)
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
+                WriteForegroundTileDiagnostic("managed.tile.group", "result=skipped;reason=connection_updating");
                 return;
             }
 
             if (!_sessionService.IsActive && !SettingsService.Current.IsAllAccountsNotifications)
             {
+                WriteForegroundTileDiagnostic("managed.tile.group", "result=skipped;reason=inactive_session");
                 return;
+            }
+
+            BackgroundSync.OnNotificationGroup();
+            WriteForegroundTileDiagnostic("managed.tile.group", $"result=received;added={update.AddedNotifications?.Count ?? 0};removed={update.RemovedNotificationIds?.Count ?? 0};session_active={_sessionService.IsActive.ToString().ToLowerInvariant()}");
+
+            foreach (var notification in update.AddedNotifications)
+            {
+                TrackPendingNotification(update.NotificationGroupId, notification.Id);
             }
 
             try
@@ -384,14 +502,37 @@ namespace Unigram.Services
             }
         }
 
+        private void TrackPendingNotification(int groupId, int notificationId)
+        {
+            var key = GetNotificationKey(groupId, notificationId);
+            if (_pendingNotificationKeys.TryAdd(key, 0))
+            {
+                _ = ReleasePendingNotificationAsync(key);
+            }
+        }
+
+        private async Task ReleasePendingNotificationAsync(string key)
+        {
+            await Task.Delay(NotificationReconciliationDelay);
+            _pendingNotificationKeys.TryRemove(key, out byte ignored);
+        }
+
+        private static string GetNotificationKey(int groupId, int notificationId)
+        {
+            return $"{notificationId}_{groupId}";
+        }
+
         public void Handle(UpdateNotification update)
         {
             var connectionState = _protoService.GetConnectionState();
             if (connectionState is ConnectionStateUpdating)
             {
                 // This is an unsynced message, we don't want to show a notification for it as it has been probably pushed already by WNS
+                WriteForegroundTileDiagnostic("managed.tile.notification", "result=skipped;reason=connection_updating");
                 return;
             }
+
+            WriteForegroundTileDiagnostic("managed.tile.notification", $"result=received;type={update.Notification?.Type?.GetType().Name ?? "null"};dispatch=not_required");
 
             //ProcessNotification(update.NotificationGroupId, 0, update.Notification);
         }
@@ -401,14 +542,21 @@ namespace Unigram.Services
             switch (notification.Type)
             {
                 case NotificationTypeNewCall newCall:
+                    WriteForegroundTileDiagnostic("managed.tile.notification", "result=ignored;type=new_call");
                     break;
                 case NotificationTypeNewMessage newMessage:
+                    WriteForegroundTileDiagnostic("managed.tile.notification", "result=dispatch;type=new_message");
                     ProcessNewMessage(group, notification.Id, newMessage.Message, notification.Date, notification.IsSilent);
                     break;
                 case NotificationTypeNewPushMessage newPushMessage:
+                    WriteForegroundTileDiagnostic("managed.tile.notification", "result=dispatch;type=new_push_message");
                     ProcessNewPushMessage(group, notification.Id, chatId, newPushMessage, notification.Date, notification.IsSilent);
                     break;
                 case NotificationTypeNewSecretChat newSecretChat:
+                    WriteForegroundTileDiagnostic("managed.tile.notification", "result=ignored;type=new_secret_chat");
+                    break;
+                default:
+                    WriteForegroundTileDiagnostic("managed.tile.notification", $"result=ignored;type={notification.Type?.GetType().Name ?? "null"}");
                     break;
             }
         }
@@ -418,21 +566,26 @@ namespace Unigram.Services
             var chat = _protoService.GetChat(chatId);
             if (chat == null)
             {
+                WriteForegroundTileDiagnostic("managed.tile.message", "result=skipped;type=new_push_message;reason=chat_unavailable");
                 return;
             }
 
+            WriteForegroundTileDiagnostic("managed.tile.message", $"result=received;type=new_push_message;silent={silent.ToString().ToLowerInvariant()}");
+
+            var isSecretChat = chat.Type is ChatTypeSecret;
+            var showOnLiveTile = !isSecretChat || _settings.Notifications.ShowSecretChatOnLiveTiles;
             var caption = GetCaption(chat);
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = GetPhoto(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
             var attribution = user?.GetFullName() ?? string.Empty;
 
-            if (chat.Type is ChatTypeSecret || TLContainer.Current.Passcode.IsLockscreenRequired)
+            if (isSecretChat || TLContainer.Current.Passcode.IsLockscreenRequired)
             {
                 caption = Strings.Resources.AppName;
                 content = Strings.Resources.YouHaveNewMessage;
@@ -444,6 +597,14 @@ namespace Unigram.Services
             await UpdateAsync(chat, async () =>
             {
                 await UpdateToast(caption, content, $"{_sessionService.Id}", sound, launch, $"{id}", $"{groupId}", picture, dateTime, canReply);
+                if (showOnLiveTile)
+                {
+                    UpdateManagedTile(caption, content, launch, picture);
+                }
+                else
+                {
+                    WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};result=skipped;reason=secret_chat_setting");
+                }
             });
         }
 
@@ -452,21 +613,26 @@ namespace Unigram.Services
             var chat = _protoService.GetChat(message.ChatId);
             if (chat == null)
             {
+                WriteForegroundTileDiagnostic("managed.tile.message", "result=skipped;type=new_message;reason=chat_unavailable");
                 return;
             }
 
+            WriteForegroundTileDiagnostic("managed.tile.message", $"result=received;type=new_message;silent={silent.ToString().ToLowerInvariant()}");
+
+            var isSecretChat = chat.Type is ChatTypeSecret;
+            var showOnLiveTile = !isSecretChat || _settings.Notifications.ShowSecretChatOnLiveTiles;
             var caption = GetCaption(chat);
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = GetPhoto(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
             var attribution = user?.GetFullName() ?? string.Empty;
 
-            if (chat.Type is ChatTypeSecret || TLContainer.Current.Passcode.IsLockscreenRequired)
+            if (isSecretChat || TLContainer.Current.Passcode.IsLockscreenRequired)
             {
                 caption = Strings.Resources.AppName;
                 content = Strings.Resources.YouHaveNewMessage;
@@ -478,6 +644,14 @@ namespace Unigram.Services
             await UpdateAsync(chat, async () =>
             {
                 await UpdateToast(caption, content, $"{_sessionService.Id}", sound, launch, $"{id}", $"{groupId}", picture, dateTime, canReply);
+                if (showOnLiveTile)
+                {
+                    UpdateManagedTile(caption, content, launch, picture);
+                }
+                else
+                {
+                    WriteForegroundTileDiagnostic("managed.tile.decision", $"session={_sessionService.Id};result=skipped;reason=secret_chat_setting");
+                }
             });
 
             if (App.Connection is AppServiceConnection connection && _settings.Notifications.InAppFlash)
@@ -489,12 +663,15 @@ namespace Unigram.Services
         private async Task UpdateAsync(Chat chat, Func<Task> action)
         { //TODO: Simplified active chat logic?
             var open = WindowContext.ActiveWrappers.Cast<TLWindowContext>().Any(x => x.IsChatOpen(_protoService.SessionId, chat.Id));
-            if (open)
+            if (open && !BackgroundSync.IsActiveInBackground)
             {
+                WriteForegroundTileDiagnostic("managed.tile.gate", "result=skipped;reason=chat_open");
                 return;
             }
 
+            WriteForegroundTileDiagnostic("managed.tile.gate", "result=invoke;reason=chat_not_open");
             await action();
+            WriteForegroundTileDiagnostic("managed.tile.gate", "result=complete");
         }
 
         private async Task UpdateToast(string caption, string message, string account, string sound, string launch, string tag, string group, string picture, string date, bool canReply)
@@ -670,63 +847,167 @@ namespace Unigram.Services
             using (await _registrationLock.WaitAsync())
             {
                 var userId = _protoService.Options.MyId;
+                Logs.PushDiagnostics.Write("wns.registration.start", $"session={_sessionService.Id};user_ready={userId != 0};already_registered={_alreadyRegistered}");
+#if MODERN_TDLIB
+                // WNS only delivers to the Store-associated identity. Telegram must hold this
+                // product's Package SID/secret for the compiled api_id; a successful TDLib
+                // registration only proves the channel was stored, native-task records prove delivery.
+                Logs.PushDiagnostics.Write("wns.identity", $"package={Package.Current.Id.Name};publisher_id={Package.Current.Id.PublisherId};signature={Package.Current.SignatureKind};delivery=requires_telegram_wns_credentials_for_api_id");
+#endif
                 if (userId == 0)
                 {
+                    Logs.Logger.Info(Logs.Target.Notifications, "Deferring push registration until the user ID is available");
+                    Logs.PushDiagnostics.Write("wns.registration.deferred", $"session={_sessionService.Id};reason=user_not_ready");
                     return;
                 }
 
                 if (_alreadyRegistered)
                 {
+                    Logs.PushDiagnostics.Write("wns.registration.skipped", $"session={_sessionService.Id};reason=already_registered");
                     return;
                 }
 
-                _alreadyRegistered = true;
+                var now = DateTimeOffset.UtcNow;
+                if (now < _nextRegistrationAttempt)
+                {
+                    Logs.PushDiagnostics.Write("wns.registration.skipped", $"session={_sessionService.Id};reason=retry_cooldown;retry_after={_nextRegistrationAttempt:O}");
+                    return;
+                }
 
                 try
                 {
+                    Logs.PushDiagnostics.Write("wns.channel.request", $"session={_sessionService.Id}");
                     var channel = await PushNotificationChannelManager.CreatePushNotificationChannelForApplicationAsync();
-                    if (channel.Uri != _settings.PushToken)
+                    Logs.PushDiagnostics.Write("wns.channel.created", $"session={_sessionService.Id};uri_hash={Logs.PushDiagnostics.HashIdentifier(channel.Uri)};expires={channel.ExpirationTime:O}");
+                    var ids = new HashSet<long>();
+                    var invalidIds = 0;
+
+                    foreach (var settings in TLContainer.Current.ResolveAll<ISettingsService>())
                     {
-                        var ids = new List<long>();
-
-                        foreach (var settings in TLContainer.Current.ResolveAll<ISettingsService>())
+                        if (settings.UseTestDC != _settings.UseTestDC || settings.UserId == _settings.UserId)
                         {
-                            if (settings.UseTestDC != _settings.UseTestDC || settings.UserId == _settings.UserId)
-                            {
-                                continue;
-                            }
-
-                            ids.Add(settings.UserId);
+                            continue;
                         }
 
-                        var result = await _protoService.SendAsync(new RegisterDevice(new DeviceTokenWindowsPush(channel.Uri), ids));
-                        if (result is PushReceiverId receiverId)
+                        if (settings.UserId > 0)
                         {
-                            _settings.PushReceiverId = receiverId.Id;
-                            _settings.PushToken = channel.Uri;
+                            ids.Add(settings.UserId);
                         }
                         else
                         {
-                            _settings.PushReceiverId = 0;
-                            _settings.PushToken = null;
+                            invalidIds++;
                         }
                     }
 
+                    Logs.PushDiagnostics.Write("tdlib.register_device.request", $"session={_sessionService.Id};other_accounts={ids.Count};invalid_accounts_omitted={invalidIds};token_type=windows_push;token_hash={Logs.PushDiagnostics.HashIdentifier(channel.Uri)}");
+                    var result = await _protoService.SendAsync(new RegisterDevice(new DeviceTokenWindowsPush(channel.Uri), ids.ToList()));
+                    if (!(result is PushReceiverId receiverId))
+                    {
+                        _settings.PushReceiverId = 0;
+                        _settings.PushToken = null;
+                        _alreadyRegistered = false;
+                        _nextRegistrationAttempt = DateTimeOffset.UtcNow.Add(RegistrationRetryDelay);
+                        ScheduleRegistrationRetry();
+                        Logs.Logger.Error(Logs.Target.Notifications, $"TDLib rejected push registration: {result}");
+                        if (result is Error error)
+                        {
+                            var message = Logs.PushDiagnostics.SanitizeErrorMessage(error.Message);
+                            Logs.PushDiagnostics.Write("tdlib.register_device.result", $"session={_sessionService.Id};result=error;code={error.Code};message={message};retry_after={_nextRegistrationAttempt:O}");
+                        }
+                        else
+                        {
+                            Logs.PushDiagnostics.Write("tdlib.register_device.result", $"session={_sessionService.Id};result=unexpected;type={result?.GetType().Name ?? "null"};retry_after={_nextRegistrationAttempt:O}");
+                        }
+                        return;
+                    }
+
+                    if (_channel != null)
+                    {
+                        _channel.PushNotificationReceived -= OnPushNotificationReceived;
+                    }
+
+                    _channel = channel;
                     channel.PushNotificationReceived += OnPushNotificationReceived;
+                    _settings.PushReceiverId = receiverId.Id;
+                    _settings.PushToken = channel.Uri;
+                    _alreadyRegistered = true;
+                    _nextRegistrationAttempt = DateTimeOffset.MinValue;
+                    CancelRegistrationRetry();
+                    Logs.Logger.Info(Logs.Target.Notifications, $"Registered WNS channel for session {_sessionService.Id}");
+                    Logs.PushDiagnostics.Write("tdlib.register_device.result", $"session={_sessionService.Id};result=success;receiver_hash={Logs.PushDiagnostics.HashIdentifier(receiverId.Id.ToString(CultureInfo.InvariantCulture))};mapping_persisted={_settings.PushReceiverId == receiverId.Id}");
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     _alreadyRegistered = false;
                     _settings.PushToken = null;
+                    _nextRegistrationAttempt = DateTimeOffset.UtcNow.Add(RegistrationRetryDelay);
+                    ScheduleRegistrationRetry();
+                    Logs.Logger.Error(Logs.Target.Notifications, $"Unable to register WNS channel: {ex.Message}");
+                    Logs.PushDiagnostics.Write("wns.registration.failed", $"session={_sessionService.Id};result=error;hresult=0x{ex.HResult:X8};type={ex.GetType().Name};message={Logs.PushDiagnostics.SanitizeErrorMessage(ex.Message)};retry_after={_nextRegistrationAttempt:O}");
                 }
             }
         }
 
+        private void ScheduleRegistrationRetry()
+        {
+            if (_registrationRetryCancellation != null)
+            {
+                return;
+            }
+
+            var cancellation = new CancellationTokenSource();
+            _registrationRetryCancellation = cancellation;
+            _ = RetryRegistrationAsync(cancellation);
+        }
+
+        private async Task RetryRegistrationAsync(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                while (!cancellation.IsCancellationRequested && !_alreadyRegistered)
+                {
+                    var delay = _nextRegistrationAttempt - DateTimeOffset.UtcNow;
+                    if (delay > TimeSpan.Zero)
+                    {
+                        Logs.PushDiagnostics.Write("wns.registration.retry_scheduled", $"session={_sessionService.Id};retry_after={_nextRegistrationAttempt:O}");
+                        await Task.Delay(delay, cancellation.Token);
+                    }
+
+                    if (!cancellation.IsCancellationRequested)
+                    {
+                        Logs.PushDiagnostics.Write("wns.registration.retry", $"session={_sessionService.Id};reason=cooldown_elapsed");
+                        await RegisterAsync();
+                    }
+                }
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            finally
+            {
+                if (ReferenceEquals(_registrationRetryCancellation, cancellation))
+                {
+                    _registrationRetryCancellation = null;
+                }
+
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelRegistrationRetry()
+        {
+            var cancellation = _registrationRetryCancellation;
+            _registrationRetryCancellation = null;
+            cancellation?.Cancel();
+        }
+
         private void OnPushNotificationReceived(PushNotificationChannel sender, PushNotificationReceivedEventArgs args)
         {
+            Logs.PushDiagnostics.Write("wns.foreground.received", $"type={args.NotificationType}");
             if (args.NotificationType == PushNotificationType.Raw)
             {
                 args.Cancel = true;
+                Logs.PushDiagnostics.Write("wns.foreground.raw.cancelled", "reason=foreground_tdlib_connection");
             }
         }
 
@@ -775,6 +1056,17 @@ namespace Unigram.Services
             //}
 
             _settings.PushToken = null;
+            _settings.PushReceiverId = 0;
+            _alreadyRegistered = false;
+            _nextRegistrationAttempt = DateTimeOffset.MinValue;
+            CancelRegistrationRetry();
+
+            if (_channel != null)
+            {
+                _channel.PushNotificationReceived -= OnPushNotificationReceived;
+                _channel = null;
+            }
+
             await Task.CompletedTask;
         }
 
@@ -784,6 +1076,9 @@ namespace Unigram.Services
             {
                 var channel = await PushNotificationChannelManager.CreatePushNotificationChannelForApplicationAsync();
                 channel.Close();
+                _alreadyRegistered = false;
+                _nextRegistrationAttempt = DateTimeOffset.MinValue;
+                CancelRegistrationRetry();
             }
             catch (Exception ex)
             {
@@ -799,11 +1094,28 @@ namespace Unigram.Services
             switch (update.AuthorizationState)
             {
                 case AuthorizationStateWaitTdlibParameters waitTdlibParameters:
+#if !MODERN_TDLIB
                 case AuthorizationStateWaitEncryptionKey waitEncryptionKey:
+#endif
                     break;
                 default:
                     _authorizationStateTask.TrySetResult(update.AuthorizationState);
                     break;
+            }
+
+            if (update.AuthorizationState is AuthorizationStateReady)
+            {
+                Logs.PushDiagnostics.Write("wns.registration.retry", "reason=authorization_ready");
+                _ = RegisterAsync();
+            }
+        }
+
+        public void Handle(UpdateOption update)
+        {
+            if (update.Name == "my_id" && update.Value is OptionValueInteger myId && myId.Value != 0)
+            {
+                Logs.PushDiagnostics.Write("wns.registration.retry", "reason=my_id_ready");
+                _ = RegisterAsync();
             }
         }
 
@@ -847,11 +1159,15 @@ namespace Unigram.Services
                     var formatted = Client.Execute(new ParseMarkdown(new FormattedText(messageText, new TextEntity[0]))) as FormattedText;
 
                     var replyToMsgId = data.ContainsKey("msg_id") ? long.Parse(data["msg_id"]) << 20 : 0;
-                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId, new MessageSendOptions(false, true, null), null, new InputMessageText(formatted, false, false)));
+#if MODERN_TDLIB
+                    var response = await _protoService.SendAsync(ModernTdlibCompatibility.CreateSendMessage(chat.Id, replyToMsgId, ModernTdlibCompatibility.CreateMessageSendOptions(false, true, null), ModernTdlibCompatibility.CreateInputMessageText(formatted, false, false)));
+#else
+                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, 0, replyToMsgId, ModernTdlibCompatibility.CreateMessageSendOptions(false, true, null), null, ModernTdlibCompatibility.CreateInputMessageText(formatted, false, false)));
+#endif
 
                     if (chat.Type is ChatTypePrivate && chat.LastMessage != null)
                     {
-                        await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                        await _protoService.SendAsync(ModernTdlibCompatibility.CreateViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
                     }
                 }
                 else if (string.Equals(action, "markasread", StringComparison.OrdinalIgnoreCase))
@@ -861,7 +1177,7 @@ namespace Unigram.Services
                         return;
                     }
 
-                    await _protoService.SendAsync(new ViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
+                    await _protoService.SendAsync(ModernTdlibCompatibility.CreateViewMessages(chat.Id, 0, new long[] { chat.LastMessage.Id }, true));
                 }
             }
         }
@@ -912,11 +1228,44 @@ namespace Unigram.Services
             return UpdateFromLabel(chat, message) + GetBriefLabel(chat, message);
         }
 
-        private string GetPhoto(Chat chat)
+        private async Task<string> GetPhotoAsync(Chat chat)
         {
-            if (chat.Photo != null && chat.Photo.Small.Local.IsDownloadingCompleted)
+            if (chat.Photo == null || !chat.Photo.Small.Local.IsDownloadingCompleted)
             {
-                return "ms-appdata:///local/0/profile_photos/" + Path.GetFileName(chat.Photo.Small.Local.Path);
+                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;reason=not_downloaded");
+                return string.Empty;
+            }
+
+            var extension = Path.GetExtension(chat.Photo.Small.Local.Path);
+            if (!string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
+            {
+                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;reason=unsupported_format");
+                return string.Empty;
+            }
+
+            try
+            {
+                var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("tile-avatars", CreationCollisionOption.OpenIfExists);
+                var fileName = $"tile-avatar-{chat.Photo.Small.Id}{extension.ToLowerInvariant()}";
+                var source = await StorageFile.GetFileFromPathAsync(chat.Photo.Small.Local.Path);
+                await source.CopyAsync(folder, fileName, NameCollisionOption.ReplaceExisting);
+
+                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=cached");
+                return "ms-appdata:///local/tile-avatars/" + Uri.EscapeDataString(fileName);
+            }
+            catch (IOException ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.avatar.failed", ex);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.avatar.failed", ex);
+            }
+            catch (ArgumentException ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.avatar.failed", ex);
             }
 
             return string.Empty;
@@ -988,9 +1337,9 @@ namespace Unigram.Services
                 {
                     result = $"{from.LastName.Trim()}: ";
                 }
-                else if (!string.IsNullOrEmpty(from.Username))
+                else if (!string.IsNullOrEmpty(from.GetUsername()))
                 {
-                    result = $"{from.Username.Trim()}: ";
+                    result = $"{from.GetUsername().Trim()}: ";
                 }
                 else if (from.Type is UserTypeDeleted)
                 {
@@ -1070,7 +1419,7 @@ namespace Unigram.Services
             }
             else if (message.Content is MessageInvoice invoice)
             {
-                return result + invoice.Title;
+                return result + invoice.GetTitle();
             }
             else if (message.Content is MessageContact)
             {
@@ -1078,7 +1427,7 @@ namespace Unigram.Services
             }
             else if (message.Content is MessageLocation location)
             {
-                return result + (location.LivePeriod > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
+                return result + (location.GetLivePeriod() > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
             }
             else if (message.Content is MessageVenue vanue)
             {
@@ -1090,7 +1439,7 @@ namespace Unigram.Services
             }
             else if (message.Content is MessagePoll poll)
             {
-                return result + "\uD83D\uDCCA " + poll.Poll.Question;
+                return result + "\uD83D\uDCCA " + ModernTdlibCompatibility.GetPollQuestion(poll.Poll);
             }
             else if (message.Content is MessageCall call)
             {
@@ -1125,9 +1474,9 @@ namespace Unigram.Services
                     {
                         result = $"{senderUser.LastName.Trim()}: ";
                     }
-                    else if (!string.IsNullOrEmpty(senderUser.Username))
+                    else if (!string.IsNullOrEmpty(senderUser.GetUsername()))
                     {
-                        result = $"{senderUser.Username.Trim()}: ";
+                        result = $"{senderUser.GetUsername().Trim()}: ";
                     }
                     else if (senderUser.Type is UserTypeDeleted)
                     {
@@ -1443,6 +1792,18 @@ namespace Unigram.Services
                 muteFor = scope.MuteFor;
             }
 
+#if MODERN_TDLIB
+            _protoService.Send(new SetChatNotificationSettings(chat.Id,
+                new ChatNotificationSettings(
+                    useDefault, muteFor,
+                    settings.UseDefaultSound, settings.SoundId,
+                    settings.UseDefaultShowPreview, settings.ShowPreview,
+                    settings.UseDefaultMuteStories, settings.MuteStories,
+                    settings.UseDefaultStorySound, settings.StorySoundId,
+                    settings.UseDefaultShowStoryPoster, settings.ShowStoryPoster,
+                    settings.UseDefaultDisablePinnedMessageNotifications, settings.DisablePinnedMessageNotifications,
+                    settings.UseDefaultDisableMentionNotifications, settings.DisableMentionNotifications)));
+#else
             _protoService.Send(new SetChatNotificationSettings(chat.Id,
                 new ChatNotificationSettings(
                     useDefault, muteFor,
@@ -1450,6 +1811,7 @@ namespace Unigram.Services
                     settings.UseDefaultShowPreview, settings.ShowPreview,
                     settings.UseDefaultDisablePinnedMessageNotifications, settings.DisablePinnedMessageNotifications,
                     settings.UseDefaultDisableMentionNotifications, settings.DisableMentionNotifications)));
+#endif
         }
     }
 }

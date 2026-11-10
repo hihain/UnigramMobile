@@ -13,6 +13,7 @@ using Unigram.Controls.Chats;
 using Unigram.Controls.Gallery;
 using Unigram.Converters;
 using Unigram.Navigation;
+using Unigram.Services;
 using Unigram.ViewModels.Chats;
 using Unigram.ViewModels.Delegates;
 using Windows.UI.Xaml;
@@ -62,35 +63,37 @@ namespace Unigram.Views.Chats
 
         public void UpdateSharedCount(Chat chat)
         {
-            ViewModel.ProtoService.Send(new SearchChatMessages(chat.Id, string.Empty, null, 0, 0, 1, new SearchMessagesFilterPhotoAndVideo(), 0), result =>
-            {
-                if (result is Messages messages)
-                    _mediaHeader.Subtitle = messages.TotalCount.ToString();
-            });
+            UpdateSharedCount(chat, _mediaHeader, "media", new SearchMessagesFilterPhotoAndVideo());
+            UpdateSharedCount(chat, _filesHeader, "files", new SearchMessagesFilterDocument());
+            UpdateSharedCount(chat, _linksHeader, "links", new SearchMessagesFilterUrl());
+            UpdateSharedCount(chat, _musicHeader, "music", new SearchMessagesFilterAudio());
+            UpdateSharedCount(chat, _voiceHeader, "voice", new SearchMessagesFilterVoiceNote());
+        }
 
-            ViewModel.ProtoService.Send(new SearchChatMessages(chat.Id, string.Empty, null, 0, 0, 1, new SearchMessagesFilterDocument(), 0), result =>
-            {
-                if (result is Messages messages)
-                    _filesHeader.Subtitle = messages.TotalCount.ToString();
-            });
-
-            ViewModel.ProtoService.Send(new SearchChatMessages(chat.Id, string.Empty, null, 0, 0, 1, new SearchMessagesFilterUrl(), 0), result =>
-            {
-                if (result is Messages messages)
-                    _linksHeader.Subtitle = messages.TotalCount.ToString();
-            });
-
-            ViewModel.ProtoService.Send(new SearchChatMessages(chat.Id, string.Empty, null, 0, 0, 1, new SearchMessagesFilterAudio(), 0), result =>
-            {
-                if (result is Messages messages)
-                    _musicHeader.Subtitle = messages.TotalCount.ToString();
-            });
-
-            ViewModel.ProtoService.Send(new SearchChatMessages(chat.Id, string.Empty, null, 0, 0, 1, new SearchMessagesFilterVoiceNote(), 0), result =>
-            {
-                if (result is Messages messages)
-                    _voiceHeader.Subtitle = messages.TotalCount.ToString();
-            });
+        private void UpdateSharedCount(Chat chat, ChatSharedMediaTab header, string section, SearchMessagesFilter filter)
+        {
+            ViewModel.ProtoService.Send(
+                ModernTdlibCompatibility.CreateSearchChatMessages(chat.Id, null, string.Empty, null, 0, 0, 1, filter),
+                result =>
+                {
+                    if (ModernTdlibCompatibility.TryGetSearchChatMessages(
+                        result,
+                        out var totalCount,
+                        out var messages,
+                        out _))
+                    {
+                        header.Subtitle = totalCount.ToString();
+                        Logs.PushDiagnostics.Write(
+                            "shared_media",
+                            $"section={section};result=found;total={totalCount};returned={messages.Count}");
+                    }
+                    else
+                    {
+                        Logs.PushDiagnostics.Write(
+                            "shared_media",
+                            $"section={section};result=unexpected_response");
+                    }
+                });
         }
 
         private readonly ObservableCollection<ChatSharedMediaTab> _tabs;
@@ -452,12 +455,13 @@ namespace Unigram.Views.Chats
 
         private bool MessageDelete_Loaded(Message message)
         {
-            return message.CanBeDeletedOnlyForSelf || message.CanBeDeletedForAllUsers;
+            return ModernTdlibCompatibility.GetMessageCanBeDeletedOnlyForSelf(ViewModel.ProtoService, message)
+                || ModernTdlibCompatibility.GetMessageCanBeDeletedForAllUsers(ViewModel.ProtoService, message);
         }
 
         private bool MessageForward_Loaded(Message message)
         {
-            return message.CanBeForwarded;
+            return ModernTdlibCompatibility.GetMessageCanBeForwarded(ViewModel.ProtoService, message);
         }
 
         private bool MessageSelect_Loaded(Message message)

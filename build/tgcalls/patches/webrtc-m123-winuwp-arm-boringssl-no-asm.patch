@@ -1,0 +1,14 @@
+diff --git a/boringssl/BUILD.gn b/boringssl/BUILD.gn
+index b590c0927..e3cd8cacd 100644
+--- a/boringssl/BUILD.gn
++++ b/boringssl/BUILD.gn
+@@ -109,7 +109,8 @@ if (enable_rust_boringssl) {
+   }
+ }
+ 
+-if (is_msan || current_cpu == "arm64") {
++if (is_msan || current_cpu == "arm64" ||
++    (target_os == "winuwp" && current_cpu == "arm")) {
+   # MSan instrumentation is incompatible with assembly optimizations.
+   # BoringSSL's GAS-compatible assembly knows how to detect MSan, but the NASM
+   # assembly does not, so we check for MSan explicitly.

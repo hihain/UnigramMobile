@@ -76,7 +76,7 @@ namespace Unigram.ViewModels.Settings
                         offset = last.Id;
                     }
 
-                    var response = await _protoService.SendAsync(new GetArchivedStickerSets(_masks, offset, 20));
+                    var response = await _protoService.SendAsync(ModernTdlibCompatibility.GetArchivedStickerSets(_masks, offset, 20));
                     if (response is StickerSets stickerSets)
                     {
                         foreach (var set in stickerSets.Sets)

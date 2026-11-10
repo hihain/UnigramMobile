@@ -642,7 +642,7 @@ namespace Unigram.Services
             var offset = -49;
             var filter = message.Content is MessageAudio ? new SearchMessagesFilterAudio() : (SearchMessagesFilter)new SearchMessagesFilterVoiceAndVideoNote();
 
-            _protoService.Send(new SearchChatMessages(message.ChatId, string.Empty, null, message.Id, offset, 100, filter, 0), result =>
+            _protoService.Send(new SearchChatMessages(message.ChatId, null, string.Empty, null, message.Id, offset, 100, filter), result =>
             {
                 if (result is Messages messages)
                 {

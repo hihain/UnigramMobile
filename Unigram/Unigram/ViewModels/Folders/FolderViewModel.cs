@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Collections;
 using Unigram.Common;
+using Unigram.Controls;
 using Unigram.Converters;
 using Unigram.Services;
 using Unigram.Views.Popups;
@@ -39,12 +40,21 @@ namespace Unigram.ViewModels.Folders
 
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
+#if MODERN_TDLIB
+            ChatFolder filter = null;
+#else
             ChatFilter filter = null;
+#endif
 
             if (parameter is int id)
             {
+#if MODERN_TDLIB
+                var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetChatFolder(id));
+                if (response is ChatFolder result)
+#else
                 var response = await ProtoService.SendAsync(new GetChatFilter(id));
                 if (response is ChatFilter result)
+#endif
                 {
                     Id = id;
                     Filter = result;
@@ -58,11 +68,29 @@ namespace Unigram.ViewModels.Folders
             else
             {
                 Id = null;
+#if MODERN_TDLIB
+                Filter = null;
+                filter = ModernTdlibCompatibility.CreateChatFolder(
+                    string.Empty,
+                    string.Empty,
+                    new List<long>(),
+                    new List<long>(),
+                    new List<long>(),
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false);
+#else
                 Filter = null;
                 filter = new ChatFilter();
                 filter.PinnedChatIds = new List<long>();
                 filter.IncludedChatIds = new List<long>();
                 filter.ExcludedChatIds = new List<long>();
+#endif
             }
 
             if (filter == null)
@@ -77,10 +105,15 @@ namespace Unigram.ViewModels.Folders
 
             _pinnedChatIds = filter.PinnedChatIds;
 
+#if MODERN_TDLIB
+            _iconPicked = !string.IsNullOrEmpty(filter.Icon?.Name);
+            Title = filter.Name?.Text?.Text ?? string.Empty;
+            Icon = Icons.ParseFilter(filter.Icon?.Name);
+#else
             _iconPicked = !string.IsNullOrEmpty(filter.IconName);
-
             Title = filter.Title;
             Icon = Icons.ParseFilter(filter);
+#endif
 
             Include.Clear();
             Exclude.Clear();
@@ -122,8 +155,13 @@ namespace Unigram.ViewModels.Folders
 
         public int? Id { get; set; }
 
+#if MODERN_TDLIB
+        private ChatFolder _filter;
+        public ChatFolder Filter
+#else
         private ChatFilter _filter;
         public ChatFilter Filter
+#endif
         {
             get => _filter;
             set => Set(ref _filter, value);
@@ -162,7 +200,11 @@ namespace Unigram.ViewModels.Folders
                 return;
             }
 
+#if MODERN_TDLIB
+            Icon = Icons.ParseFilter(GetFilter().Icon?.Name);
+#else
             Icon = Icons.ParseFilter(GetFilter());
+#endif
         }
 
         private IList<long> _pinnedChatIds;
@@ -204,7 +246,6 @@ namespace Unigram.ViewModels.Folders
 
                     return int.MaxValue;
                 });
-
                 Include.ReplaceWith(flags.Union(chats));
             }
         }
@@ -229,7 +270,6 @@ namespace Unigram.ViewModels.Folders
                         Include.Remove(already);
                     }
                 }
-
                 Exclude.ReplaceWith(result);
             }
         }
@@ -252,7 +292,11 @@ namespace Unigram.ViewModels.Folders
         private async void SendExecute()
         {
             var response = await SendAsync();
+#if MODERN_TDLIB
+            if (response is ChatFolderInfo || response is Ok)
+#else
             if (response is ChatFilterInfo)
+#endif
             {
                 NavigationService.GoBack();
             }
@@ -260,6 +304,14 @@ namespace Unigram.ViewModels.Folders
 
         public Task<BaseObject> SendAsync()
         {
+#if MODERN_TDLIB
+            if (Id is int id)
+            {
+                return ProtoService.SendAsync(ModernTdlibCompatibility.CreateEditChatFolder(id, GetFilter()));
+            }
+
+            return ProtoService.SendAsync(ModernTdlibCompatibility.CreateCreateChatFolder(GetFilter()));
+#else
             Function function;
             if (Id is int id)
             {
@@ -271,6 +323,7 @@ namespace Unigram.ViewModels.Folders
             }
 
             return ProtoService.SendAsync(function);
+#endif
         }
 
         private bool SendCanExecute()
@@ -278,6 +331,97 @@ namespace Unigram.ViewModels.Folders
             return !string.IsNullOrEmpty(Title) && Include.Count > 0;
         }
 
+#if MODERN_TDLIB
+        private ChatFolder GetFilter()
+        {
+            var pinnedChatIds = new List<long>();
+            var includedChatIds = new List<long>();
+            var excludedChatIds = new List<long>();
+            var includeContacts = false;
+            var includeNonContacts = false;
+            var includeGroups = false;
+            var includeChannels = false;
+            var includeBots = false;
+            var excludeMuted = false;
+            var excludeRead = false;
+            var excludeArchived = false;
+
+            foreach (var item in Include)
+            {
+                if (item is FilterFlag flag)
+                {
+                    switch (flag.Flag)
+                    {
+                        case ChatListFilterFlags.IncludeContacts:
+                            includeContacts = true;
+                            break;
+                        case ChatListFilterFlags.IncludeNonContacts:
+                            includeNonContacts = true;
+                            break;
+                        case ChatListFilterFlags.IncludeGroups:
+                            includeGroups = true;
+                            break;
+                        case ChatListFilterFlags.IncludeChannels:
+                            includeChannels = true;
+                            break;
+                        case ChatListFilterFlags.IncludeBots:
+                            includeBots = true;
+                            break;
+                    }
+                }
+                else if (item is FilterChat chat)
+                {
+                    if (_pinnedChatIds.Contains(chat.Chat.Id))
+                    {
+                        pinnedChatIds.Add(chat.Chat.Id);
+                    }
+                    else
+                    {
+                        includedChatIds.Add(chat.Chat.Id);
+                    }
+                }
+            }
+
+            foreach (var item in Exclude)
+            {
+                if (item is FilterFlag flag)
+                {
+                    switch (flag.Flag)
+                    {
+                        case ChatListFilterFlags.ExcludeMuted:
+                            excludeMuted = true;
+                            break;
+                        case ChatListFilterFlags.ExcludeRead:
+                            excludeRead = true;
+                            break;
+                        case ChatListFilterFlags.ExcludeArchived:
+                            excludeArchived = true;
+                            break;
+                    }
+                }
+                else if (item is FilterChat chat)
+                {
+                    excludedChatIds.Add(chat.Chat.Id);
+                }
+            }
+
+            var iconName = _iconPicked ? Enum.GetName(typeof(ChatFilterIcon), Icon) : string.Empty;
+            return ModernTdlibCompatibility.CreateChatFolder(
+                Title,
+                iconName,
+                pinnedChatIds,
+                includedChatIds,
+                excludedChatIds,
+                excludeMuted,
+                excludeRead,
+                excludeArchived,
+                includeContacts,
+                includeNonContacts,
+                includeBots,
+                includeGroups,
+                includeChannels);
+        }
+#else
         private ChatFilter GetFilter()
         {
             var filter = new ChatFilter();
@@ -348,6 +492,7 @@ namespace Unigram.ViewModels.Folders
 
             return filter;
         }
+#endif
     }
 
     public class ChatFilterElement

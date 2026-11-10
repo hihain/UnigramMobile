@@ -43,7 +43,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       VerticalScrollMode="Auto">
             <StackPanel>
-                <StackPanel Visibility="{x:Bind (Visibility)ViewModel.PaymentForm.Invoice.NeedShippingAddress}">
+                <StackPanel Visibility="{x:Bind (Visibility)ViewModel.PaymentInvoice.NeedShippingAddress}">
                     <TextBlock Text="{CustomResource PaymentShippingAddress}" Margin="12,12,0,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
                     <TextBox x:Name="FieldStreet1"
                              Text="{x:Bind ViewModel.Info.ShippingAddress.StreetLine1, Mode=TwoWay}" 
@@ -72,17 +72,17 @@
                     <TextBlock Text="{CustomResource PaymentShippingReceiver}" Margin="12,12,0,0" Foreground="{ThemeResource SystemControlForegroundAccentBrush}"/>
                     <TextBox x:Name="FieldName"
                              Text="{x:Bind ViewModel.Info.Name, Mode=TwoWay}"
-                             Visibility="{x:Bind (Visibility)ViewModel.PaymentForm.Invoice.NeedName}" 
+                             Visibility="{x:Bind (Visibility)ViewModel.PaymentInvoice.NeedName}"
                              PlaceholderText="{CustomResource PaymentShippingName}"
                              InputScope="PersonalFullName"/>
                     <TextBox x:Name="FieldEmail"
                              Text="{x:Bind ViewModel.Info.EmailAddress, Mode=TwoWay}"
-                             Visibility="{x:Bind (Visibility)ViewModel.PaymentForm.Invoice.NeedEmailAddress}"
+                             Visibility="{x:Bind (Visibility)ViewModel.PaymentInvoice.NeedEmailAddress}"
                              PlaceholderText="{CustomResource PaymentShippingEmailPlaceholder}"
                              InputScope="EmailSmtpAddress"/>
                     <TextBox x:Name="FieldPhone"
                              Text="{x:Bind ViewModel.Info.PhoneNumber, Mode=TwoWay}"
-                             Visibility="{x:Bind (Visibility)ViewModel.PaymentForm.Invoice.NeedPhoneNumber}"
+                             Visibility="{x:Bind (Visibility)ViewModel.PaymentInvoice.NeedPhoneNumber}"
                              PlaceholderText="{CustomResource PaymentShippingPhoneNumber}"
                              InputScope="TelephoneNumber"/>
                 </StackPanel>

@@ -1,6 +1,7 @@
 ﻿using System;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.ViewModels;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Media;
@@ -148,7 +149,7 @@ namespace Unigram.Controls.Messages.Content
                     Button.SetGlyph(file.Id, message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0 ? MessageContentState.Confirm : MessageContentState.Play);
                     Button.Progress = 1;
 
-                    if (message.Content is MessageText text && text.WebPage?.EmbedUrl?.Length > 0 || (message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0))
+                    if (message.Content is MessageText text && text.WebPage.HasEmbedUrl() || (message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0))
                     {
                         Button.Opacity = 1;
                     }
@@ -181,7 +182,7 @@ namespace Unigram.Controls.Messages.Content
         {
             if (content is MessageText text && text.WebPage != null && !primary)
             {
-                return text.WebPage.Document != null && string.Equals(text.WebPage.Type, "telegram_background", StringComparison.OrdinalIgnoreCase);
+                return text.WebPage.Document != null && string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(text.WebPage), "telegram_background", StringComparison.OrdinalIgnoreCase);
             }
 
             return false;
@@ -231,7 +232,7 @@ namespace Unigram.Controls.Messages.Content
             }
             else
             {
-                if (_message.Content is MessageText text && text.WebPage?.EmbedUrl?.Length > 0)
+                if (_message.Content is MessageText text && text.WebPage.HasEmbedUrl())
                 {
                     _message.Delegate.OpenUrl(text.WebPage.Url, false);
                 }

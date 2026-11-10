@@ -96,10 +96,15 @@ namespace Unigram.Services.Settings
             preferences._photos = AutoDownloadMode.All;
             preferences._videos = AutoDownloadMode.All;
             preferences.VoiceMessages = AutoDownloadMode.All;
-            preferences._maximumVideoSize = preset.MaxVideoFileSize;
+            preferences._maximumVideoSize = ToInt32Size(preset.MaxVideoFileSize);
             preferences._documents = AutoDownloadMode.All;
-            preferences._maximumDocumentSize = preset.MaxOtherFileSize;
+            preferences._maximumDocumentSize = ToInt32Size(preset.MaxOtherFileSize);
             return preferences;
+        }
+
+        private static int ToInt32Size(long value)
+        {
+            return value <= 0 ? 0 : value >= int.MaxValue ? int.MaxValue : (int)value;
         }
 
         public bool IsDefault

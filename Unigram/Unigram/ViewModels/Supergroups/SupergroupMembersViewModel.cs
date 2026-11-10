@@ -71,7 +71,6 @@ namespace Unigram.ViewModels.Supergroups
                     Delegate?.UpdateSupergroupFullInfo(chat, item, cache);
                 }
 
-                Members = new ChatMemberGroupedCollection(ProtoService, supergroup.SupergroupId, !IsEmbedded && !supergroup.IsChannel);
             }
             else if (chat.Type is ChatTypeBasicGroup basicGroup)
             {
@@ -81,11 +80,31 @@ namespace Unigram.ViewModels.Supergroups
                 {
                     basicDelegate.UpdateBasicGroup(chat, item);
                 }
-
-                Members = new ChatMemberGroupedCollection(ProtoService, chat.Id, string.Empty, !IsEmbedded);
             }
 
+            Members = CreateMembersCollection(chat);
+
             return Task.CompletedTask;
+        }
+
+        public void RefreshMembers()
+        {
+            Members = CreateMembersCollection(_chat);
+        }
+
+        private ChatMemberGroupedCollection CreateMembersCollection(Chat chat)
+        {
+            if (chat?.Type is ChatTypeSupergroup supergroup)
+            {
+                return new ChatMemberGroupedCollection(ProtoService, supergroup.SupergroupId, !IsEmbedded && !supergroup.IsChannel);
+            }
+
+            if (chat?.Type is ChatTypeBasicGroup)
+            {
+                return new ChatMemberGroupedCollection(ProtoService, chat.Id, string.Empty, !IsEmbedded);
+            }
+
+            return null;
         }
 
         public void Find(string query)
@@ -156,9 +175,9 @@ namespace Unigram.ViewModels.Supergroups
             }
 
             var response = await ProtoService.SendAsync(new AddChatMember(chat.Id, user.Id, (int)CacheService.Options.ForwardedMessageCountMax));
-            if (response is Error error)
+            if (await ShowAddChatMemberResultAsync(response, user, (chat.Type as ChatTypeSupergroup)?.IsChannel ?? false))
             {
-
+                RefreshMembers();
             }
         }
 

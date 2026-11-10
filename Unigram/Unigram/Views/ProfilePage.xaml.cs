@@ -6,6 +6,7 @@ using System.Reactive.Linq;
 using Telegram.Td.Api;
 using Unigram.Collections;
 using Unigram.Common;
+using Unigram.Services;
 using Unigram.Controls.Gallery;
 using Unigram.Converters;
 using Unigram.ViewModels;
@@ -153,13 +154,13 @@ namespace Unigram.Views
             Subtitle.Text = LastSeenConverter.GetLabel(user, true);
             SubtitleInfo.Text = Subtitle.Text;
 
-            Verified.Visibility = user.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+            Verified.Visibility = ModernTdlibCompatibility.GetUserIsVerified(user) ? Visibility.Visible : Visibility.Collapsed;
 
             UserPhone.Badge = PhoneNumber.Format(user.PhoneNumber);
             UserPhone.Visibility = string.IsNullOrEmpty(user.PhoneNumber) ? Visibility.Collapsed : Visibility.Visible;
 
-            Username.Badge = $"{user.Username}";
-            Username.Visibility = string.IsNullOrEmpty(user.Username) ? Visibility.Collapsed : Visibility.Visible;
+            Username.Badge = $"{user.GetUsername()}";
+            Username.Visibility = string.IsNullOrEmpty(user.GetUsername()) ? Visibility.Collapsed : Visibility.Visible;
 
             DescriptionTitle.Text = user.Type is UserTypeBot ? Strings.Resources.DescriptionPlaceholder : Strings.Resources.UserBio;
 
@@ -215,13 +216,15 @@ namespace Unigram.Views
         {
             if (user.Type is UserTypeBot)
             {
-                GetEntities(fullInfo.ShareText);
-                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.ShareText) ? Visibility.Collapsed : Visibility.Visible;
+                var description = ModernTdlibCompatibility.GetUserFullInfoDescription(fullInfo, true);
+                GetEntities(description);
+                DescriptionPanel.Visibility = string.IsNullOrEmpty(description) ? Visibility.Collapsed : Visibility.Visible;
             }
             else
             {
-                GetEntities(fullInfo.Bio);
-                DescriptionPanel.Visibility = string.IsNullOrEmpty(fullInfo.Bio) ? Visibility.Collapsed : Visibility.Visible;
+                var description = ModernTdlibCompatibility.GetUserFullInfoDescription(fullInfo, false);
+                GetEntities(description);
+                DescriptionPanel.Visibility = string.IsNullOrEmpty(description) ? Visibility.Collapsed : Visibility.Visible;
             }
 
             //UserCommonChats.Badge = fullInfo.GroupInCommonCount;
@@ -251,7 +254,8 @@ namespace Unigram.Views
         {
             if (secretChat.State is SecretChatStateReady ready)
             {
-                SecretLifetime.Badge = chat.MessageTtlSetting > 0 ? Locale.FormatTtl(chat.MessageTtlSetting) : Strings.Resources.ShortMessageLifetimeForever;
+                var ttl = ModernTdlibCompatibility.GetChatMessageTtlSetting(chat);
+                SecretLifetime.Badge = ttl > 0 ? Locale.FormatTtl(ttl) : Strings.Resources.ShortMessageLifetimeForever;
                 //SecretIdenticon.Source = PlaceholderHelper.GetIdenticon(secretChat.KeyHash, 24);
 
                 MiscPanel.Visibility = Visibility.Visible;
@@ -274,7 +278,7 @@ namespace Unigram.Views
 
             DescriptionTitle.Text = Strings.Resources.DescriptionPlaceholder;
 
-            GroupInvite.Visibility = group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers) || chat.Permissions.CanInviteUsers ? Visibility.Visible : Visibility.Collapsed;
+            GroupInvite.Visibility = group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanInviteUsers(administrator)) || chat.Permissions.CanInviteUsers ? Visibility.Visible : Visibility.Collapsed;
 
             Edit.Visibility = chat.Permissions.CanChangeInfo || group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator ? Visibility.Visible : Visibility.Collapsed;
             Edit.Glyph = Icons.Edit;
@@ -333,10 +337,10 @@ namespace Unigram.Views
             Edit.Visibility = group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator ? Visibility.Visible : Visibility.Collapsed;
             Edit.Glyph = Icons.Edit;
 
-            Verified.Visibility = group.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+            Verified.Visibility = ModernTdlibCompatibility.GetSupergroupIsVerified(group) ? Visibility.Visible : Visibility.Collapsed;
 
-            Username.Badge = $"{group.Username}";
-            Username.Visibility = string.IsNullOrEmpty(group.Username) ? Visibility.Collapsed : Visibility.Visible;
+            Username.Badge = $"{group.GetUsername()}";
+            Username.Visibility = string.IsNullOrEmpty(group.GetUsername()) ? Visibility.Collapsed : Visibility.Visible;
 
             Location.Visibility = group.HasLocation ? Visibility.Visible : Visibility.Collapsed;
 
@@ -351,7 +355,7 @@ namespace Unigram.Views
                 GroupLeave.Visibility = Visibility.Collapsed;
             }
 
-            GroupInvite.Visibility = !group.IsChannel && (group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && administrator.CanInviteUsers) || chat.Permissions.CanInviteUsers) ? Visibility.Visible : Visibility.Collapsed;
+            GroupInvite.Visibility = !group.IsChannel && (group.Status is ChatMemberStatusCreator || (group.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanInviteUsers(administrator)) || chat.Permissions.CanInviteUsers) ? Visibility.Visible : Visibility.Collapsed;
 
             ChannelMembersPanel.Visibility = group.IsChannel && (group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator) ? Visibility.Visible : Visibility.Collapsed;
             MembersPanel.Visibility = group.IsChannel ? Visibility.Collapsed : Visibility.Collapsed;
@@ -510,7 +514,7 @@ namespace Unigram.Views
                     if (user.IsContact)
                     {
                         flyout.CreateFlyoutItem(ViewModel.ShareCommand, Strings.Resources.ShareContact, new FontIcon { Glyph = Icons.Share });
-                        flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                        flyout.CreateFlyoutItem(chat.IsChatBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsChatBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsChatBlocked() ? Icons.Banned : Icons.Banned });
                         flyout.CreateFlyoutItem(ViewModel.EditCommand, Strings.Resources.EditContact, new FontIcon { Glyph = Icons.Edit });
                         flyout.CreateFlyoutItem(ViewModel.DeleteCommand, Strings.Resources.DeleteContact, new FontIcon { Glyph = Icons.Delete });
                     }
@@ -533,17 +537,17 @@ namespace Unigram.Views
                         if (user.PhoneNumber.Length > 0)
                         {
                             flyout.CreateFlyoutItem(ViewModel.ShareCommand, Strings.Resources.ShareContact, new FontIcon { Glyph = Icons.Share });
-                            flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                            flyout.CreateFlyoutItem(chat.IsChatBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsChatBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsChatBlocked() ? Icons.Banned : Icons.Banned });
                         }
                         else
                         {
                             if (user.Type is UserTypeBot)
                             {
-                                flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.BotRestart : Strings.Resources.BotStop, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                                flyout.CreateFlyoutItem(chat.IsChatBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsChatBlocked() ? Strings.Resources.BotRestart : Strings.Resources.BotStop, new FontIcon { Glyph = chat.IsChatBlocked() ? Icons.Banned : Icons.Banned });
                             }
                             else
                             {
-                                flyout.CreateFlyoutItem(chat.IsBlocked ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsBlocked ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsBlocked ? Icons.Banned : Icons.Banned });
+                                flyout.CreateFlyoutItem(chat.IsChatBlocked() ? ViewModel.UnblockCommand : ViewModel.BlockCommand, chat.IsChatBlocked() ? Strings.Resources.Unblock : Strings.Resources.BlockContact, new FontIcon { Glyph = chat.IsChatBlocked() ? Icons.Banned : Icons.Banned });
                             }
                         }
                     }

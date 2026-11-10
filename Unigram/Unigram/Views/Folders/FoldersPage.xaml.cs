@@ -37,8 +37,13 @@ namespace Unigram.Views.Folders
             var button = content.Children[0] as BadgeButton;
             var add = content.Children[1] as Button;
 
+#if MODERN_TDLIB
+            button.Content = filter.Folder?.Name?.Text?.Text;
+            button.Badge = filter.Description;
+#else
             button.Content = filter.Filter.Title;
             button.Badge = filter.Description;
+#endif
 
             add.Command = ViewModel.RecommendCommand;
             add.CommandParameter = filter;

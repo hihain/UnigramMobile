@@ -696,7 +696,7 @@ namespace Unigram.Common
                     type = new ProxyTypeSocks5(username ?? string.Empty, password ?? string.Empty);
                 }
 
-                protoService.Send(new AddProxy(server ?? string.Empty, port, true, type));
+                protoService.Send(ModernTdlibCompatibility.CreateAddProxy(server ?? string.Empty, port, true, type));
             }
         }
 

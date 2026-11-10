@@ -28,5 +28,17 @@
     <Type Name="System.Collections.Generic.KeyValuePair{System.UInt32, System.UInt32}" MarshalObject="Required All" />
     <Type Name="System.Collections.Generic.IReadOnlyDictionary{System.UInt32, System.UInt32}" MarshalObject="Required All" />
 
+    <!--
+      TDLib 1.8.66 types live in Telegram.Td.winmd, which is a reference rather than an
+      application assembly, so the "*Application*" directive above does not reach them.
+      Without explicit marshalling data the .NET Native interop type map has no entry for
+      an update class the app never names statically; McgModuleManager then fails the
+      RuntimeTypeHandle lookup while marshalling it into ClientResultHandler.OnResult, and
+      because that callback is a reverse P/Invoke the resulting exception fails fast
+      instead of surfacing. Declaring the namespaces keeps every update marshallable.
+    -->
+    <Namespace Name="Telegram.Td" MarshalObject="Required All" Dynamic="Required All" />
+    <Namespace Name="Telegram.Td.Api" MarshalObject="Required All" Dynamic="Required All" />
+
   </Application>
 </Directives>

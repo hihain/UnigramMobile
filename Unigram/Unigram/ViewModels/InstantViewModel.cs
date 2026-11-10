@@ -32,7 +32,7 @@ namespace Unigram.ViewModels
 
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
-            var response = await ProtoService.SendAsync(new GetWebPagePreview(new FormattedText((string)parameter, new TextEntity[0])));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetWebPagePreview(new FormattedText((string)parameter, new TextEntity[0])));
             if (response is WebPage webPage)
             {
                 Title = webPage.SiteName;

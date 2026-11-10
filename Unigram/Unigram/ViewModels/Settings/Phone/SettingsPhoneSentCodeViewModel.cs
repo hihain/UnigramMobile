@@ -113,8 +113,11 @@ namespace Unigram.ViewModels.Settings
             IsLoading = true;
 
 
-            //CheckChangePhoneNumberCode
+#if MODERN_TDLIB
+            var response = await ProtoService.SendAsync(new CheckPhoneNumberCode(_phoneCode));
+#else
             var response = await ProtoService.SendAsync(new CheckChangePhoneNumberCode(_phoneCode));
+#endif
             if (response is Ok)
             {
                 while (NavigationService.Frame.BackStackDepth > 1)
@@ -190,7 +193,11 @@ namespace Unigram.ViewModels.Settings
 
             IsLoading = true;
 
+#if MODERN_TDLIB
+            var function = new ResendPhoneNumberCode(new ResendCodeReasonUserRequest());
+#else
             var function = new ResendChangePhoneNumberCode();
+#endif
 
             var response = await ProtoService.SendAsync(function);
             if (response is AuthenticationCodeInfo info)

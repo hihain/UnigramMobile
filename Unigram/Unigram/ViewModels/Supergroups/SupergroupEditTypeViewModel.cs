@@ -1,4 +1,5 @@
 ﻿using Telegram.Td.Api;
+using Unigram.Common;
 using Unigram.Services;
 
 namespace Unigram.ViewModels.Supergroups
@@ -42,7 +43,7 @@ namespace Unigram.ViewModels.Supergroups
                     return;
                 }
 
-                if (!string.Equals(username, item.Username))
+                if (!string.Equals(username, item.GetUsername()))
                 {
                     var response = await ProtoService.SendAsync(new SetSupergroupUsername(item.Id, username));
                     if (response is Error error)

@@ -141,11 +141,11 @@ namespace Unigram.Common
                 {
                     animations.Add((container, (T)(object)setViewModel));
                 }
-                else if (item is Sticker sticker && sticker.IsAnimated)
+                else if (item is Sticker sticker && Services.ModernTdlibCompatibility.GetStickerIsAnimated(sticker))
                 {
                     animations.Add((container, (T)(object)sticker));
                 }
-                else if (item is StickerSetInfo set && set.IsAnimated)
+                else if (item is StickerSetInfo set && Services.ModernTdlibCompatibility.GetStickerSetInfoIsAnimated(set))
                 {
                     animations.Add((container, (T)(object)set));
                 }

@@ -55,6 +55,20 @@
                     </controls:HeaderedControl>
 
                     <controls:HeaderedControl
+                        Header="{CustomResource MessageLifetime}">
+                        <Button
+                            Command="{x:Bind ViewModel.ConfigureMessageAutoDeleteTimeCommand}"
+                            Style="{StaticResource EmptyButtonStyle}">
+                            <Grid Margin="12,10">
+                                <TextBlock
+                                    Text="{x:Bind ViewModel.MessageAutoDeleteTimeText, Mode=OneWay}"
+                                    Style="{StaticResource BodyTextBlockStyle}"
+                                    HorizontalAlignment="Right"/>
+                            </Grid>
+                        </Button>
+                    </controls:HeaderedControl>
+
+                    <controls:HeaderedControl
                         Header="{CustomResource ChannelMembers}">
                         <controls:BadgeButton
                             Content="{CustomResource ChannelAddMembers}"

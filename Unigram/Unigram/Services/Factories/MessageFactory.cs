@@ -80,7 +80,7 @@ namespace Unigram.Services.Factories
                 {
                     InputFile = generated,
                     Type = new FileTypeDocument(),
-                    Delegate = (inputFile, caption) => new InputMessageDocument(inputFile, thumbnail, false, caption)
+                    Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageDocument(inputFile, thumbnail, false, caption)
                 };
             }
 
@@ -88,7 +88,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypePhoto(),
-                Delegate = (inputFile, caption) => new InputMessagePhoto(generated, thumbnail, new int[0], size.Width, size.Height, caption, ttl)
+                Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessagePhoto(inputFile, thumbnail, size.Width, size.Height, caption, ttl)
             };
         }
 
@@ -140,7 +140,7 @@ namespace Unigram.Services.Factories
                 {
                     InputFile = generated,
                     Type = new FileTypeDocument(),
-                    Delegate = (inputFile, caption) => new InputMessageDocument(inputFile, thumbnail, asFile, caption)
+                    Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageDocument(inputFile, thumbnail, asFile, caption)
                 };
             }
             else if (animated && ttl == 0)
@@ -149,7 +149,7 @@ namespace Unigram.Services.Factories
                 {
                     InputFile = generated,
                     Type = new FileTypeAnimation(),
-                    Delegate = (inputFile, caption) => new InputMessageAnimation(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, caption)
+                    Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageAnimation(inputFile, thumbnail, duration, (int)videoWidth, (int)videoHeight, caption)
                 };
             }
 
@@ -157,7 +157,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypeVideo(),
-                Delegate = (inputFile, caption) => new InputMessageVideo(inputFile, thumbnail, new int[0], duration, (int)videoWidth, (int)videoHeight, true, caption, ttl)
+                Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageVideo(inputFile, thumbnail, duration, (int)videoWidth, (int)videoHeight, caption, ttl)
             };
         }
 
@@ -203,7 +203,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypeVideoNote(),
-                Delegate = (inputFile, caption) => new InputMessageVideoNote(inputFile, thumbnail, duration, (int) Math.Min(videoWidth, videoHeight))
+                Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageVideoNote(inputFile, thumbnail, duration, (int) Math.Min(videoWidth, videoHeight))
             };
         }
 
@@ -226,7 +226,12 @@ namespace Unigram.Services.Factories
                     {
                         InputFile = generated,
                         Type = new FileTypeSticker(),
-                        Delegate = (inputFile, caption) => new InputMessageSticker(inputFile, null, width, height, string.Empty)
+                        Delegate = (inputFile, caption) =>
+#if MODERN_TDLIB
+                            new InputMessageSticker(new InputSticker(inputFile, null, width, height), caption?.Text ?? string.Empty)
+#else
+                            new InputMessageSticker(inputFile, null, width, height, caption ?? string.Empty)
+#endif
                     };
                 }
                 catch
@@ -250,7 +255,7 @@ namespace Unigram.Services.Factories
                 {
                     InputFile = generated,
                     Type = new FileTypeAudio(),
-                    Delegate = (inputFile, caption) => new InputMessageAudio(inputFile, thumbnail, duration, title, performer, caption)
+                    Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageAudio(inputFile, thumbnail, duration, title, performer, caption)
                 };
             }
 
@@ -258,7 +263,7 @@ namespace Unigram.Services.Factories
             {
                 InputFile = generated,
                 Type = new FileTypeDocument(),
-                Delegate = (inputFile, caption) => new InputMessageDocument(inputFile, thumbnail, true, caption)
+                Delegate = (inputFile, caption) => ModernTdlibCompatibility.CreateInputMessageDocument(inputFile, thumbnail, true, caption)
             };
         }
     }

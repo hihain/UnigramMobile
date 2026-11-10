@@ -21,13 +21,13 @@ namespace Unigram.Controls
         public void UpdatePollOption(Poll poll, PollOption option)
         {
             var results = poll.IsClosed || poll.Options.Any(x => x.IsChosen);
-            var correct = poll.Type is PollTypeQuiz quiz && quiz.CorrectOptionId == poll.Options.IndexOf(option);
+            var correct = poll.Type is PollTypeQuiz quiz && quiz.GetCorrectOptionId() == poll.Options.IndexOf(option);
 
             this.IsThreeState = results;
             this.IsChecked = results ? null : new bool?(false);
             this.Tag = option;
 
-            _allowToggle = poll.Type is PollTypeRegular regular && regular.AllowMultipleAnswers && !results;
+            _allowToggle = poll.GetAllowsMultipleAnswers() && !results;
 
             Ellipse.Opacity = results || option.IsBeingChosen ? 0 : 1;
 
@@ -36,7 +36,7 @@ namespace Unigram.Controls
 
             ToolTipService.SetToolTip(Percentage, results ? Locale.Declension(poll.Type is PollTypeQuiz ? "Answer" : "Vote", option.VoterCount) : null);
 
-            Text.Text = option.Text;
+            Text.Text = option.GetText();
 
             Zero.Visibility = results ? Visibility.Visible : Visibility.Collapsed;
 
@@ -56,7 +56,7 @@ namespace Unigram.Controls
                 VisualStateManager.GoToState(LayoutRoot, "Normal", false);
             }
 
-            AutomationProperties.SetName(this, option.Text);
+            AutomationProperties.SetName(this, option.GetText());
         }
 
         protected override void OnToggle()

@@ -159,8 +159,16 @@ namespace Unigram.Services.Settings
                 if (_emojiSet == null)
                     _emojiSet = new InstalledEmojiSet
                     {
+#if MODERN_TDLIB
+                        // See Theme.cs: the bundled colour-bitmap emoji fonts do not render on
+                        // Windows 10 Mobile, so this build uses the system emoji font. Default
+                        // the stored set to match, so Settings reflects what is actually drawn.
+                        Id = GetValueOrDefault(_container, "EmojiSetId", "microsoft"),
+                        Title = GetValueOrDefault(_container, "EmojiSet", "Microsoft"),
+#else
                         Id = GetValueOrDefault(_container, "EmojiSetId", "apple"),
                         Title = GetValueOrDefault(_container, "EmojiSet", "Apple"),
+#endif
                         Version = GetValueOrDefault(_container, "EmojiSetVersion", 1),
                     };
 
@@ -168,10 +176,12 @@ namespace Unigram.Services.Settings
             }
             set
             {
-                _emojiSet = value ?? GetDefaultEmojiSet();
-                AddOrUpdateValue(_container, "EmojiSetId", value?.Id ?? "apple");
-                AddOrUpdateValue(_container, "EmojiSet", value?.Title ?? "Apple");
-                AddOrUpdateValue(_container, "EmojiSetVersion", value?.Version ?? 1);
+                var fallback = GetDefaultEmojiSet();
+
+                _emojiSet = value ?? fallback;
+                AddOrUpdateValue(_container, "EmojiSetId", value?.Id ?? fallback.Id);
+                AddOrUpdateValue(_container, "EmojiSet", value?.Title ?? fallback.Title);
+                AddOrUpdateValue(_container, "EmojiSetVersion", value?.Version ?? fallback.Version);
             }
         }
 
@@ -179,8 +189,13 @@ namespace Unigram.Services.Settings
         {
             return new InstalledEmojiSet
             {
+#if MODERN_TDLIB
+                Id = "microsoft",
+                Title = "Microsoft",
+#else
                 Id = "apple",
                 Title = "Apple",
+#endif
                 Version = 1
             };
         }

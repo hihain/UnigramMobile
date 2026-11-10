@@ -1,0 +1,19 @@
+diff --git a/td/generate/tl_writer_dotnet.h b/td/generate/tl_writer_dotnet.h
+--- a/td/generate/tl_writer_dotnet.h
++++ b/td/generate/tl_writer_dotnet.h
+@@ -401,6 +401,15 @@ class TlWriterDotNet final : public TL_writer {
+     ss << "\n";
+     if (function_name == "ToUnmanaged") {
+       gen_to_unmanaged(ss, t);
++      if (class_name == "WebPage") {
++        if (is_header_) {
++          ss << "td::td_api::object_ptr<td::td_api::linkPreview> ToUnmanaged_LinkPreview(WebPage^ from);\n";
++        } else {
++          ss << "td::td_api::object_ptr<td::td_api::linkPreview> ToUnmanaged_LinkPreview(WebPage^ from) {\n"
++                "  return ToUnmanaged_WebPage(from);\n"
++                "}\n";
++        }
++      }
+     } else {
+       gen_from_unmanaged(ss, t);
+     }

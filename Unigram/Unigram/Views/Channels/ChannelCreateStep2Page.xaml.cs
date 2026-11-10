@@ -59,7 +59,7 @@ namespace Unigram.Views.Channels
                     if (supergroup != null)
                     {
                         var subtitle = content.Children[2] as TextBlock;
-                        subtitle.Text = MeUrlPrefixConverter.Convert(ViewModel.CacheService, supergroup.Username, true);
+                        subtitle.Text = MeUrlPrefixConverter.Convert(ViewModel.CacheService, supergroup.GetUsername(), true);
                     }
                 }
             }
@@ -85,7 +85,7 @@ namespace Unigram.Views.Channels
         {
             Header.Text = group.IsChannel ? Strings.Resources.ChannelSettingsTitle : Strings.Resources.GroupSettingsTitle;
             Subheader.Header = group.IsChannel ? Strings.Resources.ChannelTypeHeader : Strings.Resources.GroupTypeHeader;
-            Subheader.Footer = group.Username.Length > 0 ? group.IsChannel ? Strings.Resources.ChannelPublicInfo : Strings.Resources.MegaPublicInfo : group.IsChannel ? Strings.Resources.ChannelPrivateInfo : Strings.Resources.MegaPrivateInfo;
+            Subheader.Footer = group.GetUsername().Length > 0 ? group.IsChannel ? Strings.Resources.ChannelPublicInfo : Strings.Resources.MegaPublicInfo : group.IsChannel ? Strings.Resources.ChannelPrivateInfo : Strings.Resources.MegaPrivateInfo;
 
             Public.Content = group.IsChannel ? Strings.Resources.ChannelPublic : Strings.Resources.MegaPublic;
             Private.Content = group.IsChannel ? Strings.Resources.ChannelPrivate : Strings.Resources.MegaPrivate;
@@ -95,15 +95,15 @@ namespace Unigram.Views.Channels
 
 
 
-            ViewModel.Username = group.Username;
-            ViewModel.IsPublic = !string.IsNullOrEmpty(group.Username);
+            ViewModel.Username = group.GetUsername();
+            ViewModel.IsPublic = !string.IsNullOrEmpty(group.GetUsername());
         }
 
         public void UpdateSupergroupFullInfo(Chat chat, Supergroup group, SupergroupFullInfo fullInfo)
         {
             ViewModel.InviteLink = fullInfo.InviteLink?.InviteLink;
 
-            if (fullInfo.InviteLink == null && string.IsNullOrEmpty(group.Username))
+            if (fullInfo.InviteLink == null && string.IsNullOrEmpty(group.GetUsername()))
             {
                 ViewModel.ProtoService.Send(new CreateChatInviteLink(chat.Id, string.Empty, 0, 0, false));
             }

@@ -32,10 +32,27 @@ namespace Unigram.Controls.Drawers
         {
             this.InitializeComponent();
 
+#if MODERN_TDLIB
+            // Composition here is decorative only. A device-side gap must not stop the
+            // control from being created, because the XAML parser reports a failing
+            // constructor as a XamlParseException and aborts navigation to the chat page.
+            try
+            {
+                ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
+
+                var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
+                DropShadowEx.SetRelativeSize(shadow, Separator);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("drawer.construct", ex, "drawer=emoji");
+            }
+#else
             ElementCompositionPreview.GetElementVisual(this).Clip = Window.Current.Compositor.CreateInsetClip();
 
             var shadow = DropShadowEx.Attach(Separator, 20, 0.25f);
             shadow.RelativeSizeAdjustment = Vector2.One;
+#endif
 
             ToolbarContainer.SizeChanged += (s, args) =>
             {

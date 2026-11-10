@@ -48,14 +48,18 @@ namespace Unigram.ViewModels.Chats
                 var limit = 20;
                 var offset = -limit / 2;
 
-                var response = await ProtoService.SendAsync(new SearchChatMessages(_chat.Id, string.Empty, null, 0, offset, limit, new SearchMessagesFilterChatPhoto(), 0));
-                if (response is Messages messages)
+                var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateSearchChatMessages(_chat.Id, null, string.Empty, null, 0, offset, limit, new SearchMessagesFilterChatPhoto()));
+                if (ModernTdlibCompatibility.TryGetSearchChatMessages(
+                    response,
+                    out var totalCount,
+                    out var messages,
+                    out _))
                 {
-                    TotalItems = messages.TotalCount;
+                    TotalItems = totalCount;
 
                     var missing = true;
 
-                    foreach (var message in messages.MessagesValue.OrderByDescending(x => x.Id))
+                    foreach (var message in messages.OrderByDescending(x => x.Id))
                     {
                         if (message.Content is MessageChatChangePhoto chatChangePhoto)
                         {
@@ -164,7 +168,7 @@ namespace Unigram.ViewModels.Chats
                 var chat = _chat;
                 if (chat != null && CacheService.TryGetSupergroup(chat, out Supergroup supergroup))
                 {
-                    if (supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanChangeInfo)
+                    if (supergroup.Status is ChatMemberStatusCreator || supergroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanChangeInfo(administrator))
                     {
                         return true;
                     }
@@ -173,7 +177,7 @@ namespace Unigram.ViewModels.Chats
                 }
                 else if (chat != null && CacheService.TryGetBasicGroup(chat, out BasicGroup basicGroup))
                 {
-                    if (basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && administrator.CanChangeInfo)
+                    if (basicGroup.Status is ChatMemberStatusCreator || basicGroup.Status is ChatMemberStatusAdministrator administrator && ModernTdlibCompatibility.GetAdministratorCanChangeInfo(administrator))
                     {
                         return true;
                     }

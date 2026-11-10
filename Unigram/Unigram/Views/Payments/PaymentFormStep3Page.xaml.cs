@@ -55,7 +55,7 @@ namespace Unigram.Views.Payments
 
             if (e.PropertyName.Equals("Navigate"))
             {
-                View.Navigate(new Uri(ViewModel.PaymentForm.Url));
+                View.Navigate(new Uri(ViewModel.PaymentFormUrl));
             }
         }
 

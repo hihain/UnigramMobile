@@ -8,6 +8,7 @@ using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.ViewModels;
+using Unigram.Services;
 using Windows.Devices.Geolocation;
 using Windows.Foundation.Metadata;
 using Windows.Services.Maps;
@@ -202,7 +203,7 @@ namespace Unigram.Views.Popups
 
         private void CurrentLocation_Click(object sender, RoutedEventArgs e)
         {
-            Media = new InputMessageLocation(new Location(mMap.Center.Position.Latitude, mMap.Center.Position.Longitude, 0), 0, 0, 0);
+            Media = ModernTdlibCompatibility.CreateInputMessageLocation(new Location(mMap.Center.Position.Latitude, mMap.Center.Position.Longitude, 0));
             Hide(ContentDialogResult.Primary);
         }
 

@@ -42,6 +42,13 @@ namespace Unigram
         public static AppServiceConnection Connection { get; private set; }
         public static BackgroundTaskDeferral Deferral { get; private set; }
 
+        private static volatile bool _isInForeground;
+        public static bool IsInForeground
+        {
+            get => _isInForeground;
+            private set => _isInForeground = value;
+        }
+
         private ExtendedExecutionSession _extendedSession;
         private MediaExtensionManager _mediaExtensionManager;
 
@@ -54,7 +61,20 @@ namespace Unigram
         /// </summary>
         public App()
         {
-            Locator.Configure(/*session*/);
+            var packageVersion = Package.Current.Id.Version;
+            Logs.PushDiagnostics.Write("startup.app", $"stage=configure;package_version={packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
+#if MODERN_TDLIB
+            Common.ApiInfo.WriteCapabilities();
+#endif
+            try
+            {
+                Locator.Configure(/*session*/);
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("startup.configure", ex);
+                throw;
+            }
 
             if (SettingsService.Current.Appearance.RequestedTheme != ElementTheme.Default)
             {
@@ -79,6 +99,11 @@ namespace Unigram
 
             InactivityHelper.Detected += Inactivity_Detected;
 
+            // Background activations (e.g. the periodic sync) start without UI and never
+            // raise LeavingBackground, so this stays false until the app is actually shown.
+            LeavingBackground += (s, e) => IsInForeground = true;
+            EnteredBackground += (s, e) => IsInForeground = false;
+
             UnhandledException += (s, args) =>
             {
                 if (args.Exception is NotSupportedException)
@@ -90,7 +115,9 @@ namespace Unigram
                     Client.Execute(new AddLogMessage(1, "Unhandled exception:\n" + args.Exception.ToString()));
                 }
 
-#if !DEBUG
+#if MODERN_TDLIB
+                Logs.PushDiagnostics.WriteException("app.unhandled", args.Exception, null, args.Message);
+#elif !DEBUG
                 Microsoft.AppCenter.Crashes.Crashes.TrackError(args.Exception);
 #endif
 
@@ -101,7 +128,37 @@ namespace Unigram
                 //catch { }
             };
 
-#if !DEBUG
+#if MODERN_TDLIB
+            // App Center is deliberately never started on the experimental TDLib branch.
+            // Its UWP session tracker queries Windows.System.Diagnostics.ProcessDiagnosticInfo
+            // on a background thread, and that WinRT server faults on Windows 10 Mobile 15254.
+            // The native fault crosses a managed P/Invoke boundary, so .NET Native fail-fasts
+            // the whole process (0x1007) a few seconds after launch. It would also publish this
+            // experimental build's telemetry, including the signed-in user id, into the
+            // production App Center app. Unhandled exceptions go to the local diagnostics log.
+            TaskScheduler.UnobservedTaskException += OnUnobservedException;
+            UnhandledException += OnUnhandledException;
+
+            // Application.UnhandledException only ever observes the UI thread, which is why
+            // every call crash so far has been invisible: the call engine raises its failures
+            // on WebRTC's own threads. CoreApplication.UnhandledErrorDetected is the one
+            // managed hook that sees those, and Propagate() rethrows the error here so it can
+            // be recorded. Catching it also marks the error handled, so a managed failure on a
+            // background thread no longer fail-fasts the process without leaving a trace.
+            Windows.ApplicationModel.Core.CoreApplication.UnhandledErrorDetected += OnUnhandledErrorDetected;
+
+            // Windows 10 Mobile terminates an app that holds audio while it is being suspended,
+            // and that death is indistinguishable from a crash in the log. Recording the
+            // lifecycle transitions is what separates "we faulted" from "the OS took us out".
+            Windows.ApplicationModel.Core.CoreApplication.Suspending += (s, e) =>
+                Logs.PushDiagnostics.Write("app.lifecycle", "event=suspending");
+            Windows.ApplicationModel.Core.CoreApplication.Resuming += (s, e) =>
+                Logs.PushDiagnostics.Write("app.lifecycle", "event=resuming");
+            EnteredBackground += (s, e) =>
+                Logs.PushDiagnostics.Write("app.lifecycle", "event=entered_background");
+            LeavingBackground += (s, e) =>
+                Logs.PushDiagnostics.Write("app.lifecycle", "event=leaving_background");
+#elif !DEBUG
             Microsoft.AppCenter.AppCenter.Start(Constants.AppCenterId,
                 typeof(Microsoft.AppCenter.Analytics.Analytics),
                 typeof(Microsoft.AppCenter.Crashes.Crashes));
@@ -235,6 +292,7 @@ namespace Unigram
         protected override async void OnBackgroundActivated(BackgroundActivatedEventArgs args)
         {
             base.OnBackgroundActivated(args);
+            Logs.PushDiagnostics.Write("managed.background.run", $"task_name={args.TaskInstance.Task.Name};trigger={args.TaskInstance.TriggerDetails?.GetType().Name ?? "null"}");
 
             //if (args.TaskInstance.TriggerDetails is AppServiceTriggerDetails appService && string.Equals(appService.CallerPackageFamilyName, Package.Current.Id.FamilyName))
             //{
@@ -250,65 +308,112 @@ namespace Unigram
             //else
             {
                 var deferral = args.TaskInstance.GetDeferral();
-
-                if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
+                try
                 {
-                    var data = Toast.GetData(triggerDetail);
-                    if (data == null)
+                    if (args.TaskInstance.Task.Name == BackgroundSync.TaskName)
                     {
-                        deferral.Complete();
-                        return;
+                        await BackgroundSync.RunAsync(args.TaskInstance, IsInForeground);
                     }
-
-                    var session = TLContainer.Current.Lifetime.ActiveItem.Id;
-                    if (data.TryGetValue("session", out string value) && int.TryParse(value, out int result))
+                    else if (args.TaskInstance.TriggerDetails is ToastNotificationActionTriggerDetail triggerDetail)
                     {
-                        session = result;
-                    }
-
-                    if (TLContainer.Current.TryResolve(session, out INotificationsService service))
-                    {
-                        await service.ProcessAsync(data);
-                    }
-                }
-                else if (args.TaskInstance.TriggerDetails is RawNotification notification)
-                {
-                    int? GetSession(long id)
-                    {
-                        if (ApplicationData.Current.LocalSettings.Values.TryGet($"User{id}", out int value))
+                        var data = Toast.GetData(triggerDetail);
+                        if (data == null)
                         {
-                            return value;
+                            Logs.PushDiagnostics.Write("managed.background.toast.invalid");
+                            return;
                         }
 
-                        return null;
-                    }
-
-                    var receiver = Client.Execute(new GetPushReceiverId(notification.Content)) as PushReceiverId;
-                    if (receiver == null)
-                    {
-                        deferral.Complete();
-                        return;
-                    }
-
-                    var session = GetSession(receiver.Id);
-                    if (session == null)
-                    {
-                        deferral.Complete();
-                        return;
-                    }
-
-                    if (TLContainer.Current.TryResolve(session.Value, out IProtoService service))
-                    {
-                        var response = await service.SendAsync(new ProcessPushNotification(notification.Content));
-                        if (response is Error error && error.Code == 406)
+                        var session = TLContainer.Current.Lifetime.ActiveItem.Id;
+                        if (data.TryGetValue("session", out string value) && int.TryParse(value, out int result))
                         {
-                            // xd memes
-                            await Task.Delay(5000);
+                            session = result;
+                        }
+
+                        if (TLContainer.Current.TryResolve(session, out INotificationsService service))
+                        {
+                            await service.ProcessAsync(data);
+                        }
+                    }
+                    else if (args.TaskInstance.TriggerDetails is RawNotification notification)
+                    {
+                        Logs.PushDiagnostics.Write("managed.raw.received", $"length={notification.Content?.Length ?? 0}");
+
+                        int? GetSession(long id)
+                        {
+                            if (ApplicationData.Current.LocalSettings.Values.TryGet($"PushReceiverId{id}", out int receiverSession))
+                            {
+                                return receiverSession;
+                            }
+
+                            if (ApplicationData.Current.LocalSettings.Values.TryGet($"User{id}", out int value))
+                            {
+                                return value;
+                            }
+
+                            return null;
+                        }
+
+                        var receiver = Client.Execute(new GetPushReceiverId(notification.Content)) as PushReceiverId;
+                        if (receiver == null)
+                        {
+                            Logs.PushDiagnostics.Write("tdlib.get_push_receiver.result", "result=missing");
+                            return;
+                        }
+
+                        var session = GetSession(receiver.Id);
+                        Logs.PushDiagnostics.Write("tdlib.get_push_receiver.result", $"result=success;receiver_hash={Logs.PushDiagnostics.HashIdentifier(receiver.Id.ToString(System.Globalization.CultureInfo.InvariantCulture))};mapping_found={session != null}");
+                        if (session == null)
+                        {
+                            return;
+                        }
+
+                        if (TLContainer.Current.TryResolve(session.Value, out IProtoService service))
+                        {
+                            for (var attempt = 1; attempt <= 3; attempt++)
+                            {
+                                Logs.PushDiagnostics.Write("tdlib.process_push.request", $"session={session.Value};attempt={attempt}");
+                                var response = await service.SendAsync(new ProcessPushNotification(notification.Content));
+                                if (!(response is Error error) || error.Code != 406)
+                                {
+                                    if (response is Error finalError)
+                                    {
+                                        Logs.Logger.Error(Logs.Target.Notifications, $"Unable to process push notification: {finalError}");
+                                        Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=error;code={finalError.Code};attempt={attempt}");
+                                    }
+                                    else
+                                    {
+                                        Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=success;type={response?.GetType().Name ?? "null"};attempt={attempt}");
+                                    }
+
+                                    break;
+                                }
+
+                                if (attempt == 3)
+                                {
+                                    Logs.Logger.Error(Logs.Target.Notifications, $"Unable to process push notification after {attempt} attempts: {error}");
+                                    Logs.PushDiagnostics.Write("tdlib.process_push.result", $"session={session.Value};result=error;code={error.Code};attempt={attempt}");
+                                    break;
+                                }
+
+                                Logs.PushDiagnostics.Write("tdlib.process_push.retry", $"session={session.Value};code={error.Code};attempt={attempt}");
+                                await Task.Delay(5000);
+                            }
+                        }
+                        else
+                        {
+                            Logs.PushDiagnostics.Write("tdlib.process_push.unavailable", $"session={session.Value};reason=service_not_resolved");
                         }
                     }
                 }
-
-                deferral.Complete();
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("managed.background.failed", ex);
+                }
+                finally
+                {
+                    deferral.Complete();
+                    Logs.PushDiagnostics.Write("managed.background.complete");
+                }
             }
         }
 
@@ -377,10 +482,20 @@ namespace Unigram
             }
 
             var state = service.GetAuthorizationState();
+#if MODERN_TDLIB
+            // Modern TDLib initializes on a background task, so a fresh start reaches
+            // this point before the first UpdateAuthorizationState has been delivered
+            // and the state is still null. Returning here would skip SetActivatedArgs
+            // and leave the content frame empty, rendering only the shell, and would
+            // also skip background task registration. Continue instead and let the
+            // null state navigate to a placeholder until the real state arrives.
+            Logs.PushDiagnostics.Write("startup.start", $"state={state?.GetType().Name ?? "null"}");
+#else
             if (state == null)
             {
                 return;
             }
+#endif
 
             TLWindowContext.GetForCurrentView().SetActivatedArgs(args, navService);
             TLWindowContext.GetForCurrentView().UpdateTitleBar();
@@ -449,12 +564,6 @@ namespace Unigram
 
             try
             {
-                TileUpdateManager.CreateTileUpdaterForApplication("App").Clear();
-            }
-            catch { }
-
-            try
-            {
                 ToastNotificationManager.History.Clear("App");
             }
             catch { }
@@ -513,7 +622,78 @@ namespace Unigram
             return base.OnSuspendingAsync(s, e, prelaunchActivated);
         }
 
-#if !DEBUG
+#if MODERN_TDLIB
+        private void OnUnobservedException(object sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Logs.PushDiagnostics.WriteException("app.unobserved", e.Exception);
+            e.SetObserved();
+        }
+
+        private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            Logs.PushDiagnostics.WriteException("app.unhandled.handler", e.Exception, null, e.Message);
+            e.Handled = true;
+        }
+
+        private void OnUnhandledErrorDetected(object sender, Windows.ApplicationModel.Core.UnhandledErrorDetectedEventArgs e)
+        {
+            // Reached while the process is already ending because this handler rethrew.
+            // Returning without calling Propagate leaves the error unhandled, which is
+            // what keeps that termination on course instead of looping back in here.
+            if (System.Threading.Volatile.Read(ref _unhandledErrorFatal) != 0)
+            {
+                return;
+            }
+
+            // Propagate() is the only way to obtain the underlying exception; it rethrows on
+            // this thread, and catching it is what marks the error handled. The handler is
+            // reached from arbitrary threads, so it must not touch UI state.
+            Exception error = null;
+            try
+            {
+                e.UnhandledError.Propagate();
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+
+            if (error == null)
+            {
+                return;
+            }
+
+            // A null dereference on the call UI path happens on every call and has been
+            // observed to be survivable, so that is the one shape this handler absorbs.
+            // Anything else stays unhandled on purpose: a managed failure inside a native
+            // callback leaves the caller's invariants half applied, and resuming it would
+            // trade a crash that names its cause for a later one that does not.
+            var survivable = error is NullReferenceException;
+
+            try
+            {
+                Logs.PushDiagnostics.WriteException(
+                    survivable ? "app.unhandled.core.suppressed" : "app.unhandled.core.fatal",
+                    error,
+                    null,
+                    null);
+            }
+            catch
+            {
+                // Losing the record is survivable; failing to record is not a reason to
+                // change what happens to the error itself.
+            }
+
+            if (!survivable)
+            {
+                // The record above is already on disk, so ending here costs no diagnostics.
+                System.Threading.Volatile.Write(ref _unhandledErrorFatal, 1);
+                throw error;
+            }
+        }
+
+        private static int _unhandledErrorFatal;
+#elif !DEBUG
         private void OnUnobservedException(object sender, UnobservedTaskExceptionEventArgs e)
         {
             Microsoft.AppCenter.Crashes.Crashes.TrackError(e.Exception);

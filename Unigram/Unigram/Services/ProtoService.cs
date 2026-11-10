@@ -6,8 +6,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Td;
 using Telegram.Td.Api;
+
+#if MODERN_TDLIB
+using MessageForwardOriginUser = Telegram.Td.Api.MessageOriginUser;
+using MessageForwardOriginChat = Telegram.Td.Api.MessageOriginChat;
+using MessageForwardOriginChannel = Telegram.Td.Api.MessageOriginChannel;
+using MessageForwardOriginHiddenUser = Telegram.Td.Api.MessageOriginHiddenUser;
+using MessageForwardOriginMessageImport = Telegram.Td.Api.MessageOriginHiddenUser;
+#endif
 using Unigram.Common;
 using Unigram.Entities;
+using Unigram.Logs;
 using Windows.Storage;
 
 namespace Unigram.Services
@@ -123,6 +132,10 @@ namespace Unigram.Services
 
         Task<StickerSet> GetAnimatedSetAsync(AnimatedSetType type);
         bool IsDiceEmoji(string text, out string dice);
+
+#if MODERN_TDLIB
+        ReactionType DefaultReactionType { get; }
+#endif
     }
 
     public partial class ProtoService : IProtoService, ClientResultHandler
@@ -163,6 +176,11 @@ namespace Unigram.Services
 
         private IList<string> _diceEmojis;
 
+#if MODERN_TDLIB
+        private ReactionType _defaultReactionType;
+        public ReactionType DefaultReactionType => _defaultReactionType;
+#endif
+
         private IList<int> _savedAnimations;
         private IList<int> _favoriteStickers;
         private IList<long> _installedStickerSets;
@@ -181,6 +199,85 @@ namespace Unigram.Services
         private Background _selectedBackgroundDark;
 
         private static Task _longRunningTask;
+
+#if MODERN_TDLIB
+        private static int _receiveLoopStarted;
+        private static int _interopProbed;
+
+        // InitializeDiagnostics() must be fully finished, not merely entered, before any
+        // receive loop starts. A plain compare-exchange guard only makes the loser skip
+        // the work: it would return immediately, race ahead to EnsureReceiveLoop and
+        // start Client.Run while the winner was still inside Client.Execute(SetLogStream).
+        // Both steps therefore take this lock, so "diagnostics configured" strictly
+        // happens-before "receive loop started" for every thread, not just the winner.
+        private static readonly object _diagnosticsLock = new object();
+        private static bool _diagnosticsConfigured;
+
+        // Client.Run drives td::ClientManager::get_manager_singleton()->receive(), which
+        // upstream documents as "Must be called once on a separate dedicated thread on
+        // which all updates and query results from all Clients will be handled".
+        // "_longRunningTask = _longRunningTask ?? StartNew(...)" is a non-atomic
+        // read-modify-write that runs on thread pool threads, so two sessions
+        // initializing concurrently can both observe null and start a second receive
+        // loop. Two threads draining the same singleton queue hand the same response to
+        // two handlers and free it twice, which surfaces much later as process heap
+        // corruption inside an unrelated WinRT string release.
+        private static void EnsureReceiveLoop()
+        {
+            lock (_diagnosticsLock)
+            {
+                if (Interlocked.CompareExchange(ref _receiveLoopStarted, 1, 0) == 0)
+                {
+                    PushDiagnostics.Write("tdlib.receive", "stage=start");
+                    _longRunningTask = Task.Factory.StartNew(Client.Run, TaskCreationOptions.LongRunning);
+                }
+                else
+                {
+                    PushDiagnostics.Write("tdlib.receive", "stage=already-running");
+                }
+            }
+        }
+
+        // Isolates which native layer corrupts the process heap during startup.
+        // Both requests are documented as synchronously executable, so they run entirely
+        // inside Telegram.Td.dll on the calling thread: no client, no database, no
+        // OpenSSL, no actor threads and no receive loop exist yet. GetOption("version")
+        // additionally returns a WinRT string, which is the same .NET Native <-> C++/CX
+        // HSTRING marshalling path that faults later on updateOption.
+        // A crash here therefore proves the fault is pure interop against the pinned
+        // WinMD; reaching "stage=ok" proves marshalling is sound and moves the suspicion
+        // to the database/crypto layer that SetTdlibParameters brings up.
+        private static void ProbeNativeInterop()
+        {
+            if (Interlocked.CompareExchange(ref _interopProbed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                PushDiagnostics.Write("tdlib.probe", "stage=begin");
+
+                var entities = Client.Execute(new GetTextEntities("@probe https://telegram.org")) as TextEntities;
+                PushDiagnostics.Write("tdlib.probe", entities == null
+                    ? "stage=entities;result=unexpected-type"
+                    : $"stage=entities;count={entities.Entities.Count}");
+
+                // Only the length is recorded: the value is a TDLib build identifier, but
+                // logging lengths keeps this sink free of any payload by construction.
+                var version = Client.Execute(new GetOption("version")) as OptionValueString;
+                PushDiagnostics.Write("tdlib.probe", version == null
+                    ? "stage=version;result=unexpected-type"
+                    : $"stage=version;length={version.Value.Length}");
+
+                PushDiagnostics.Write("tdlib.probe", "stage=ok");
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("tdlib.probe", ex);
+            }
+        }
+#endif
 
         public ProtoService(int session, bool online, IDeviceInfoService deviceInfoService, ISettingsService settings, ILocaleService locale, IEventAggregator aggregator)
         {
@@ -207,26 +304,47 @@ namespace Unigram.Services
 
         private void Initialize(bool online = true)
         {
-            _client = Client.Create(this);
-
-            var parameters = new TdlibParameters
+#if MODERN_TDLIB
+            ProbeNativeInterop();
+#endif
+            PushDiagnostics.Write("tdlib.client", "stage=create");
+            try
             {
-                DatabaseDirectory = System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, $"{_session}"),
-                UseSecretChats = true,
-                UseMessageDatabase = true,
-                ApiId = Constants.ApiId,
-                ApiHash = Constants.ApiHash,
-                ApplicationVersion = _deviceInfoService.ApplicationVersion,
-                SystemVersion = _deviceInfoService.SystemVersion,
-                SystemLanguageCode = _deviceInfoService.SystemLanguageCode,
-                DeviceModel = _deviceInfoService.DeviceModel,
-                UseTestDc = _settings.UseTestDC
-            };
+                _client = Client.Create(this);
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("tdlib.client", ex);
+                throw;
+            }
+
+            PushDiagnostics.Write("tdlib.client", "result=created;version=1.8.66;commit=022d602");
+
+            var parameters = ModernTdlibCompatibility.CreateTdlibParameters(
+                _settings.UseTestDC,
+                Views.SessionStorage.GetSessionDirectory(_session),
+                _settings.FilesDirectory,
+                true,
+                true,
+                true,
+                true,
+                Constants.ApiId,
+                Constants.ApiHash,
+                _deviceInfoService.SystemLanguageCode,
+                _deviceInfoService.DeviceModel,
+                _deviceInfoService.SystemVersion,
+                _deviceInfoService.ApplicationVersion,
+                true,
+                false);
 
             if (_settings.FilesDirectory != null)
             {
                 parameters.FilesDirectory = _settings.FilesDirectory;
             }
+
+#if MODERN_TDLIB
+            PushDiagnostics.Write("tdlib.database", "result=isolated;scope=experimental");
+#endif
 
 #if MOCKUP
             ProfilePhoto ProfilePhoto(string name)
@@ -321,25 +439,113 @@ namespace Unigram.Services
 
             Task.Run(() =>
             {
-                InitializeDiagnostics();
+                void InitializeClient()
+                {
+#if MODERN_TDLIB
+                    // Everything before the parameters send is best-effort and must never
+                    // prevent it: without parameters TDLib stays in
+                    // authorizationStateWaitTdlibParameters forever and no update, QR token
+                    // or phone code can ever be produced.
+                    try
+                    {
+                        InitializeDiagnostics();
 
-                _client.Send(new SetOption("language_pack_database_path", new OptionValueString(System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, "langpack"))));
-                _client.Send(new SetOption("localization_target", new OptionValueString("android")));
-                _client.Send(new SetOption("language_pack_id", new OptionValueString(SettingsService.Current.LanguagePackId)));
-                //_client.Send(new SetOption("online", new OptionValueBoolean(online)));
-                _client.Send(new SetOption("online", new OptionValueBoolean(false)));
-                _client.Send(new SetOption("notification_group_count_max", new OptionValueInteger(25)));
-                _client.Send(new SetTdlibParameters(parameters));
-                _client.Send(new CheckDatabaseEncryptionKey(new byte[0]));
-                _client.Send(new GetApplicationConfig(), result => UpdateConfig(result));
+                        _client.Send(new SetOption("language_pack_database_path", new OptionValueString(System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, "langpack"))));
+                        _client.Send(new SetOption("localization_target", new OptionValueString("android")));
+                        _client.Send(new SetOption("language_pack_id", new OptionValueString(SettingsService.Current.LanguagePackId)));
+                        _client.Send(new SetOption("online", new OptionValueBoolean(false)));
+                        _client.Send(new SetOption("notification_group_count_max", new OptionValueInteger(25)));
+                    }
+                    catch (Exception ex)
+                    {
+                        PushDiagnostics.WriteException("tdlib.options", ex);
+                    }
+
+                    // Construction and dispatch are logged separately so that a failure in
+                    // either is identifiable from the device log without another guess cycle.
+                    PushDiagnostics.Write("tdlib.parameters", "stage=build");
+                    var request = ModernTdlibCompatibility.CreateSetTdlibParameters(parameters);
+                    PushDiagnostics.Write("tdlib.parameters", "stage=built");
+
+                    _client.Send(request, result =>
+                    {
+                        PushDiagnostics.Write("tdlib.parameters", result is Error error
+                            ? $"result=error;code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}"
+                            : "result=ok");
+                    });
+
+                    PushDiagnostics.Write("tdlib.parameters", "stage=sent");
+#else
+                    InitializeDiagnostics();
+                    _client.Send(new SetOption("language_pack_database_path", new OptionValueString(System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, "langpack"))));
+                    _client.Send(new SetOption("localization_target", new OptionValueString("android")));
+                    _client.Send(new SetOption("language_pack_id", new OptionValueString(SettingsService.Current.LanguagePackId)));
+                    //_client.Send(new SetOption("online", new OptionValueBoolean(online)));
+                    _client.Send(new SetOption("online", new OptionValueBoolean(false)));
+                    _client.Send(new SetOption("notification_group_count_max", new OptionValueInteger(25)));
+                    _client.Send(ModernTdlibCompatibility.CreateSetTdlibParameters(parameters));
+                    _client.Send(ModernTdlibCompatibility.CreateCheckDatabaseEncryptionKey(new byte[0]));
+#endif
+                    _client.Send(new GetApplicationConfig(), result => UpdateConfig(result));
+                }
+
+#if MODERN_TDLIB
+                // TDLib's log stream is a raw global pointer that
+                // Client.Execute(SetLogStream) swaps while re-initializing the shared
+                // FileLog in place; upstream only guards it with a release fence it
+                // describes as "better than nothing". Reconfiguring logging after the
+                // receive loop exists therefore races with the thread that is logging,
+                // so every Execute-based configuration step has to finish before the
+                // loop starts, exactly as the stable build sequenced it.
+                // The finally still guarantees the loop starts even if initialization
+                // throws, so a failed step can never silently swallow every update.
+                try
+                {
+                    InitializeClient();
+                }
+                catch (Exception ex)
+                {
+                    PushDiagnostics.WriteException("tdlib.initialize", ex);
+                }
+                finally
+                {
+                    EnsureReceiveLoop();
+                }
+#else
+                InitializeClient();
 
                 _longRunningTask = _longRunningTask ?? Task.Factory.StartNew(Client.Run, TaskCreationOptions.LongRunning);
+#endif
             });
         }
 
         private void InitializeDiagnostics()
         {
-            Client.Execute(new SetLogStream(new LogStreamFile(System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, "tdlib_log.txt"), 100 * 1024 * 1024, false)));
+#if MODERN_TDLIB
+            // TDLib logging is process-global, not per client, and SetLogStream
+            // re-initializes the shared FileLog in place. Re-running this after a
+            // re-initialization (AuthorizationStateClosed -> TryInitialize) would swap
+            // the log stream underneath the live receive thread, so configure it exactly
+            // once per process, before any receive loop exists. The lock is shared with
+            // EnsureReceiveLoop so a thread that loses the race cannot start the loop
+            // while the winner is still executing the steps below.
+            lock (_diagnosticsLock)
+            {
+                if (_diagnosticsConfigured)
+                {
+                    return;
+                }
+
+                _diagnosticsConfigured = true;
+                InitializeDiagnosticsCore();
+            }
+        }
+
+        private void InitializeDiagnosticsCore()
+        {
+#endif
+
+            Client.Execute(ModernTdlibCompatibility.CreateSetLogStream(System.IO.Path.Combine(ApplicationData.Current.LocalFolder.Path, "tdlib_log.txt"), 100 * 1024 * 1024, false));
             Client.Execute(new SetLogVerbosityLevel(SettingsService.Current.VerbosityLevel));
 
             var tags = Client.Execute(new GetLogTags()) as LogTags;
@@ -350,7 +556,14 @@ namespace Unigram.Services
 
             foreach (var tag in tags.Tags)
             {
+                // Execute returns an Error for tags the pinned build does not expose,
+                // so this must never be dereferenced blindly: throwing here would
+                // abort initialization before SetTdlibParameters is ever sent.
                 var level = Client.Execute(new GetLogTagVerbosityLevel(tag)) as LogVerbosityLevel;
+                if (level == null)
+                {
+                    continue;
+                }
 
                 var saved = _settings.Diagnostics.GetValueOrDefault(tag, -1);
                 if (saved != level.VerbosityLevel && saved > -1)
@@ -383,7 +596,7 @@ namespace Unigram.Services
                 if (response is Chat chat)
                 {
                     Windows.ApplicationModel.PackageVersion version = SettingsService.GetAppVersion();
-                    var title = $"**{Windows.ApplicationModel.Package.Current.DisplayName} Version {version.Major}.{version.Minor}**";
+                    var title = $"**{Windows.ApplicationModel.Package.Current.DisplayName} Version {version.Major}.{version.Minor}.{version.Build}.{version.Revision}**";
                     var message = title + Environment.NewLine + Environment.NewLine + SettingsService.CurrentChangelog;
 
                     var entities = Client.Execute(new GetTextEntities(message)) as TextEntities;
@@ -394,12 +607,12 @@ namespace Unigram.Services
                     {
                         if (entity.Type is TextEntityTypeTextUrl textUrl || entity.Type is TextEntityTypeUrl)
                         {
-                            await SendAsync(new GetWebPagePreview(formattedText));
+                            await SendAsync(ModernTdlibCompatibility.CreateGetWebPagePreview(formattedText));
                             break;
                         }
                     }
 
-                    Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, new InputMessageText(formattedText, false, false)));
+                    Send(ModernTdlibCompatibility.CreateAddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, ModernTdlibCompatibility.CreateInputMessageText(formattedText, false, false)));
                 }
             }
 
@@ -415,7 +628,7 @@ namespace Unigram.Services
                 var message = title + Environment.NewLine + string.Join(Environment.NewLine, update.Strings);
                 var formattedText = new FormattedText(message, new[] { new TextEntity { Offset = 0, Length = title.Length, Type = new TextEntityTypeBold() } });
 
-                Send(new AddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, new InputMessageText(formattedText, true, false)));
+                Send(ModernTdlibCompatibility.CreateAddLocalMessage(chat.Id, new MessageSenderUser(777000), 0, false, ModernTdlibCompatibility.CreateInputMessageText(formattedText, true, false)));
             }
         }
 
@@ -445,6 +658,9 @@ namespace Unigram.Services
             _usersMap.Clear();
             
             _diceEmojis = null;
+#if MODERN_TDLIB
+            _defaultReactionType = null;
+#endif
 
             _savedAnimations = null;
             _favoriteStickers = null;
@@ -480,12 +696,39 @@ namespace Unigram.Services
 
         public void Send(Function function, Action<BaseObject> handler = null)
         {
-            _client.Send(function, handler);
+            _client.Send(function, result =>
+            {
+                if (result is Error error)
+                {
+                    PushDiagnostics.Write("tdlib.result", $"type=error;code={error.Code}");
+                }
+                else
+                {
+                    PushDiagnostics.Write("tdlib.result", $"type={result?.GetType().Name ?? "null"}");
+                }
+
+                handler?.Invoke(result);
+            });
         }
 
         public Task<BaseObject> SendAsync(Function function)
         {
-            return _client.SendAsync(function);
+            return SendAsyncWithDiagnostics(function);
+        }
+
+        private async Task<BaseObject> SendAsyncWithDiagnostics(Function function)
+        {
+            var result = await _client.SendAsync(function);
+            if (result is Error error)
+            {
+                PushDiagnostics.Write("tdlib.result", $"request={function?.GetType().Name ?? "null"};type=error;code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+            }
+            else
+            {
+                PushDiagnostics.Write("tdlib.result", $"request={function?.GetType().Name ?? "null"};type={result?.GetType().Name ?? "null"}");
+            }
+
+            return result;
         }
 
 
@@ -607,10 +850,18 @@ namespace Unigram.Services
             {
                 return 1;
             }
+#if !MODERN_TDLIB
             else if (chatList is ChatListFilter filter)
             {
                 return filter.ChatFilterId;
             }
+#endif
+#if MODERN_TDLIB
+            else if (chatList is ChatListFolder folder)
+            {
+                return folder.ChatFolderId;
+            }
+#endif
 
             return -1;
         }
@@ -1278,7 +1529,7 @@ namespace Unigram.Services
                 return null;
             }
 
-            var response = await SendAsync(new SearchStickerSet(name));
+            var response = await SendAsync(ModernTdlibCompatibility.SearchStickerSet(name));
             if (response is StickerSet set)
             {
                 _animatedSet[(int)type] = set;
@@ -1309,8 +1560,56 @@ namespace Unigram.Services
 
         public void OnResult(BaseObject update)
         {
+#if MODERN_TDLIB
+            // TDLib's native receive thread invokes this through a reverse P/Invoke.
+            // .NET Native cannot marshal a managed exception back into C++, so anything
+            // escaping here reaches RhpFailFastForPInvokeExceptionPreemp and terminates the
+            // process immediately, leaving no managed stack in the crash dump. Containing it
+            // keeps one unmapped or malformed update from being fatal and records the update
+            // type, which is API surface rather than user data.
+            try
+            {
+                OnResultCore(update);
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException($"tdlib.update.{update?.GetType().Name ?? "null"}", ex);
+            }
+#else
+            OnResultCore(update);
+#endif
+        }
+
+        private void OnResultCore(BaseObject update)
+        {
+#if MODERN_TDLIB
+            // Local cache maintenance must never stop an update from reaching the view
+            // models. A single unmapped field in the 1.8.66 surface would otherwise leave
+            // the UI frozen on whatever state it last rendered.
+            try
+            {
+                TrackUpdate(update);
+            }
+            finally
+            {
+                _aggregator.Publish(update);
+            }
+#else
+            TrackUpdate(update);
+            _aggregator.Publish(update);
+#endif
+        }
+
+        private void TrackUpdate(BaseObject update)
+        {
             if (update is UpdateAuthorizationState updateAuthorizationState)
             {
+                PushDiagnostics.Write("tdlib.authorization", $"state={updateAuthorizationState.AuthorizationState?.GetType().Name ?? "null"}");
+
+                // Assign before dispatching: CleanUp and InitializeReady can throw, and
+                // leaving _authorizationState stale strands the UI on the connecting screen.
+                _authorizationState = updateAuthorizationState.AuthorizationState;
+
                 switch (updateAuthorizationState.AuthorizationState)
                 {
                     case AuthorizationStateLoggingOut loggingOut:
@@ -1324,6 +1623,9 @@ namespace Unigram.Services
                         break;
                 }
 
+                // CleanUp resets _authorizationState to null, so restore it. A null state
+                // means "TDLib has not reported one yet" and routes activation to IntroPage,
+                // which is not the same thing as a closed session.
                 _authorizationState = updateAuthorizationState.AuthorizationState;
             }
             else if (update is UpdateAnimationSearchParameters updateAnimationSearchParameters)
@@ -1363,29 +1665,49 @@ namespace Unigram.Services
                     value.DefaultDisableNotification = updateChatDefaultDisableNotification.DefaultDisableNotification;
                 }
             }
+#if MODERN_TDLIB
+            else if (update is UpdateChatMessageSender updateChatDefaultMessageSenderId)
+#else
             else if (update is UpdateChatDefaultMessageSenderId updateChatDefaultMessageSenderId)
+#endif
             {
                 if (_chats.TryGetValue(updateChatDefaultMessageSenderId.ChatId, out Chat value))
                 {
+#if MODERN_TDLIB
+                    value.MessageSenderId = updateChatDefaultMessageSenderId.MessageSenderId;
+#else
                     value.DefaultMessageSenderId = updateChatDefaultMessageSenderId.DefaultMessageSenderId;
+#endif
                 }
             }
             else if (update is UpdateChatDraftMessage updateChatDraftMessage)
             {
                 if (_chats.TryGetValue(updateChatDraftMessage.ChatId, out Chat value))
                 {
-                    Monitor.Enter(value);
-
-                    value.DraftMessage = updateChatDraftMessage.DraftMessage;
-                    SetChatPositions(value, updateChatDraftMessage.Positions);
-                    
-                    Monitor.Exit(value);
+                    lock (value)
+                    {
+                        value.DraftMessage = updateChatDraftMessage.DraftMessage;
+                        SetChatPositions(value, updateChatDraftMessage.Positions);
+                    }
                 }
             }
+#if MODERN_TDLIB
+            else if (update is UpdateChatFolders updateChatFolders)
+            {
+                _chatFilters = updateChatFolders.ChatFolders.Select(x => new ChatFilterInfo
+                {
+                    Id = x.Id,
+                    Title = x.Name?.Text?.Text ?? string.Empty,
+                    IconName = x.Icon?.Name ?? string.Empty
+                }).ToList();
+                _aggregator.Publish(new UpdateChatFilters { ChatFilters = _chatFilters });
+            }
+#else
             else if (update is UpdateChatFilters updateChatFilters)
             {
                 _chatFilters = updateChatFilters.ChatFilters.ToList();
             }
+#endif
             else if (update is UpdateChatHasScheduledMessages updateChatHasScheduledMessages)
             {
                 if (_chats.TryGetValue(updateChatHasScheduledMessages.ChatId, out Chat value))
@@ -1393,6 +1715,15 @@ namespace Unigram.Services
                     value.HasScheduledMessages = updateChatHasScheduledMessages.HasScheduledMessages;
                 }
             }
+#if MODERN_TDLIB
+            else if (update is UpdateChatBlockList updateChatBlockList)
+            {
+                if (_chats.TryGetValue(updateChatBlockList.ChatId, out Chat value))
+                {
+                    value.BlockList = updateChatBlockList.BlockList;
+                }
+            }
+#else
             else if (update is UpdateChatIsBlocked updateChatIsBlocked)
             {
                 if (_chats.TryGetValue(updateChatIsBlocked.ChatId, out Chat value))
@@ -1400,6 +1731,7 @@ namespace Unigram.Services
                     value.IsBlocked = updateChatIsBlocked.IsBlocked;
                 }
             }
+#endif
             else if (update is UpdateChatIsMarkedAsUnread updateChatIsMarkedAsUnread)
             {
                 if (_chats.TryGetValue(updateChatIsMarkedAsUnread.ChatId, out Chat value))
@@ -1411,12 +1743,11 @@ namespace Unigram.Services
             {
                 if (_chats.TryGetValue(updateChatLastMessage.ChatId, out Chat value))
                 {
-                    Monitor.Enter(value);
-
-                    value.LastMessage = updateChatLastMessage.LastMessage;
-                    SetChatPositions(value, updateChatLastMessage.Positions);
-                    
-                    Monitor.Exit(value);
+                    lock (value)
+                    {
+                        value.LastMessage = updateChatLastMessage.LastMessage;
+                        SetChatPositions(value, updateChatLastMessage.Positions);
+                    }
                 }
             }
             else if (update is UpdateChatNotificationSettings updateNotificationSettings)
@@ -1450,34 +1781,33 @@ namespace Unigram.Services
             {
                 if (_chats.TryGetValue(updateChatPosition.ChatId, out Chat value))
                 {
-                    Monitor.Enter(value);
-
-                    int i;
-                    for (i = 0; i < value.Positions.Count; i++)
+                    lock (value)
                     {
-                        if (value.Positions[i].List.ToId()  == updateChatPosition.Position.List.ToId())
+                        int i;
+                        for (i = 0; i < value.Positions.Count; i++)
                         {
-                            break;
+                            if (value.Positions[i].List.ToId()  == updateChatPosition.Position.List.ToId())
+                            {
+                                break;
+                            }
                         }
-                    }
 
-                    var newPositions = new List<ChatPosition>(value.Positions.Count + (updateChatPosition.Position.Order == 0 ? 0 : 1) - (i < value.Positions.Count ? 1 : 0));
-                    if (updateChatPosition.Position.Order != 0)
-                    {
-                        newPositions.Add(updateChatPosition.Position);
-                    }
-
-                    for (int j = 0; j < value.Positions.Count; j++)
-                    {
-                        if (j != i)
+                        var newPositions = new List<ChatPosition>(value.Positions.Count + (updateChatPosition.Position.Order == 0 ? 0 : 1) - (i < value.Positions.Count ? 1 : 0));
+                        if (updateChatPosition.Position.Order != 0)
                         {
-                            newPositions.Add(value.Positions[j]);
+                            newPositions.Add(updateChatPosition.Position);
                         }
+
+                        for (int j = 0; j < value.Positions.Count; j++)
+                        {
+                            if (j != i)
+                            {
+                                newPositions.Add(value.Positions[j]);
+                            }
+                        }
+
+                        SetChatPositions(value, newPositions);
                     }
-
-                    SetChatPositions(value, newPositions);
-
-                    Monitor.Exit(value);
                 }
             }
             else if (update is UpdateChatReadInbox updateChatReadInbox)
@@ -1499,7 +1829,7 @@ namespace Unigram.Services
             {
                 if (_chats.TryGetValue(updateChatReplyMarkup.ChatId, out Chat value))
                 {
-                    value.ReplyMarkupMessageId = updateChatReplyMarkup.ReplyMarkupMessageId;
+                    value.ReplyMarkupMessageId = ModernTdlibCompatibility.GetUpdateChatReplyMarkupMessageId(updateChatReplyMarkup);
                 }
             }
             else if (update is UpdateChatTitle updateChatTitle)
@@ -1528,6 +1858,12 @@ namespace Unigram.Services
             {
                 _diceEmojis = updateDiceEmojis.Emojis.ToArray();
             }
+#if MODERN_TDLIB
+            else if (update is UpdateDefaultReactionType updateDefaultReactionType)
+            {
+                _defaultReactionType = updateDefaultReactionType.ReactionType;
+            }
+#endif
             else if (update is UpdateFavoriteStickers updateFavoriteStickers)
             {
                 _favoriteStickers = updateFavoriteStickers.StickerIds;
@@ -1564,11 +1900,19 @@ namespace Unigram.Services
             }
             else if (update is UpdateInstalledStickerSets updateInstalledStickerSets)
             {
+#if MODERN_TDLIB
+                if (updateInstalledStickerSets.StickerType is StickerTypeMask)
+#else
                 if (updateInstalledStickerSets.IsMasks)
+#endif
                 {
                     _installedMaskSets = updateInstalledStickerSets.StickerSetIds;
                 }
+#if MODERN_TDLIB
+                else if (updateInstalledStickerSets.StickerType is StickerTypeRegular)
+#else
                 else
+#endif
                 {
                     _installedStickerSets = updateInstalledStickerSets.StickerSetIds;
                 }
@@ -1624,9 +1968,10 @@ namespace Unigram.Services
             {
                 _chats[updateNewChat.Chat.Id] = updateNewChat.Chat;
 
-                Monitor.Enter(updateNewChat.Chat);
-                SetChatPositions(updateNewChat.Chat, updateNewChat.Chat.Positions);
-                Monitor.Exit(updateNewChat.Chat);
+                lock (updateNewChat.Chat)
+                {
+                    SetChatPositions(updateNewChat.Chat, updateNewChat.Chat.Positions);
+                }
 
                 if (updateNewChat.Chat.Photo != null)
                 {
@@ -1651,12 +1996,22 @@ namespace Unigram.Services
 
                 if (updateOption.Name == "my_id" && updateOption.Value is OptionValueInteger myId)
                 {
-                    _settings.UserId = (int)myId.Value;
+                    _settings.UserId = myId.Value;
 
-#if !DEBUG
+#if !DEBUG && !MODERN_TDLIB
                     Microsoft.AppCenter.AppCenter.SetUserId($"uid={myId.Value}");
 #endif
                 }
+
+#if MODERN_TDLIB
+                // TDLib guarantees the version option arrives before every other update, so
+                // this records which library the process actually loaded. The value is a
+                // library version, not user data.
+                if (updateOption.Name == "version" && updateOption.Value is OptionValueString versionOption)
+                {
+                    PushDiagnostics.Write("tdlib.version", $"value={versionOption.Value}");
+                }
+#endif
             }
             else if (update is UpdateRecentStickers updateRecentStickers)
             {
@@ -1674,7 +2029,11 @@ namespace Unigram.Services
             {
                 _secretChats[updateSecretChat.SecretChat.Id] = updateSecretChat.SecretChat;
             }
+#if MODERN_TDLIB
+            else if (update is UpdateDefaultBackground updateSelectedBackground)
+#else
             else if (update is UpdateSelectedBackground updateSelectedBackground)
+#endif
             {
                 if (updateSelectedBackground.ForDarkTheme)
                 {
@@ -1764,8 +2123,6 @@ namespace Unigram.Services
                     value.Status = updateUserStatus.Status;
                 }
             }
-
-            _aggregator.Publish(update);
         }
     }
 
@@ -1890,7 +2247,20 @@ namespace Unigram.Services
     {
         public void OnResult(BaseObject result)
         {
+#if MODERN_TDLIB
+            // Also reached directly from TDLib's native thread, so an exception here would
+            // fail fast exactly as it would in ProtoService.OnResult.
+            try
+            {
+                SetResult(result);
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("tdlib.completion", ex);
+            }
+#else
             SetResult(result);
+#endif
         }
     }
 
@@ -1905,7 +2275,19 @@ namespace Unigram.Services
 
         public void OnResult(BaseObject result)
         {
+#if MODERN_TDLIB
+            // Request callbacks run on TDLib's native thread too; see ProtoService.OnResult.
+            try
+            {
+                _callback(result);
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("tdlib.callback", ex);
+            }
+#else
             _callback(result);
+#endif
         }
     }
 

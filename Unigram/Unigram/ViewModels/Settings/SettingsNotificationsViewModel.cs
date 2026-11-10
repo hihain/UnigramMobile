@@ -208,6 +208,38 @@ namespace Unigram.ViewModels.Settings
             }
         }
 
+        public bool ShowSecretChatOnLiveTiles
+        {
+            get
+            {
+                return Settings.Notifications.ShowSecretChatOnLiveTiles;
+            }
+            set
+            {
+                Settings.Notifications.ShowSecretChatOnLiveTiles = value;
+                RaisePropertyChanged();
+            }
+        }
+
+        public bool IsBackgroundSyncEnabled
+        {
+            get
+            {
+                return BackgroundSync.IsEnabled;
+            }
+            set
+            {
+                if (BackgroundSync.IsEnabled == value)
+                {
+                    return;
+                }
+
+                BackgroundSync.IsEnabled = value;
+                BackgroundSync.UpdateRegistration();
+                RaisePropertyChanged();
+            }
+        }
+
         public void Handle(UpdateScopeNotificationSettings update)
         {
             foreach (var scope in Scopes)
@@ -231,6 +263,7 @@ namespace Unigram.ViewModels.Settings
                 InAppSounds = true;
                 InAppPreview = true;
                 InAppVibrate = true;
+                ShowSecretChatOnLiveTiles = false;
                 _suppressUpdating = false;
 
                 ProtoService.Send(new ResetAllNotificationSettings());
@@ -282,6 +315,13 @@ namespace Unigram.ViewModels.Settings
 
         private bool _disableMention;
         private bool _disablePinnedMessage;
+#if MODERN_TDLIB
+        private long _soundId;
+        private bool _muteStories;
+        private bool _useDefaultMuteStories = true;
+        private long _storySoundId;
+        private bool _showStoryPoster = true;
+#endif
 
         public void Reset()
         {
@@ -299,8 +339,16 @@ namespace Unigram.ViewModels.Settings
                     Alert = update.NotificationSettings.MuteFor == 0;
                     Preview = update.NotificationSettings.ShowPreview;
                     Sound = string.Empty;
-                    _disablePinnedMessage = false;
-                    _disableMention = false;
+                    _disablePinnedMessage = update.NotificationSettings.DisablePinnedMessageNotifications;
+                    _disableMention = update.NotificationSettings.DisableMentionNotifications;
+#if MODERN_TDLIB
+                    var settings = update.NotificationSettings;
+                    _soundId = settings.SoundId;
+                    _muteStories = settings.MuteStories;
+                    _useDefaultMuteStories = settings.UseDefaultMuteStories;
+                    _storySoundId = settings.StorySoundId;
+                    _showStoryPoster = settings.ShowStoryPoster;
+#endif
                 });
             }
         }
@@ -318,6 +366,13 @@ namespace Unigram.ViewModels.Settings
                         Sound = string.Empty;
                         _disablePinnedMessage = settings.DisablePinnedMessageNotifications;
                         _disableMention = settings.DisableMentionNotifications;
+#if MODERN_TDLIB
+                        _soundId = settings.SoundId;
+                        _muteStories = settings.MuteStories;
+                        _useDefaultMuteStories = settings.UseDefaultMuteStories;
+                        _storySoundId = settings.StorySoundId;
+                        _showStoryPoster = settings.ShowStoryPoster;
+#endif
                     });
                 }
             });
@@ -337,7 +392,13 @@ namespace Unigram.ViewModels.Settings
         public RelayCommand SendCommand { get; }
         public async void SendExecute()
         {
+#if MODERN_TDLIB
+            await ProtoService.SendAsync(new SetScopeNotificationSettings(GetScope(), new ScopeNotificationSettings(
+                _alert ? 0 : int.MaxValue, _soundId, _preview, _useDefaultMuteStories, _muteStories, _storySoundId,
+                _showStoryPoster, _disablePinnedMessage, _disableMention)));
+#else
             await ProtoService.SendAsync(new SetScopeNotificationSettings(GetScope(), new ScopeNotificationSettings(_alert ? 0 : int.MaxValue, string.Empty, _preview, _disablePinnedMessage, _disableMention)));
+#endif
         }
 
         public RelayCommand ExceptionsCommand { get; }

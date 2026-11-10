@@ -118,6 +118,7 @@
             VerticalAlignment="Center"
             Padding="12,20"
             MaxWidth="360"
+            Visibility="Collapsed"
             Grid.Row="1"
             Grid.RowSpan="2">
             <Grid

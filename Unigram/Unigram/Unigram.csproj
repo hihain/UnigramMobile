@@ -16,20 +16,52 @@
     <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <PackageCertificateKeyFile>Unigram_StoreKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateKeyFile>
+    </PackageCertificateKeyFile>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
     <AppxBundle>Always</AppxBundle>
-    <AppxBundlePlatforms>x64|arm</AppxBundlePlatforms>
-    <PackageCertificateThumbprint>A2A8DEBFB129BF1ED16C0CF24397A3FD27C2FBC5</PackageCertificateThumbprint>
-    <BuildAppxSideloadPackageForUap>False</BuildAppxSideloadPackageForUap>
+    <!-- This experimental branch is modern-TDLib-only. Do not allow an
+         unqualified VS/MSBuild invocation to silently select the legacy SDK. -->
+    <UseModernTdlib Condition="'$(UseModernTdlib)' == ''">true</UseModernTdlib>
+    <ModernTdlibVersion>1.8.66</ModernTdlibVersion>
+    <ModernTdlibCommit>022d60202e446ad1287b9fb68e687c8a0760788b</ModernTdlibCommit>
+    <AppxBundlePlatforms Condition="'$(UseModernTdlib)' == 'true'">arm</AppxBundlePlatforms>
+    <AppxBundlePlatforms Condition="'$(UseModernTdlib)' != 'true'">x64|arm</AppxBundlePlatforms>
+    <!-- This experimental branch is sideloaded onto a device, never submitted to
+         the Store. The default upload-only packaging mode emits the MSIL payload
+         under bin\$(Platform)\$(Configuration)\Upload, because that package is
+         meant to be compiled by the Store's cloud .NET Native compiler. Such a
+         package installs but cannot launch when sideloaded, as it contains no
+         native code. Force sideload packaging so BuildNativePackage's ILC output
+         is what actually gets packaged. -->
+    <UapAppxPackageBuildMode Condition="'$(UseModernTdlib)' == 'true'">SideloadOnly</UapAppxPackageBuildMode>
+    <AppxBundle Condition="'$(UseModernTdlib)' == 'true'">Always</AppxBundle>
+    <PackageCertificateThumbprint>0082CDEF2DF76F40117532597BA1D70B48959738</PackageCertificateThumbprint>
+    <BuildAppxSideloadPackageForUap Condition="'$(UseModernTdlib)' == 'true'">True</BuildAppxSideloadPackageForUap>
+    <BuildAppxUploadPackageForUap Condition="'$(UseModernTdlib)' == 'true'">False</BuildAppxUploadPackageForUap>
+    <BuildAppxSideloadPackageForUap Condition="'$(UseModernTdlib)' != 'true'">False</BuildAppxSideloadPackageForUap>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
     <LangVersion>7.3</LangVersion>
-    <GenerateTestArtifacts>False</GenerateTestArtifacts>
+    <GenerateTestArtifacts Condition="'$(UseModernTdlib)' == 'true'">True</GenerateTestArtifacts>
+    <GenerateTestArtifacts Condition="'$(UseModernTdlib)' != 'true'">False</GenerateTestArtifacts>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+    <ModernTdlibWorkRoot Condition="'$(ModernTdlibWorkRoot)' == ''">$(LOCALAPPDATA)\UnigramTdlibExperiment</ModernTdlibWorkRoot>
+    <ModernTdlibRoot Condition="'$(ModernTdlibRoot)' == '' and '$(UNIGRAM_MODERN_TDLIB_ROOT)' != ''">$(UNIGRAM_MODERN_TDLIB_ROOT)</ModernTdlibRoot>
+    <ModernTdlibRoot Condition="'$(ModernTdlibRoot)' == ''">$(ModernTdlibWorkRoot)\build-uwp-arm\RelWithDebInfo</ModernTdlibRoot>
+    <ModernTdlibBuildManifest Condition="'$(ModernTdlibBuildManifest)' == ''">$(ModernTdlibRoot)\TdlibBuildManifest.txt</ModernTdlibBuildManifest>
+    <ModernTdlibVerifierScript>$(MSBuildThisFileDirectory)..\..\build\tdlib\Verify-TdlibArm.ps1</ModernTdlibVerifierScript>
+    <ModernTdlibBuildScript>$(MSBuildThisFileDirectory)..\..\build\tdlib\Build-TdlibArm.ps1</ModernTdlibBuildScript>
+    <!-- The modern TgCalls bridge remains opt-in until it has completed device
+         interoperability testing. The legacy ARM libtgvoip payload is always
+         retained for validated Windows 10 Mobile calls. -->
+    <UseModernTgCalls Condition="'$(UseModernTgCalls)' == ''">false</UseModernTgCalls>
+    <ModernTgCallsBridgeRoot Condition="'$(ModernTgCallsBridgeRoot)' == ''">$(ModernTdlibWorkRoot)\bridge-probe</ModernTgCallsBridgeRoot>
+    <ModernTgCallsBridgeBuildScript>$(MSBuildThisFileDirectory)..\..\build\tgcalls\Build-ModernCallsBridgeProof.ps1</ModernTgCallsBridgeBuildScript>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -111,6 +143,12 @@
     <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
     <CodeAnalysisRuleSet />
     <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(UseModernTdlib)' == 'true'">
+    <DefineConstants>$(DefineConstants);MODERN_TDLIB</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(UseModernTgCalls)' == 'true'">
+    <DefineConstants>$(DefineConstants);MODERN_TGCALLS</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
@@ -227,6 +265,7 @@
     <Compile Include="Common\PhoneNumber.cs" />
     <Compile Include="Common\PlaceholderHelper.cs" />
     <Compile Include="Common\RatioControl.cs" />
+    <Compile Include="Common\BackgroundSync.cs" />
     <Compile Include="Common\TdExtensions.cs" />
     <Compile Include="Common\TextBlockHelper.cs" />
     <Compile Include="Common\Theme.cs" />
@@ -241,7 +280,8 @@
     <Compile Include="Common\XamlUtils.cs" />
     <Compile Include="Common\ZoomableListHandler.cs" />
     <Compile Include="Common\ZoomableRepeaterHandler.cs" />
-    <Compile Include="Constants.Secret.cs" />
+    <Compile Include="Constants.Secret.cs" Condition="Exists('$(ProjectDir)Constants.Secret.cs')" />
+    <Compile Include="Constants.Experimental.cs" Condition="!Exists('$(ProjectDir)Constants.Secret.cs')" />
     <Compile Include="Controls\AnimatedBitmapButton.cs" />
     <Compile Include="Controls\AnimatedGlyphButton.cs" />
     <Compile Include="Controls\AnimatedGlyphToggleButton.cs" />
@@ -499,6 +539,10 @@
     <Compile Include="Navigation\Services\NavigationServiceList.cs" />
     <Compile Include="Selectors\ChatStatisticsOverviewTemplateSelector.cs" />
     <Compile Include="Services\CallsService.cs" />
+    <Compile Include="Services\DataSavingMode.cs" />
+    <Compile Include="Services\LegacyTdlibCompatibility.cs" Condition="'$(UseModernTdlib)' != 'true'" />
+    <Compile Include="Services\ModernTdlibCompatibility.cs" Condition="'$(UseModernTdlib)' == 'true'" />
+    <Compile Include="Services\Updates\UpdateSelectedBackground.cs" />
     <Compile Include="Services\ProtoService.ChatList.cs" />
     <Compile Include="Services\ThemeService.Defaults.cs" />
     <Compile Include="ViewModels\DialogEventLogViewModel.cs" />
@@ -522,6 +566,9 @@
     </Compile>
     <Compile Include="Views\Popups\SelectColorPopup.xaml.cs">
       <DependentUpon>SelectColorPopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popups\ReactionPickerPopup.xaml.cs">
+      <DependentUpon>ReactionPickerPopup.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\Popups\ZoomableMediaPopup.xaml.cs">
       <DependentUpon>ZoomableMediaPopup.xaml</DependentUpon>
@@ -551,6 +598,7 @@
     <Compile Include="Logs\Logger.cs" />
     <Compile Include="Logs\LogHelper.cs" />
     <Compile Include="Logs\LogLevel.cs" />
+    <Compile Include="Logs\PushDiagnostics.cs" />
     <Compile Include="Navigation\BindableBase.cs" />
     <Compile Include="Navigation\BootStrapper.cs" />
     <Compile Include="Navigation\DispatcherWrapper.cs" />
@@ -650,7 +698,7 @@
     <Compile Include="ViewModels\CallsViewModel.cs" />
     <Compile Include="ViewModels\Channels\ChannelCreateStep1ViewModel.cs" />
     <Compile Include="ViewModels\Channels\ChannelCreateStep2ViewModel.cs" />
-    <Compile Include="ViewModels\ChatsNearbyViewModel.cs" />
+    <Compile Include="ViewModels\ChatsNearbyViewModel.cs" Condition="'$(UseModernTdlib)' != 'true'" />
     <Compile Include="ViewModels\ChatsViewModel.cs" />
     <Compile Include="ViewModels\Chats\ChatGalleryViewModel.cs" />
     <Compile Include="ViewModels\Chats\ChatInviteLinkViewModel.cs" />
@@ -858,7 +906,7 @@
     <Compile Include="Views\Payments\PaymentReceiptPage.xaml.cs">
       <DependentUpon>PaymentReceiptPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Views\ChatsNearbyPage.xaml.cs">
+    <Compile Include="Views\ChatsNearbyPage.xaml.cs" Condition="'$(UseModernTdlib)' != 'true'">
       <DependentUpon>ChatsNearbyPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\Popups\AttachedStickersPopup.xaml.cs">
@@ -2111,6 +2159,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Views\Popups\ReactionPickerPopup.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Views\Popups\ZoomableMediaPopup.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -2267,7 +2319,7 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Views\ChatsNearbyPage.xaml">
+    <Page Include="Views\ChatsNearbyPage.xaml" Condition="'$(UseModernTdlib)' != 'true'">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -2684,6 +2736,16 @@
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
       <Version>6.2.10</Version>
     </PackageReference>
+    <PackageReference Include="System.Numerics.Vectors" Condition="'$(UseModernTdlib)' == 'true'">
+      <Version>4.1.1</Version>
+      <ExcludeAssets>compile;runtime</ExcludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.Numerics.Vectors.WindowsRuntime" Condition="'$(UseModernTdlib)' == 'true'">
+      <Version>4.0.1</Version>
+      <ExcludeAssets>compile;runtime</ExcludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.UI.Xaml">
       <Version>2.4.2</Version>
     </PackageReference>
@@ -2703,10 +2765,20 @@
       <Version>1.25.0</Version>
     </PackageReference>
   </ItemGroup>
+  <PropertyGroup>
+    <UwpNumericsReferenceRoot Condition="Exists('$(SolutionDir)\packages\microsoft.netcore.universalwindowsplatform\6.2.10\ref\uap10.0.15138')">$(SolutionDir)\packages\microsoft.netcore.universalwindowsplatform\6.2.10\ref\uap10.0.15138</UwpNumericsReferenceRoot>
+    <UwpNumericsReferenceRoot Condition="'$(UwpNumericsReferenceRoot)' == '' and '$(NuGetPackageRoot)' != ''">$(NuGetPackageRoot)\microsoft.netcore.universalwindowsplatform\6.2.10\ref\uap10.0.15138</UwpNumericsReferenceRoot>
+    <ModernUwpNumericsRuntimeRoot Condition="'$(ModernUwpNumericsRuntimeRoot)' == '' and Exists('$(SolutionDir)\packages\runtime.win10-arm-aot.microsoft.netcore.universalwindowsplatform\6.2.10\runtimes\win10-arm-aot\lib\uap10.0.15138')">$(SolutionDir)\packages\runtime.win10-arm-aot.microsoft.netcore.universalwindowsplatform\6.2.10\runtimes\win10-arm-aot\lib\uap10.0.15138</ModernUwpNumericsRuntimeRoot>
+    <ModernUwpNumericsRuntimeRoot Condition="'$(ModernUwpNumericsRuntimeRoot)' == '' and '$(NuGetPackageRoot)' != '' and Exists('$(NuGetPackageRoot)\runtime.win10-arm-aot.microsoft.netcore.universalwindowsplatform\6.2.10\runtimes\win10-arm-aot\lib\uap10.0.15138')">$(NuGetPackageRoot)\runtime.win10-arm-aot.microsoft.netcore.universalwindowsplatform\6.2.10\runtimes\win10-arm-aot\lib\uap10.0.15138</ModernUwpNumericsRuntimeRoot>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Unigram.Native.Media\Unigram.Native.Media.vcxproj">
       <Project>{3adbf08f-0550-4a1c-9794-fea30cf69e3a}</Project>
       <Name>Unigram.Native.Media</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Unigram.Native.Tasks\Unigram.Native.Tasks.vcxproj">
+      <Project>{ca0c2cc0-3d83-4556-a9a3-0923ece8c1d3}</Project>
+      <Name>Unigram.Native.Tasks</Name>
     </ProjectReference>
     <ProjectReference Include="..\Unigram.Native\Unigram.Native.vcxproj">
       <Project>{1b521e77-46bd-4d60-89f6-d68e9bb9abff}</Project>
@@ -2717,7 +2789,7 @@
     <SDKReference Include="Microsoft.VCLibs, Version=14.0">
       <Name>Visual C++ 2015 Runtime for Universal Windows Platform Apps</Name>
     </SDKReference>
-    <SDKReference Include="Telegram.Td.UWP, Version=1.0">
+    <SDKReference Include="Telegram.Td.UWP, Version=1.0" Condition="'$(UseModernTdlib)' != 'true'">
       <Name>TDLib for Universal Windows Platform</Name>
     </SDKReference>
     <SDKReference Include="WindowsDesktop, Version=10.0.18362.0">
@@ -2728,13 +2800,53 @@
     </SDKReference>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Telegram.Td" Condition="'$(UseModernTdlib)' == 'true'">
+      <HintPath>$(ModernTdlibRoot)\Telegram.Td.winmd</HintPath>
+      <Implementation>Telegram.Td.dll</Implementation>
+      <IsWinMDFile>true</IsWinMDFile>
+      <Private>true</Private>
+    </Reference>
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\Telegram.Td.winmd" Condition="'$(UseModernTdlib)' == 'true'">
+      <Implementation>Telegram.Td.dll</Implementation>
+    </ReferenceCopyLocalPaths>
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\Telegram.Td.dll" Condition="'$(UseModernTdlib)' == 'true'" />
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\Telegram.Td.pri" Condition="'$(UseModernTdlib)' == 'true'" />
+    <AppxPackagePayload Include="$(ModernTdlibRoot)\Telegram.Td.pri" Condition="'$(UseModernTdlib)' == 'true'">
+      <TargetPath>Telegram.Td.pri</TargetPath>
+    </AppxPackagePayload>
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\libcrypto-3-arm.dll" Condition="'$(UseModernTdlib)' == 'true'" />
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\libssl-3-arm.dll" Condition="'$(UseModernTdlib)' == 'true'" />
+    <ReferenceCopyLocalPaths Include="$(ModernTdlibRoot)\z.dll" Condition="'$(UseModernTdlib)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseModernTgCalls)' == 'true'">
+    <Reference Include="Unigram.Native.Calls.Proof">
+      <HintPath>$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.winmd</HintPath>
+      <Implementation>ModernCallsBridge.dll</Implementation>
+      <IsWinMDFile>true</IsWinMDFile>
+      <Private>true</Private>
+    </Reference>
+    <ReferenceCopyLocalPaths Include="$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.winmd">
+      <Implementation>ModernCallsBridge.dll</Implementation>
+    </ReferenceCopyLocalPaths>
+    <ReferenceCopyLocalPaths Include="$(ModernTgCallsBridgeRoot)\ModernCallsBridge.dll" />
+    <ReferenceCopyLocalPaths Include="$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.pri" />
+    <AppxPackagePayload Include="$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.pri">
+      <TargetPath>Unigram.Native.Calls.Proof.pri</TargetPath>
+    </AppxPackagePayload>
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="RLottie">
       <HintPath>$(ProjectDir)\..\Libraries\rlottie\$(Platform)\RLottie.winmd</HintPath>
       <Implementation>RLottie.dll</Implementation>
     </Reference>
     <ReferenceCopyLocalPaths Include="$(ProjectDir)\..\Libraries\rlottie\$(Platform)\RLottie.dll" />
     <ReferenceCopyLocalPaths Include="$(ProjectDir)\..\Libraries\rlottie\$(Platform)\RLottie.pri" />
-    <ReferenceCopyLocalPaths Condition=" '$(Configuration)' == 'Debug' " Include="$(ProjectDir)\..\Libraries\rlottie\$(Platform)\zlib1.dll" />
+    <!-- RLottie.dll imports inflate/inflateEnd/inflateInit2_ from zlib1.dll. Shipping it only in
+         Debug means a Release package cannot load RLottie at all: the first animated sticker
+         raises FileNotFoundException 0x8007007E, which crosses the WinRT boundary and fail-fasts
+         the process. The modern configuration satisfies the import with the pinned zlib staged as
+         zlib1.dll by StageModernZlib1 instead of the bundled 1.2.11 copy. -->
+    <ReferenceCopyLocalPaths Condition=" '$(Configuration)' == 'Debug' and '$(UseModernTdlib)' != 'true' " Include="$(ProjectDir)\..\Libraries\rlottie\$(Platform)\zlib1.dll" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="libtgvoip">
@@ -2748,14 +2860,171 @@
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|x86'">
+    <OutputPath>bin\x86\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;MOBILE;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|x64'">
+    <OutputPath>bin\x64\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;PREVIEW;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Store|ARM'">
+    <OutputPath>bin\ARM\Store\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;MOBILE;MODERN_TDLIB;CODE_ANALYSIS</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <NoStdLib>true</NoStdLib>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>ARM</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+  <Target Name="EnsureModernTdlib" BeforeTargets="ValidateModernTdlib" Inputs="$(ModernTdlibBuildScript);$(MSBuildThisFileDirectory)..\..\build\tdlib\vcpkg.json;@(ModernTdlibBuildInput)" Outputs="$(ModernTdlibBuildManifest)" Condition="'$(UseModernTdlib)' == 'true'">
+    <Message Importance="High" Text="Preparing pinned TDLib $(ModernTdlibVersion) in $(ModernTdlibWorkRoot)..." />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ModernTdlibBuildScript)&quot; -WorkRoot &quot;$(ModernTdlibWorkRoot)&quot; -Stage All" />
+  </Target>
+  <Target Name="EnsureModernTgCallsBridge" BeforeTargets="ValidateModernTgCallsBridge" Condition="'$(UseModernTgCalls)' == 'true'">
+    <Message Importance="High" Text="Preparing the opt-in ARM TgCalls bridge in $(ModernTgCallsBridgeRoot)..." />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ModernTgCallsBridgeBuildScript)&quot; -OutputRoot &quot;$(ModernTgCallsBridgeRoot)&quot;" />
+  </Target>
+  <Target Name="RemoveModernTgCallsPayload" BeforeTargets="ResolveAssemblyReferences" Condition="'$(UseModernTgCalls)' != 'true'">
+    <Delete Files="$(OutDir)ModernCallsBridge.dll;$(OutDir)ModernCallsBridge.pdb;$(OutDir)Unigram.Native.Calls.Proof.winmd;$(OutDir)Unigram.Native.Calls.Proof.pri" />
+  </Target>
+  <Target Name="ValidateModernTgCallsBridge" BeforeTargets="ResolveAssemblyReferences" DependsOnTargets="EnsureModernTgCallsBridge" Condition="'$(UseModernTgCalls)' == 'true'">
+    <Error Condition="'$(Platform)' != 'ARM'" Text="The modern TgCalls bridge is ARM-only." />
+    <Error Condition="!Exists('$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.winmd')" Text="Modern TgCalls WinMD was not found at $(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.winmd." />
+    <Error Condition="!Exists('$(ModernTgCallsBridgeRoot)\ModernCallsBridge.dll')" Text="Modern TgCalls implementation was not found at $(ModernTgCallsBridgeRoot)\ModernCallsBridge.dll." />
+    <Error Condition="!Exists('$(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.pri')" Text="Modern TgCalls PRI resources were not found at $(ModernTgCallsBridgeRoot)\Unigram.Native.Calls.Proof.pri." />
+  </Target>
+  <Target Name="ValidateModernTdlib" BeforeTargets="ResolveAssemblyReferences" Condition="'$(UseModernTdlib)' == 'true'">
+    <Error Condition="'$(Platform)' != 'ARM'" Text="The experimental modern TDLib payload is ARM-only." />
+    <Error Condition="'$(ModernTdlibRoot)' == ''" Text="Set ModernTdlibRoot or UNIGRAM_MODERN_TDLIB_ROOT to the modern TDLib ARM output directory." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\Telegram.Td.winmd')" Text="Modern TDLib WinMD was not found at $(ModernTdlibRoot)\Telegram.Td.winmd." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\Telegram.Td.dll')" Text="Modern TDLib implementation was not found at $(ModernTdlibRoot)\Telegram.Td.dll." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\Telegram.Td.pri')" Text="Modern TDLib PRI resources were not found at $(ModernTdlibRoot)\Telegram.Td.pri." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\libcrypto-3-arm.dll')" Text="OpenSSL crypto runtime was not found in $(ModernTdlibRoot)." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\libssl-3-arm.dll')" Text="OpenSSL TLS runtime was not found in $(ModernTdlibRoot)." />
+    <Error Condition="!Exists('$(ModernTdlibRoot)\z.dll')" Text="zlib runtime was not found in $(ModernTdlibRoot)." />
+    <Error Condition="!Exists('$(ModernTdlibBuildManifest)')" Text="The modern TDLib build manifest was not found at $(ModernTdlibBuildManifest). Rebuild the pinned TDLib output with build\tdlib\Build-TdlibArm.ps1." />
+    <Error Condition="!Exists('$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.dll')" Text="The ARM UWP System.Numerics.Vectors runtime was not found at $(ModernUwpNumericsRuntimeRoot)." />
+    <Error Condition="!Exists('$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.WindowsRuntime.dll')" Text="The ARM UWP System.Numerics.Vectors.WindowsRuntime runtime was not found at $(ModernUwpNumericsRuntimeRoot)." />
+        <Error Condition="!Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll') or !Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll')" Text="The UWP System.Numerics.Vectors reference pair for the Store upload was not found at $(UwpNumericsReferenceRoot)." />
+        <Exec  Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ModernTdlibVerifierScript)&quot; -OutputRoot &quot;$(ModernTdlibRoot)&quot; -ExpectedTdlibVersion &quot;1.8.66&quot; -ExpectedTdlibCommit &quot;022d60202e446ad1287b9fb68e687c8a0760788b&quot;" />
+  </Target>
+  <Target Name="StageModernZlib1" AfterTargets="ResolveAssemblyReferences" Condition="'$(UseModernTdlib)' == 'true'">
+    <!-- RLottie.dll was built against zlib1.dll and imports inflate/inflateEnd/inflateInit2_ from
+         it by that exact file name. The pinned modern zlib ships as z.dll for TDLib, so stage a
+         second copy under the name the import table expects. This keeps a single, current zlib in
+         the package instead of restoring the bundled 1.2.11 build. -->
+    <MakeDir Directories="$(IntermediateOutputPath)modern-tdlib" />
+    <Copy SourceFiles="$(ModernTdlibRoot)\z.dll" DestinationFiles="$(IntermediateOutputPath)modern-tdlib\zlib1.dll" SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(IntermediateOutputPath)modern-tdlib\zlib1.dll')" Text="Failed to stage the pinned zlib as zlib1.dll for RLottie." />
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Include="$(IntermediateOutputPath)modern-tdlib\zlib1.dll" />
+    </ItemGroup>
+  </Target>
+  <Target Name="RejectLegacyTdlibSelection" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(UseModernTdlib)' != 'true'" Text="This experimental branch requires TDLib $(ModernTdlibVersion) ($(ModernTdlibCommit)). UseModernTdlib must remain true; the legacy Telegram.Td.UWP SDK is not supported here." />
+  </Target>
+  <Target Name="OverrideModernUwpNumerics" AfterTargets="ResolveNuGetPackageAssets" BeforeTargets="ResolveAssemblyReferences" Condition="'$(UseModernTdlib)' == 'true' and Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll')">
+    <ItemGroup>
+      <Reference Remove="System.Numerics.Vectors" />
+      <Reference Include="System.Numerics.Vectors">
+        <HintPath>$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <Reference Remove="System.Numerics.Vectors.WindowsRuntime" />
+      <Reference Include="System.Numerics.Vectors.WindowsRuntime">
+        <HintPath>$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll</HintPath>
+        <Private>false</Private>
+      </Reference>
+      <_ReferencePathWithoutModernNumerics Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' != 'System.Numerics.Vectors' and '%(ReferencePath.Filename)' != 'System.Numerics.Vectors.WindowsRuntime'" />
+      <ReferencePath Remove="@(ReferencePath)" />
+      <ReferencePath Include="@(_ReferencePathWithoutModernNumerics)" />
+      <ReferencePath Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll">
+        <Private>false</Private>
+      </ReferencePath>
+      <ReferencePath Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
+        <Private>false</Private>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+  <Target Name="OverrideModernUwpNumericsForCompile" AfterTargets="ResolveAssemblyReferences" BeforeTargets="CoreCompile" Condition="'$(UseModernTdlib)' == 'true' and Exists('$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll')">
+    <ItemGroup>
+      <_ReferencePathWithoutModernNumerics Include="@(ReferencePath)" Condition="'%(ReferencePath.Filename)' != 'System.Numerics.Vectors' and '%(ReferencePath.Filename)' != 'System.Numerics.Vectors.WindowsRuntime'" />
+      <ReferencePath Remove="@(ReferencePath)" />
+      <ReferencePath Include="@(_ReferencePathWithoutModernNumerics)" />
+      <ReferencePath Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll" />
+      <ReferencePath Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll" />
+      <_ReferenceCopyLocalWithoutModernNumerics Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' != 'System.Numerics.Vectors' and '%(ReferenceCopyLocalPaths.Filename)' != 'System.Numerics.Vectors.WindowsRuntime'" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" />
+      <ReferenceCopyLocalPaths Include="@(_ReferenceCopyLocalWithoutModernNumerics)" />
+      <ReferenceCopyLocalPaths Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll" />
+      <ReferenceCopyLocalPaths Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll" />
+    </ItemGroup>
+  </Target>
+  <Target Name="RemoveModernUwpNumericsFromAppx" AfterTargets="BuildNativePackage" Condition="'$(UseModernTdlib)' == 'true'">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)' == 'System.Numerics.Vectors' or '%(ReferenceCopyLocalPaths.Filename)' == 'System.Numerics.Vectors.WindowsRuntime'" />
+      <PackagingOutputs Remove="@(PackagingOutputs)" Condition="'%(PackagingOutputs.Filename)' == 'System.Numerics.Vectors' or '%(PackagingOutputs.Filename)' == 'System.Numerics.Vectors.WindowsRuntime'" />
+      <AppxPackagePayload Remove="@(AppxPackagePayload)" Condition="'%(AppxPackagePayload.Filename)' == 'System.Numerics.Vectors' or '%(AppxPackagePayload.Filename)' == 'System.Numerics.Vectors.WindowsRuntime'" />
+      <AppxUploadPackagePayload Remove="@(AppxUploadPackagePayload)" Condition="'%(AppxUploadPackagePayload.Filename)' == 'System.Numerics.Vectors' or '%(AppxUploadPackagePayload.Filename)' == 'System.Numerics.Vectors.WindowsRuntime'" />
+    </ItemGroup>
+  </Target>
+  <Target Name="AddModernUwpNumericsRuntimePayload" BeforeTargets="_CreatePackageLayout_CalculateInputsAndOutputs;_CreateUploadPackageLayout_CalculateInputsAndOutputs" Condition="'$(UseModernTdlib)' == 'true'">
+    <ItemGroup>
+      <AppxPackagePayload Include="$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.dll">
+        <TargetPath>System.Numerics.Vectors.dll</TargetPath>
+      </AppxPackagePayload>
+      <AppxPackagePayload Include="$(ModernUwpNumericsRuntimeRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
+        <TargetPath>System.Numerics.Vectors.WindowsRuntime.dll</TargetPath>
+      </AppxPackagePayload>
+      <!-- The Store recompiles the upload's MSIL; it must receive the same reference pair the local ILC compiled.
+           The ARM AOT pair crashes the Store's .NET Native compiler (NUTC1056, Store error 1201). -->
+      <AppxUploadPackagePayload Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.dll">
+        <TargetPath>System.Numerics.Vectors.dll</TargetPath>
+      </AppxUploadPackagePayload>
+      <AppxUploadPackagePayload Include="$(UwpNumericsReferenceRoot)\System.Numerics.Vectors.WindowsRuntime.dll">
+        <TargetPath>System.Numerics.Vectors.WindowsRuntime.dll</TargetPath>
+      </AppxUploadPackagePayload>
+    </ItemGroup>
+  </Target>
+  <Target Name="RequireTdlibCredentialsForPackage" BeforeTargets="_GenerateAppxPackage;GenerateAppxPackage" Condition="'$(UseModernTdlib)' == 'true'">
+    <Error Condition="!Exists('$(ProjectDir)Constants.Secret.cs')" Text="Packaging the experimental app requires the ignored Constants.Secret.cs. The compile-only placeholder must never be packaged." />
+  </Target>
+  <!-- Package.appxmanifest is intentionally static in this experimental branch.
+       UpdateManifest.ps1 must not rewrite it during a VS build. -->
   <PropertyGroup>
-    <PreBuildEvent>powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -file "$(ProjectDir)\..\UpdateManifest.ps1" -path $(ProjectDir) -config $(ConfigurationName)</PreBuildEvent>
+    <PreBuildEvent />
   </PropertyGroup>
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>
   </PropertyGroup>
+  <ItemGroup>
+    <ModernTdlibBuildInput Include="$(MSBuildThisFileDirectory)..\..\build\tdlib\patches\*.patch" />
+  </ItemGroup>
   <!--<PropertyGroup>
     <PreBuildEvent>xcopy /y /s "$(SolutionDir)Unigram.DesktopService\bin\$(ConfigurationName)\Unigram.DesktopService.exe" "$(SolutionDir)\Unigram\bin\x64\$(ConfigurationName)\AppX\"
 xcopy /y /s "$(SolutionDir)Unigram.DesktopService\bin\$(ConfigurationName)\Unigram.DesktopService.exe" "$(SolutionDir)\Unigram\bin\x86\$(ConfigurationName)\AppX\"</PreBuildEvent>

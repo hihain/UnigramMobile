@@ -148,7 +148,7 @@ namespace Unigram.Controls.Messages.Content
                     Button.SetGlyph(file.Id, message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0 ? MessageContentState.Confirm : MessageContentState.Play);
                     Button.Progress = 1;
 
-                    if (message.Content is MessageText text && text.WebPage?.EmbedUrl?.Length > 0 || (message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0))
+                    if (message.Content is MessageText text && text.WebPage.HasEmbedUrl() || (message.SendingState is MessageSendingStatePending && message.MediaAlbumId != 0))
                     {
                         Button.Opacity = 1;
                     }
@@ -260,7 +260,7 @@ namespace Unigram.Controls.Messages.Content
             }
             else
             {
-                if (_message.Content is MessageText text && text.WebPage?.EmbedUrl?.Length > 0)
+                if (_message.Content is MessageText text && text.WebPage.HasEmbedUrl())
                 {
                     _message.Delegate.OpenUrl(text.WebPage.Url, false);
                 }

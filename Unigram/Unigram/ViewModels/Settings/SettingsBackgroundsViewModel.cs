@@ -35,7 +35,11 @@ namespace Unigram.ViewModels.Settings
 
         private void RefreshItems()
         {
+#if MODERN_TDLIB
+            ProtoService.Send(new GetInstalledBackgrounds(Settings.Appearance.IsDarkTheme()), result =>
+#else
             ProtoService.Send(new GetBackgrounds(Settings.Appearance.IsDarkTheme()), result =>
+#endif
             {
                 if (result is Backgrounds wallpapers)
                 {
@@ -119,7 +123,11 @@ namespace Unigram.ViewModels.Settings
                 return;
             }
 
+#if MODERN_TDLIB
+            var response = await ProtoService.SendAsync(new ResetInstalledBackgrounds());
+#else
             var response = await ProtoService.SendAsync(new ResetBackgrounds());
+#endif
             if (response is Ok)
             {
                 RefreshItems();

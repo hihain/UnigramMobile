@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Numerics;
 using Telegram.Td.Api;
@@ -21,6 +22,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using Windows.UI.Xaml.Shapes;
 using Point = Windows.Foundation.Point;
 
 namespace Unigram.Views.Host
@@ -32,6 +34,11 @@ namespace Unigram.Views.Host
 
         private RootDestination _navigationViewSelected;
         private MvxObservableCollection<object> _navigationViewItems;
+        private readonly Dictionary<int, User> _sessionUsers = new Dictionary<int, User>();
+        private readonly HashSet<int> _pendingSessionUsers = new HashSet<int>();
+        private int _accountSelectorDiagnosticBudget = 64;
+        private long _accountSelectorSessionsHash = long.MinValue;
+        private bool _accountSelectorWasExpanded;
 
         public RootPage(NavigationService service)
         {
@@ -43,6 +50,7 @@ namespace Unigram.Views.Host
             InitializeComponent();
 
             _lifetime = TLContainer.Current.Lifetime;
+            _lifetime.Items.CollectionChanged += OnSessionsChanged;
 
             _navigationViewSelected = RootDestination.Chats;
             _navigationViewItems = new MvxObservableCollection<object>
@@ -97,6 +105,7 @@ namespace Unigram.Views.Host
 
             _navigationViewSelected = RootDestination.Chats;
             NavigationViewList.ItemsSource = _navigationViewItems;
+            _accountSelectorSessionsHash = long.MinValue;
 
             InitializeTitleBar();
             InitializeNavigation(_navigationService.Frame);
@@ -126,6 +135,7 @@ namespace Unigram.Views.Host
         public void Switch(ISessionService session)
         {
             _lifetime.ActiveItem = session;
+            InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
 
             if (_navigationService != null)
             {
@@ -161,6 +171,15 @@ namespace Unigram.Views.Host
                     case AuthorizationStateWaitPassword waitPassword:
                         service.Navigate(typeof(SignInPasswordPage));
                         break;
+#if MODERN_TDLIB
+                    case null:
+                    case AuthorizationStateWaitTdlibParameters waitTdlibParameters:
+                        if (session.Settings.UserId == 0)
+                        {
+                            service.Navigate(typeof(IntroPage));
+                        }
+                        break;
+#endif
                 }
 
                 //WindowContext.GetForCurrentView().Handle(session, new UpdateConnectionState(session.ProtoService.GetConnectionState()));
@@ -222,6 +241,7 @@ namespace Unigram.Views.Host
 
         private void InitializeLocalization()
         {
+            AddAccountItem.Text = Strings.Resources.AddAccount;
             //NavigationChats.Text = Strings.Additional.Chats;
             //NavigationAbout.Content = Strings.Additional.About;
             //NavigationNews.Text = Strings.Additional.News;
@@ -234,7 +254,21 @@ namespace Unigram.Views.Host
                 InitializeUser(main.ViewModel);
             }
 
-            InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, _lifetime.Items);
+            InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
+        }
+
+        private async void OnSessionsChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (Dispatcher.HasThreadAccess)
+            {
+                InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
+                return;
+            }
+
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
+            });
         }
 
         private async void InitializeUser(MainViewModel viewModel)
@@ -267,37 +301,212 @@ namespace Unigram.Views.Host
             Automation.SetToolTip(Accounts, SettingsService.Current.IsAccountsSelectorExpanded ? Strings.Resources.AccDescrHideAccounts : Strings.Resources.AccDescrShowAccounts);
         }
 
+        private static IList<ISessionService> GetSessionsSnapshot()
+        {
+            return TLContainer.Current.GetSessions().OrderBy(session => session.Id).ToList();
+        }
+
+        private static long GetSessionsHash(IList<ISessionService> sessions)
+        {
+            unchecked
+            {
+                var hash = 17L;
+                foreach (var session in sessions)
+                {
+                    hash = hash * 31 + session.Id;
+                }
+
+                return hash;
+            }
+        }
+
+        private User GetSessionUser(ISessionService session)
+        {
+            var user = session.ProtoService.GetUser(session.UserId);
+            if (user == null)
+            {
+                _sessionUsers.TryGetValue(session.Id, out user);
+            }
+
+            return user;
+        }
+
+        private void RefreshSessionContainers()
+        {
+            foreach (var child in AccountSelectorPanel.Children)
+            {
+                var container = child as ListViewItem;
+                var session = container?.Tag as ISessionService;
+                var content = container?.ContentTemplateRoot as Grid;
+                if (session == null || content == null)
+                {
+                    continue;
+                }
+
+                var user = GetSessionUser(session);
+                if (user == null)
+                {
+                    RequestSessionUser(session);
+                    continue;
+                }
+
+                var title = content.Children[2] as TextBlock;
+                title.Text = user.GetFullName();
+                Automation.SetToolTip(content, title.Text);
+
+                var indicator = content.Children[1] as Rectangle;
+                indicator.Visibility = session == _lifetime.ActiveItem ? Visibility.Visible : Visibility.Collapsed;
+
+                var photo = content.Children[0] as ProfilePicture;
+                photo.Source = PlaceholderHelper.GetUser(session.ProtoService, user, 28);
+            }
+        }
+
+        private void RequestSessionUser(ISessionService session)
+        {
+            if (session.UserId == 0 || !_pendingSessionUsers.Add(session.Id))
+            {
+                TraceAccountSelector($"stage=request;slot={session.Id};queued=0");
+                return;
+            }
+
+            TraceAccountSelector($"stage=request;slot={session.Id};queued=1");
+            session.ProtoService.Send(new GetUser(session.UserId), response =>
+            {
+                _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    _pendingSessionUsers.Remove(session.Id);
+
+                    if (response is User user && user.Id == session.UserId)
+                    {
+                        _sessionUsers[session.Id] = user;
+                        TraceAccountSelector($"stage=response;slot={session.Id};result=user");
+                        InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
+                    }
+                    else
+                    {
+                        TraceAccountSelector($"stage=response;slot={session.Id};result={response?.GetType().Name ?? "null"}");
+                    }
+                });
+            });
+        }
+
+        private void TraceAccountSelector(string value)
+        {
+            if (System.Threading.Interlocked.Decrement(ref _accountSelectorDiagnosticBudget) >= 0)
+            {
+                Logs.PushDiagnostics.Write("account_selector", value);
+            }
+        }
+
         private void InitializeSessions(bool show, IList<ISessionService> items)
         {
-            for (int i = 0; i < _navigationViewItems.Count; i++)
-            {
-                if (_navigationViewItems[i] is ISessionService)
-                {
-                    _navigationViewItems.RemoveAt(i);
-                    i--;
-                }
-                else if (_navigationViewItems[i] is RootDestination viewItem && viewItem == RootDestination.AddAccount)
-                {
-                    _navigationViewItems.RemoveAt(i);
+            var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            AccountSelectorPanel.Visibility = visibility;
+            AddAccountItem.Visibility = visibility;
+            AccountSelectorSeparator.Visibility = visibility;
 
-                    if (i < _navigationViewItems.Count && _navigationViewItems[i] is RootDestination destination && destination == RootDestination.Separator)
-                    {
-                        _navigationViewItems.RemoveAt(i);
-                        break;
-                    }
-                }
+            var sessionsHash = GetSessionsHash(items);
+            if (_accountSelectorSessionsHash == long.MinValue)
+            {
+                TraceAccountSelector($"stage=origin;stored={CountStoredSessions()};containers={items?.Count ?? 0}");
             }
 
-            if (show && items != null)
+            if (_accountSelectorSessionsHash == sessionsHash && _accountSelectorWasExpanded == show
+                && AccountSelectorPanel.Children.Count == (show ? items.Count : 0))
             {
-                _navigationViewItems.Insert(0, RootDestination.Separator);
-                _navigationViewItems.Insert(0, RootDestination.AddAccount);
-
-                for (int k = items.Count - 1; k >= 0; k--)
-                {
-                    _navigationViewItems.Insert(0, items[k]);
-                }
+                RefreshSessionContainers();
+                TraceAccountSelector($"stage=refresh;expanded={(show ? 1 : 0)};source={items.Count};rows={AccountSelectorPanel.Children.Count}");
+                return;
             }
+
+            var desiredSessions = show ? items : new List<ISessionService>();
+
+            AccountSelectorPanel.Children.Clear();
+
+            foreach (var session in desiredSessions)
+            {
+                AccountSelectorPanel.Children.Add(CreateSessionRow(session));
+            }
+
+            _accountSelectorSessionsHash = sessionsHash;
+            _accountSelectorWasExpanded = show;
+            TraceAccountSelector($"stage=update;expanded={(show ? 1 : 0)};source={items?.Count ?? 0};rows={AccountSelectorPanel.Children.Count}");
+
+            RefreshSessionContainers();
+            TraceAccountSelectorLayout();
+        }
+
+        private static int CountStoredSessions()
+        {
+            try
+            {
+                return SessionStorage.EnumerateStoredSessions().Count();
+            }
+            catch
+            {
+                return -1;
+            }
+        }
+
+        private ListViewItem CreateSessionRow(ISessionService session)
+        {
+            var container = new ListViewItem
+            {
+                Content = session,
+                Tag = session,
+                ContentTemplate = Resources["SessionItemTemplate"] as DataTemplate,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(0)
+            };
+
+            container.Tapped += OnSessionRowTapped;
+            container.Loaded += OnSessionRowLoaded;
+            return container;
+        }
+
+        private void OnSessionRowLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ListViewItem container && container.Tag is ISessionService)
+            {
+                RefreshSessionContainers();
+            }
+        }
+
+        private void OnSessionRowTapped(object sender, Windows.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            if (sender is ListViewItem container && container.Tag is ISessionService session && !session.IsActive)
+            {
+                Switch(session);
+            }
+        }
+
+        private void TraceAccountSelectorLayout()
+        {
+            AccountSelectorPanel.UpdateLayout();
+
+            var built = AccountSelectorPanel.Children.Count;
+            var realized = 0;
+            var heights = 0.0;
+
+            foreach (var child in AccountSelectorPanel.Children)
+            {
+                var element = child as FrameworkElement;
+                if (element == null)
+                {
+                    continue;
+                }
+
+                if (element.Visibility == Visibility.Visible && element.ActualHeight > 0)
+                {
+                    realized++;
+                }
+
+                heights += element.ActualHeight;
+            }
+
+            TraceAccountSelector($"stage=layout;built={built};realized={realized};rowsum={(int)heights};panel={(int)AccountSelectorPanel.ActualHeight};vis={(AccountSelectorPanel.Visibility == Visibility.Visible ? 1 : 0)}");
         }
 
         #region Recycling
@@ -307,9 +516,8 @@ namespace Unigram.Views.Host
             if (args.Item is ISessionService && (args.ItemContainer == null || args.ItemContainer is Controls.NavigationViewItem || args.ItemContainer is Controls.NavigationViewItemSeparator))
             {
                 args.ItemContainer = new ListViewItem();
-                args.ItemContainer.Style = NavigationViewList.ItemContainerStyle;
+                args.ItemContainer.Style = sender.ItemContainerStyle;
                 args.ItemContainer.ContentTemplate = Resources["SessionItemTemplate"] as DataTemplate;
-                args.ItemContainer.ContextRequested += OnContextRequested;
             }
             else if (args.Item is RootDestination destination)
             {
@@ -367,20 +575,26 @@ namespace Unigram.Views.Host
                     return;
                 }
 
-                var user = session.ProtoService.GetUser(session.UserId);
+                var user = GetSessionUser(session);
+
                 if (user == null)
                 {
-                    return;
+                    RequestSessionUser(session);
                 }
+
+                TraceAccountSelector($"stage=container;slot={session.Id};phase={args.Phase};profile={(user != null ? 1 : 0)}");
 
                 if (args.Phase == 0)
                 {
                     var title = content.Children[2] as TextBlock;
-                    title.Text = user.GetFullName();
+                    title.Text = user?.GetFullName() ?? Strings.Resources.Loading;
 
-                    Automation.SetToolTip(content, user.GetFullName());
+                    Automation.SetToolTip(content, title.Text);
+
+                    var indicator = content.Children[1] as Rectangle;
+                    indicator.Visibility = session == _lifetime.ActiveItem ? Visibility.Visible : Visibility.Collapsed;
                 }
-                else if (args.Phase == 2)
+                else if (args.Phase == 2 && user != null)
                 {
                     var photo = content.Children[0] as ProfilePicture;
                     photo.Source = PlaceholderHelper.GetUser(session.ProtoService, user, 28);
@@ -464,10 +678,15 @@ namespace Unigram.Views.Host
         {
             SettingsService.Current.IsAccountsSelectorExpanded = !SettingsService.Current.IsAccountsSelectorExpanded;
 
-            InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, _lifetime.Items);
+            InitializeSessions(SettingsService.Current.IsAccountsSelectorExpanded, GetSessionsSnapshot());
             Expanded.IsChecked = SettingsService.Current.IsAccountsSelectorExpanded;
 
             Automation.SetToolTip(Accounts, SettingsService.Current.IsAccountsSelectorExpanded ? Strings.Resources.AccDescrHideAccounts : Strings.Resources.AccDescrShowAccounts);
+        }
+
+        private void OnAddAccountTapped(object sender, Windows.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            Switch(_lifetime.Create());
         }
 
         private void OnItemClick(object sender, ItemClickEventArgs e)

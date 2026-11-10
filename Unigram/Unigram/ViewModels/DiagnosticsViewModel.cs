@@ -44,6 +44,14 @@ namespace Unigram.ViewModels
                 LogOldSize = basic.Size;
             }
 
+            var pushLog = await ApplicationData.Current.LocalFolder.TryGetItemAsync(Logs.PushDiagnostics.DirectoryName) as StorageFolder;
+            var pushLogFile = pushLog == null ? null : await pushLog.TryGetItemAsync(Logs.PushDiagnostics.FileName) as StorageFile;
+            if (pushLogFile != null)
+            {
+                var basic = await pushLogFile.GetBasicPropertiesAsync();
+                PushLogSize = basic.Size;
+            }
+
             var properties = typeof(IOptionsService).GetProperties();
 
             foreach (var prop in properties)
@@ -92,10 +100,14 @@ namespace Unigram.ViewModels
             var tags = Client.Execute(new GetLogTags()) as LogTags;
             if (tags != null)
             {
+                // Execute returns an Error for tags this build does not expose, so the
+                // result has to be probed instead of hard cast: throwing here would take
+                // down the diagnostics page, which is the only on-device way to read the
+                // TDLib upgrade breadcrumbs.
                 Tags.ReplaceWith(tags.Tags.Select(x => new DiagnosticsTag
                 {
                     Name = x,
-                    Default = ((LogVerbosityLevel)Client.Execute(new GetLogTagVerbosityLevel(x))).VerbosityLevel,
+                    Default = Client.Execute(new GetLogTagVerbosityLevel(x)) is LogVerbosityLevel level ? level.VerbosityLevel : 0,
                     Value = (VerbosityLevel)Settings.Diagnostics.GetValueOrDefault(x, -1)
                 }));
             }
@@ -240,6 +252,13 @@ namespace Unigram.ViewModels
         {
             get => _logOldSize;
             set => Set(ref _logOldSize, value);
+        }
+
+        private ulong _pushLogSize;
+        public ulong PushLogSize
+        {
+            get => _pushLogSize;
+            set => Set(ref _pushLogSize, value);
         }
 
         public RelayCommand VerbosityCommand { get; }

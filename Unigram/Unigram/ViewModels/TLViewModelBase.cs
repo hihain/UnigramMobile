@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Threading.Tasks;
+using Telegram.Td.Api;
+using Unigram.Common;
+using Unigram.Controls;
 using Unigram.Navigation;
 using Unigram.Services;
+using Unigram.Views.Popups;
 
 namespace Unigram.ViewModels
 {
@@ -42,6 +47,37 @@ namespace Unigram.ViewModels
         public IEventAggregator Aggregator => _aggregator;
 
         public int SessionId => _protoService.SessionId;
+
+        protected async Task<bool> ShowAddChatMemberResultAsync(BaseObject response, User user, bool isChannel)
+        {
+            if (response is FailedToAddMembers failedToAddMembers)
+            {
+                if (failedToAddMembers.FailedToAddMembersValue == null ||
+                    failedToAddMembers.FailedToAddMembersValue.Count == 0)
+                {
+                    await MessagePopup.ShowAsync(
+                        Strings.Resources.ActionYouAddUser.Replace("un2", user.GetFullName()),
+                        Strings.Resources.AppName,
+                        Strings.Resources.OK);
+                    return true;
+                }
+
+                await MessagePopup.ShowAsync(
+                    isChannel ? Strings.Resources.InviteToChannelError : Strings.Resources.InviteToGroupError,
+                    Strings.Resources.AppName,
+                    Strings.Resources.OK);
+            }
+            else if (response is Error error)
+            {
+                AlertsService.ShowAddUserAlert(Dispatcher, error.Message, isChannel);
+            }
+            else
+            {
+                await MessagePopup.ShowAsync(Strings.Resources.ErrorOccurred, Strings.Resources.AppName, Strings.Resources.OK);
+            }
+
+            return false;
+        }
 
         private bool _isLoading;
         public virtual bool IsLoading

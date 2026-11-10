@@ -386,11 +386,11 @@ namespace Unigram.Controls.Cells
             var verified = false;
             if (chat.Type is ChatTypePrivate privata)
             {
-                verified = _protoService.GetUser(privata.UserId)?.IsVerified ?? false;
+                verified = ModernTdlibCompatibility.GetUserIsVerified(_protoService.GetUser(privata.UserId));
             }
             else if (chat.Type is ChatTypeSupergroup super)
             {
-                verified = _protoService.GetSupergroup(super.SupergroupId)?.IsVerified ?? false;
+                verified = ModernTdlibCompatibility.GetSupergroupIsVerified(_protoService.GetSupergroup(super.SupergroupId));
             }
 
             VerifiedIcon.Visibility = verified ? Visibility.Visible : Visibility.Collapsed;
@@ -560,10 +560,10 @@ namespace Unigram.Controls.Cells
 
             if (chat.DraftMessage != null && draft)
             {
-                switch (chat.DraftMessage.InputMessageText)
+                var text = ModernTdlibCompatibility.GetDraftMessageText(chat.DraftMessage);
+                if (text != null)
                 {
-                    case InputMessageText text:
-                        return text.Text.Text.Replace('\n', ' ');
+                    return text.Text.Replace('\n', ' ');
                 }
             }
 
@@ -611,10 +611,9 @@ namespace Unigram.Controls.Cells
         {
             if (chat.DraftMessage != null)
             {
-                switch (chat.DraftMessage.InputMessageText)
+                if (ModernTdlibCompatibility.GetDraftMessageText(chat.DraftMessage) != null)
                 {
-                    case InputMessageText text:
-                        return string.Format(_expanded ? "{0}\r\n" : "{0}: ", Strings.Resources.Draft);
+                    return string.Format(_expanded ? "{0}\r\n" : "{0}: ", Strings.Resources.Draft);
                 }
             }
 
@@ -629,10 +628,9 @@ namespace Unigram.Controls.Cells
             }
             else if (chat.DraftMessage != null)
             {
-                switch (chat.DraftMessage.InputMessageText)
+                if (ModernTdlibCompatibility.GetDraftMessageText(chat.DraftMessage) != null)
                 {
-                    case InputMessageText text:
-                        return string.Empty;
+                    return string.Empty;
                 }
             }
 
@@ -678,9 +676,9 @@ namespace Unigram.Controls.Cells
                     {
                         result = string.Format(format, from.LastName.Trim());
                     }
-                    else if (!string.IsNullOrEmpty(from.Username))
+                    else if (!string.IsNullOrEmpty(from.GetUsername()))
                     {
-                        result = string.Format(format, from.Username.Trim());
+                        result = string.Format(format, from.GetUsername().Trim());
                     }
                     else if (from.Type is UserTypeDeleted)
                     {
@@ -765,7 +763,7 @@ namespace Unigram.Controls.Cells
             }
             else if (message.Content is MessageInvoice invoice)
             {
-                return result + invoice.Title;
+                return result + invoice.GetTitle();
             }
             else if (message.Content is MessageContact)
             {
@@ -773,7 +771,7 @@ namespace Unigram.Controls.Cells
             }
             else if (message.Content is MessageLocation location)
             {
-                return result + (location.LivePeriod > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
+                return result + (location.GetLivePeriod() > 0 ? Strings.Resources.AttachLiveLocation : Strings.Resources.AttachLocation);
             }
             else if (message.Content is MessageVenue vanue)
             {
@@ -785,7 +783,7 @@ namespace Unigram.Controls.Cells
             }
             else if (message.Content is MessagePoll poll)
             {
-                return result + "\uD83D\uDCCA " + poll.Poll.Question;
+                return result + "\uD83D\uDCCA " + ModernTdlibCompatibility.GetPollQuestion(poll.Poll);
             }
             else if (message.Content is MessageCall call)
             {

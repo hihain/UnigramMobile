@@ -104,7 +104,7 @@ namespace Unigram.Views.Popups
             LoadMoreExecute();
         }
 
-        public string Text => _option.Text;
+        public string Text => _option.GetText();
         public int VotePercentage => _option.VotePercentage;
         public int VoterCount => _option.VoterCount;
 

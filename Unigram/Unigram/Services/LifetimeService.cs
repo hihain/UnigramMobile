@@ -183,7 +183,7 @@ namespace Unigram.Services
             {
                 try
                 {
-                    Directory.Delete(Path.Combine(ApplicationData.Current.LocalFolder.Path, $"{item.Id}"), true);
+                    Directory.Delete(Views.SessionStorage.GetSessionDirectory(item.Id), true);
                 }
                 catch { }
             });

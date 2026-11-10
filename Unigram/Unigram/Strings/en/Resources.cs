@@ -10991,11 +10991,11 @@ namespace Unigram.Strings
         ///
         ///To go over the limit and get additional features, upgrade to a supergroup:
         ///
-        ///• Supergroups can get up to {0}
-        ///• New members can see the full message history
-        ///• Deleted messages will disappear for all members
-        ///• Admins can add a description to the group
-        ///• Creator can set a public link for the group"
+        ///ï¿½ Supergroups can get up to {0}
+        ///ï¿½ New members can see the full message history
+        ///ï¿½ Deleted messages will disappear for all members
+        ///ï¿½ Admins can add a description to the group
+        ///ï¿½ Creator can set a public link for the group"
         /// </summary>
         public static string ConvertGroupInfo
         {
@@ -11008,10 +11008,10 @@ namespace Unigram.Strings
         /// <summary>
         /// Localized resource similar to "**In supergroups:**
         ///
-        ///• New members can see the full message history
-        ///• Deleted messages will disappear for all members
-        ///• Admins can add a description to the group
-        ///• Creator can set a public link for the group"
+        ///ï¿½ New members can see the full message history
+        ///ï¿½ Deleted messages will disappear for all members
+        ///ï¿½ Admins can add a description to the group
+        ///ï¿½ Creator can set a public link for the group"
         /// </summary>
         public static string ConvertGroupInfo2
         {
@@ -13981,7 +13981,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Some videos can't be streamed – e.g., all videos that were sent from Android using Telegram 4.7 and earlier versions.
+        /// Localized resource similar to "Some videos can't be streamed ï¿½ e.g., all videos that were sent from Android using Telegram 4.7 and earlier versions.
         ///"
         /// </summary>
         public static string EnableAllStreamingInfo
@@ -17060,7 +17060,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "{0} ft from you"
+        /// Localized resource similar to "{0} ft fromï¿½you"
         /// </summary>
         public static string FootsFromYou
         {
@@ -19637,7 +19637,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Hey, I'm using Telegram to chat – and so are {0} of our other contact. Join us! Download it here: {1}"
+        /// Localized resource similar to "Hey, I'm using Telegram to chat ï¿½ and so are {0} of our other contact. Join us! Download it here: {1}"
         /// </summary>
         public static string InviteTextNumOne
         {
@@ -19648,7 +19648,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Hey, I'm using Telegram to chat – and so are {0} of our other contacts. Join us! Download it here: {1}"
+        /// Localized resource similar to "Hey, I'm using Telegram to chat ï¿½ and so are {0} of our other contacts. Join us! Download it here: {1}"
         /// </summary>
         public static string InviteTextNumOther
         {
@@ -20156,7 +20156,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "{0} km from you"
+        /// Localized resource similar to "{0} km fromï¿½you"
         /// </summary>
         public static string KMetersFromYou2
         {
@@ -20626,7 +20626,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Checking name…"
+        /// Localized resource similar to "Checking nameï¿½"
         /// </summary>
         public static string LinkChecking
         {
@@ -22625,7 +22625,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "{0} m from you"
+        /// Localized resource similar to "{0} m fromï¿½you"
         /// </summary>
         public static string MetersFromYou2
         {
@@ -22713,7 +22713,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "{0} mi from you"
+        /// Localized resource similar to "{0} mi fromï¿½you"
         /// </summary>
         public static string MilesFromYou
         {
@@ -30340,7 +30340,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "You can change your Telegram number here. Your account and all your cloud data — messages, media, contacts, etc. will be moved to the new number."
+        /// Localized resource similar to "You can change your Telegram number here. Your account and all your cloud data ï¿½ messages, media, contacts, etc. will be moved to the new number."
         /// </summary>
         public static string PhoneNumberHelp
         {
@@ -31033,7 +31033,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Sorry, polls can’t be forwarded to secret chats."
+        /// Localized resource similar to "Sorry, polls canï¿½t be forwarded to secret chats."
         /// </summary>
         public static string PollCantForwardSecretChat
         {
@@ -31649,7 +31649,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "https://telegram.org/privacy"
+        /// Localized resource similar to "https://zunetracks.github.io/UnigramMobileUWP/privacy"
         /// </summary>
         public static string PrivacyPolicyUrl
         {
@@ -31968,7 +31968,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Sorry, polls with visible votes can’t be forwarded to channels."
+        /// Localized resource similar to "Sorry, polls with visible votes canï¿½t be forwarded to channels."
         /// </summary>
         public static string PublicPollCantForward
         {
@@ -34391,6 +34391,41 @@ namespace Unigram.Strings
         }
         
         /// <summary>
+        /// Localized resource similar to "Show Secret Chat Notifications on Live Tiles"
+        /// </summary>
+        public static string SecretChatLiveTile
+        {
+            get
+            {
+                return resourceLoader.GetString("SecretChatLiveTile");
+            }
+        }
+
+        public static string BackgroundSync
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSync");
+            }
+        }
+
+        public static string BackgroundSyncEnabled
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSyncEnabled");
+            }
+        }
+
+        public static string BackgroundSyncInfo
+        {
+            get
+            {
+                return resourceLoader.GetString("BackgroundSyncInfo");
+            }
+        }
+        
+        /// <summary>
         /// Localized resource similar to "Please note that inline bots are provided by third-party developers. For the bot to work, the symbols you type after the bot's username are sent to the respective developer."
         /// </summary>
         public static string SecretChatContextBotAlert
@@ -35207,7 +35242,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "We’ve sent an SMS with an activation code to your phone **{0}**."
+        /// Localized resource similar to "Weï¿½ve sent an SMS with an activation code to your phone **{0}**."
         /// </summary>
         public static string SentSmsCode
         {
@@ -38487,7 +38522,7 @@ namespace Unigram.Strings
         }
         
         /// <summary>
-        /// Localized resource similar to "Sorry, this color theme doesn’t support your device yet."
+        /// Localized resource similar to "Sorry, this color theme doesnï¿½t support your device yet."
         /// </summary>
         public static string ThemeNotSupported
         {
@@ -39146,7 +39181,7 @@ namespace Unigram.Strings
         /// <summary>
         /// Localized resource similar to "We're very sorry, but this means we must part ways here. Unlike others, we don't use your data for ad targeting or other commercial purposes. Telegram only stores the information it needs to function as a feature-rich cloud service. You can adjust how we use your data (e.g., delete synced contacts) in Privacy & Security settings.
         ///
-        ///But if you're generally not OK with Telegram's modest needs, it won't be possible for us to provide this service. You can deactivate your account now — or look around some more and deactivate it later if you feel you're not happy with the way we use your data."
+        ///But if you're generally not OK with Telegram's modest needs, it won't be possible for us to provide this service. You can deactivate your account now ï¿½ or look around some more and deactivate it later if you feel you're not happy with the way we use your data."
         /// </summary>
         public static string TosUpdateDecline
         {
@@ -40226,7 +40261,7 @@ namespace Unigram.Strings
         /// <summary>
         /// Localized resource similar to "You can choose a username on **Telegram**. If you do, other people will be able to find you by this username and contact you without knowing your phone number.
         ///
-        ///You can use **a–z**, **0–9** and underscores. Minimum length is **5** characters."
+        ///You can use **aï¿½z**, **0ï¿½9** and underscores. Minimum length is **5** characters."
         /// </summary>
         public static string UsernameHelp
         {

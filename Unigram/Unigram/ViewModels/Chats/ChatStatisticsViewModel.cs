@@ -129,7 +129,7 @@ namespace Unigram.ViewModels.Chats
                     stats.Add(ChartViewData.create(channelStats.MessageInteractionGraph, Strings.Resources.InteractionsChartTitle, /*1*/6));
                     stats.Add(ChartViewData.create(channelStats.InstantViewInteractionGraph, Strings.Resources.IVInteractionsChartTitle, /*1*/6));
 
-                    var messages = await ProtoService.SendAsync(new GetMessages(chatId, channelStats.RecentMessageInteractions.Select(x => x.MessageId).ToArray())) as Messages;
+                    var messages = await ProtoService.SendAsync(new GetMessages(chatId, ModernTdlibCompatibility.GetChatStatisticsMessageIds(channelStats).ToArray())) as Messages;
                     if (messages == null)
                     {
                         return;
@@ -144,8 +144,10 @@ namespace Unigram.ViewModels.Chats
                             continue;
                         }
 
-                        var counters = channelStats.RecentMessageInteractions.FirstOrDefault(x => x.MessageId == message.Id);
-                        interactions.Add(new MessageInteractionCounters(message, counters.ForwardCount, counters.ViewCount));
+                        if (ModernTdlibCompatibility.TryGetChatStatisticsInteraction(channelStats, message.Id, out var forwardCount, out var viewCount))
+                        {
+                            interactions.Add(new MessageInteractionCounters(message, forwardCount, viewCount));
+                        }
                     }
 
                     Interactions.ReplaceWith(interactions);

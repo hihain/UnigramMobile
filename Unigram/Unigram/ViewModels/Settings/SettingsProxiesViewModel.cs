@@ -34,9 +34,15 @@ namespace Unigram.ViewModels.Settings
         public override async Task OnNavigatedToAsync(object parameter, NavigationMode mode, IDictionary<string, object> state)
         {
             var response = await ProtoService.SendAsync(new GetProxies());
+#if MODERN_TDLIB
+            if (response is AddedProxies proxies)
+            {
+                var items = proxies.Proxies.Select(x => new ProxyViewModel(x) as ConnectionViewModel).ToList();
+#else
             if (response is Proxies proxies)
             {
                 var items = proxies.ProxiesValue.Select(x => new ProxyViewModel(x) as ConnectionViewModel).ToList();
+#endif
                 items.Insert(0, new ConnectionViewModel());
 
                 Items.ReplaceWith(items);
@@ -56,7 +62,11 @@ namespace Unigram.ViewModels.Settings
 
         private async Task UpdateAsync(ConnectionViewModel proxy)
         {
+#if MODERN_TDLIB
+            var status = await ProtoService.SendAsync(new PingProxy(((ProxyViewModel)proxy).ProxyValue.Proxy));
+#else
             var status = await ProtoService.SendAsync(new PingProxy(proxy.Id));
+#endif
             BeginOnUIThread(() =>
             {
                 if (status is Seconds seconds)
@@ -149,8 +159,12 @@ namespace Unigram.ViewModels.Settings
                 return;
             }
 
-            var response = await ProtoService.SendAsync(new AddProxy(dialog.Server, dialog.Port, false, dialog.Type));
+            var response = await ProtoService.SendAsync(ModernTdlibCompatibility.CreateAddProxy(dialog.Server, dialog.Port, false, dialog.Type));
+#if MODERN_TDLIB
+            if (response is AddedProxy proxy)
+#else
             if (response is Proxy proxy)
+#endif
             {
                 var connection = new ProxyViewModel(proxy);
                 Items.Add(connection);
@@ -185,8 +199,16 @@ namespace Unigram.ViewModels.Settings
                 return;
             }
 
+#if MODERN_TDLIB
+            var response = await ProtoService.SendAsync(new EditProxy(connection.Id, new Proxy(dialog.Server, dialog.Port, dialog.Type), false, string.Empty));
+#else
             var response = await ProtoService.SendAsync(new EditProxy(connection.Id, dialog.Server, dialog.Port, false, dialog.Type));
+#endif
+#if MODERN_TDLIB
+            if (response is AddedProxy proxy)
+#else
             if (response is Proxy proxy)
+#endif
             {
                 var index = Items.IndexOf(connection);
                 Items.Remove(connection);
@@ -220,16 +242,23 @@ namespace Unigram.ViewModels.Settings
         public RelayCommand<ProxyViewModel> ShareCommand { get; }
         private async void ShareExecute(ProxyViewModel proxy)
         {
+#if MODERN_TDLIB
+            await MessagePopup.ShowAsync("Proxy links are unavailable with the modern TDLib API.", Strings.Resources.AppName, Strings.Resources.OK);
+#else
             var response = await ProtoService.SendAsync(new GetProxyLink(proxy.Id));
             if (response is Text text && Uri.TryCreate(text.TextValue, UriKind.Absolute, out Uri uri))
             {
                 await SharePopup.GetForCurrentView().ShowAsync(uri, Strings.Resources.Proxy);
             }
+#endif
         }
 
         public RelayCommand<ProxyViewModel> CopyLinkCommand { get; }
         private async void CopyLinkExecute(ProxyViewModel proxy)
         {
+#if MODERN_TDLIB
+            await MessagePopup.ShowAsync("Proxy links are unavailable with the modern TDLib API.", Strings.Resources.AppName, Strings.Resources.OK);
+#else
             var response = await ProtoService.SendAsync(new GetProxyLink(proxy.Id));
             if (response is Text text && Uri.TryCreate(text.TextValue, UriKind.Absolute, out Uri uri))
             {
@@ -238,6 +267,7 @@ namespace Unigram.ViewModels.Settings
                 ClipboardEx.TrySetContent(dataPackage);
                 await MessagePopup.ShowAsync(Strings.Resources.LinkCopied, Strings.Resources.UseProxyTelegram, Strings.Resources.OK);
             }
+#endif
         }
 
         private void MarkAsEnabled(ConnectionViewModel connection)
@@ -273,6 +303,22 @@ namespace Unigram.ViewModels.Settings
 
     public class ProxyViewModel : ConnectionViewModel
     {
+#if MODERN_TDLIB
+        private readonly AddedProxy _proxy;
+
+        public ProxyViewModel(AddedProxy proxy)
+        {
+            _proxy = proxy;
+        }
+
+        public AddedProxy ProxyValue => _proxy;
+        public ProxyType Type => _proxy.Proxy?.Type;
+        public override bool IsEnabled { get => _proxy.IsEnabled; set => _proxy.IsEnabled = value; }
+        public int LastUsedDate => _proxy.LastUsedDate;
+        public int Port => _proxy.Proxy?.Port ?? 0;
+        public string Server => _proxy.Proxy?.Server;
+        public override int Id => _proxy.Id;
+#else
         private readonly Proxy _proxy;
 
         public ProxyViewModel(Proxy proxy)
@@ -286,6 +332,7 @@ namespace Unigram.ViewModels.Settings
         public int Port => _proxy.Port;
         public string Server => _proxy.Server;
         public override int Id => _proxy.Id;
+#endif
     }
 
     public interface ConnectionStatus

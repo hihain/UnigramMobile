@@ -6,6 +6,7 @@ using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Entities;
+using Unigram.Logs;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
 using Unigram.Views.Settings;
@@ -47,18 +48,22 @@ namespace Unigram.ViewModels.SignIn
             var authState = ProtoService.GetAuthorizationState();
             var waitState = authState is AuthorizationStateWaitPhoneNumber || authState is AuthorizationStateWaitCode || authState is AuthorizationStateWaitPassword;
 
-            if (waitState && mode != NavigationMode.Refresh)
+            if (authState is AuthorizationStateWaitTdlibParameters)
             {
                 IsLoading = false;
-
-                Delegate.UpdateQrCodeMode(QrCodeMode.Loading);
+                Delegate?.UpdateQrCodeMode(QrCodeMode.Loading);
+            }
+            else if (waitState && mode != NavigationMode.Refresh)
+            {
+                SetAuthorizationLoading(false);
+                Delegate?.UpdateQrCodeMode(QrCodeMode.Loading);
 
                 ProtoService.Send(new GetApplicationConfig(), result =>
                 {
                     if (result is JsonValueObject json)
                     {
-                        var camera = json.GetNamedBoolean("qr_login_camera", false);
-                        var code = json.GetNamedString("qr_login_code", "disabled");
+                        var camera = json.GetNamedBoolean("qr_login_camera", true);
+                        var code = json.GetNamedString("qr_login_code", "primary");
 
                         if (camera && Enum.TryParse(code, true, out QrCodeMode qrmode))
                         {
@@ -66,7 +71,24 @@ namespace Unigram.ViewModels.SignIn
 
                             if (qrmode == QrCodeMode.Primary)
                             {
-                                ProtoService.Send(new RequestQrCodeAuthentication());
+                                if (authState is AuthorizationStateWaitPhoneNumber)
+                                {
+                                    ProtoService.Send(new RequestQrCodeAuthentication(), qrResult =>
+                                    {
+                                        if (qrResult is Error error)
+                                        {
+                                            PushDiagnostics.Write(
+                                                "signin.qr",
+                                                $"result=failed;code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}");
+
+                                            BeginOnUIThread(() => Delegate?.UpdateQrCodeMode(QrCodeMode.Secondary));
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    _sessionService.RequestQrCodeAuthentication();
+                                }
                             }
 
                             return;
@@ -86,6 +108,21 @@ namespace Unigram.ViewModels.SignIn
                     Delegate?.UpdateQrCodeMode(QrCodeMode.Primary);
                 }
             }
+#if MODERN_TDLIB
+            else if (!waitState)
+            {
+                // PhonePanel and TokenPanel share one grid cell and neither declares an
+                // initial Visibility, so a single UpdateQrCodeMode call is the only thing
+                // that makes this page readable. Any authorization state left unhandled
+                // here renders both panels stacked on top of each other. A null state just
+                // means TDLib has not reported yet, and TLRootNavigationService refreshes
+                // this view model once authorizationStateWaitPhoneNumber arrives.
+                IsLoading = false;
+                Delegate?.UpdateQrCodeMode(authState == null ? QrCodeMode.Loading : QrCodeMode.Secondary);
+
+                PushDiagnostics.Write("signin.navigated", $"state={authState?.GetType().Name ?? "null"};mode=fallback");
+            }
+#endif
 
             return Task.CompletedTask;
         }
@@ -180,11 +217,17 @@ namespace Unigram.ViewModels.SignIn
                 }
             }
 
-            IsLoading = true;
+            SetAuthorizationLoading(true);
 
             await _notificationsService.CloseAsync();
 
-            var function = new SetAuthenticationPhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false, new string[0]));
+            var function = new SetAuthenticationPhoneNumber(phoneNumber, new PhoneNumberAuthenticationSettings(false, false, false, false
+#if MODERN_TDLIB
+                , false, null, new string[0]
+#else
+                , new string[0]
+#endif
+            ));
             var request = default(Task<BaseObject>);
 
             if (ProtoService.AuthorizationState is AuthorizationStateWaitOtherDeviceConfirmation)
@@ -199,7 +242,10 @@ namespace Unigram.ViewModels.SignIn
             var response = await request;
             if (response is Error error)
             {
-                IsLoading = false;
+                SetAuthorizationLoading(false);
+                PushDiagnostics.Write(
+                    "signin.phone",
+                    $"result=failed;code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}");
 
                 if (error.TypeEquals(ErrorType.PHONE_NUMBER_INVALID))
                 {
@@ -236,6 +282,12 @@ namespace Unigram.ViewModels.SignIn
                     await MessagePopup.ShowAsync(error.Message, Strings.Resources.AppName, Strings.Resources.OK);
                 }
             }
+        }
+
+        private void SetAuthorizationLoading(bool value)
+        {
+            IsLoading = value;
+            SendCommand.RaiseCanExecuteChanged();
         }
 
         public RelayCommand ProxyCommand { get; }

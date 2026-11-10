@@ -178,9 +178,9 @@ namespace Unigram.Views.Popups
             ViewModel.IsWithMyScore = withMyScore;
 
             var chat = ViewModel.ProtoService.GetChat(message.ChatId);
-            if (chat != null && chat.Type is ChatTypeSupergroup super && super.IsChannel && ViewModel.ProtoService.GetSupergroup(super.SupergroupId) is Supergroup supergroup && supergroup.Username.Length > 0)
+            if (chat != null && chat.Type is ChatTypeSupergroup super && super.IsChannel && ViewModel.ProtoService.GetSupergroup(super.SupergroupId) is Supergroup supergroup && supergroup.GetUsername().Length > 0)
             {
-                var link = $"{supergroup.Username}/{message.Id}";
+                var link = $"{supergroup.GetUsername()}/{message.Id}";
 
                 if (message.Content is MessageVideoNote)
                 {
@@ -203,9 +203,9 @@ namespace Unigram.Views.Popups
             else if (message.Content is MessageGame game)
             {
                 var viaBot = ViewModel.ProtoService.GetUser(message.ViaBotUserId);
-                if (viaBot != null && viaBot.Username.Length > 0)
+                if (viaBot != null && viaBot.GetUsername().Length > 0)
                 {
-                    ViewModel.ShareLink = new Uri(MeUrlPrefixConverter.Convert(ViewModel.ProtoService, $"{viaBot.Username}?game={game.Game.ShortName}"));
+                    ViewModel.ShareLink = new Uri(MeUrlPrefixConverter.Convert(ViewModel.ProtoService, $"{viaBot.GetUsername()}?game={game.Game.ShortName}"));
                     ViewModel.ShareTitle = game.Game.Title;
                 }
             }
@@ -510,12 +510,12 @@ namespace Unigram.Views.Popups
                     if (result.User != null || result.Chat.Type is ChatTypePrivate || result.Chat.Type is ChatTypeSecret)
                     {
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
-                        verified.Visibility = user != null && user.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+                        verified.Visibility = user != null && ModernTdlibCompatibility.GetUserIsVerified(user) ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else if (result.Chat != null && result.Chat.Type is ChatTypeSupergroup supergroup)
                     {
                         var group = ViewModel.ProtoService.GetSupergroup(supergroup.SupergroupId);
-                        verified.Visibility = group != null && group.IsVerified ? Visibility.Visible : Visibility.Collapsed;
+                        verified.Visibility = group != null && ModernTdlibCompatibility.GetSupergroupIsVerified(group) ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else
                     {
@@ -530,7 +530,7 @@ namespace Unigram.Views.Popups
                         var user = result.User ?? ViewModel.ProtoService.GetUser(result.Chat);
                         if (result.IsPublic)
                         {
-                            subtitle.Text = $"@{user.Username}";
+                            subtitle.Text = $"@{user.GetUsername()}";
                         }
                         else
                         {
@@ -544,11 +544,11 @@ namespace Unigram.Views.Popups
                         {
                             if (supergroup.MemberCount > 0)
                             {
-                                subtitle.Text = string.Format("@{0}, {1}", supergroup.Username, Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
+                                subtitle.Text = string.Format("@{0}, {1}", supergroup.GetUsername(), Locale.Declension(supergroup.IsChannel ? "Subscribers" : "Members", supergroup.MemberCount));
                             }
                             else
                             {
-                                subtitle.Text = $"@{supergroup.Username}";
+                                subtitle.Text = $"@{supergroup.GetUsername()}";
                             }
                         }
                         else if (supergroup.MemberCount > 0)

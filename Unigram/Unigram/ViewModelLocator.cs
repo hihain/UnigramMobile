@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Unigram.Common;
 using Unigram.Services;
@@ -39,7 +40,10 @@ namespace Unigram
             var fail = true;
             var first = 0;
 
-            foreach (var session in GetSessions())
+            var stored = 0;
+            var configured = 0;
+
+            foreach (var session in GetSessions(ref stored))
             {
                 if (first < 1 || session == SettingsService.Current.PreviousSession)
                 {
@@ -47,40 +51,57 @@ namespace Unigram
                 }
 
                 fail = false;
+                configured++;
                 Configure(session);
             }
 
             if (fail)
             {
+                configured++;
                 Configure(first);
             }
+
+            Unigram.Logs.PushDiagnostics.Write("sessions", $"stored={stored};configured={configured};fallback={(fail ? 1 : 0)}");
 
             _container.Lifetime.Update();
         }
 
-        private IEnumerable<int> GetSessions()
+        private IEnumerable<int> GetSessions(ref int stored)
         {
-            var folders = Directory.GetDirectories(ApplicationData.Current.LocalFolder.Path);
-            foreach (var folder in folders)
+            // Session databases live under SessionStorage.Root, which the modern TDLib build
+            // relocates to an isolated subfolder. Enumerating any other directory here silently
+            // drops every stored session except the id 0 fallback below.
+            var sessions = Unigram.Views.SessionStorage.EnumerateStoredSessions().ToList();
+            stored = sessions.Count;
+
+            return GetSessions(sessions);
+        }
+
+        private IEnumerable<int> GetSessions(IList<int> sessions)
+        {
+            foreach (var session in sessions)
             {
-                if (int.TryParse(Path.GetFileName(folder), out int session))
+                var container = ApplicationData.Current.LocalSettings.CreateContainer($"{session}", ApplicationDataCreateDisposition.Always);
+                if (container.Values.ContainsKey("UserId"))
                 {
-                    var container = ApplicationData.Current.LocalSettings.CreateContainer($"{session}", ApplicationDataCreateDisposition.Always);
-                    if (container.Values.ContainsKey("UserId"))
+                    yield return session;
+                }
+                else
+                {
+#if MODERN_TDLIB
+                    // Never delete a stored database in the experimental build: an unexpected
+                    // layout change must not destroy an account that cannot be re-synced.
+                    Unigram.Logs.PushDiagnostics.Write("sessions", "result=skipped;reason=no-marker");
+#else
+                    Task.Factory.StartNew((path) =>
                     {
-                        yield return session;
-                    }
-                    else
-                    {
-                        Task.Factory.StartNew((path) =>
+                        try
                         {
-                            try
-                            {
-                                Directory.Delete((string)path, true);
-                            }
-                            catch { }
-                        }, folder);
-                    }
+                            Directory.Delete((string)path, true);
+                        }
+                        catch { }
+                    }, Unigram.Views.SessionStorage.GetSessionDirectory(session));
+#endif
                 }
             }
         }
@@ -278,7 +299,9 @@ namespace Unigram
                 builder.RegisterType<PaymentFormStep5ViewModel>();
                 builder.RegisterType<PaymentReceiptViewModel>();
                 builder.RegisterType<InviteViewModel>();
+#if !MODERN_TDLIB
                 builder.RegisterType<ChatsNearbyViewModel>();
+#endif
                 builder.RegisterType<FoldersViewModel>();
                 builder.RegisterType<FolderViewModel>();
 

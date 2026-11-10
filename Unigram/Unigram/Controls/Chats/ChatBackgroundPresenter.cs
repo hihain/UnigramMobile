@@ -16,7 +16,7 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Unigram.Controls.Chats
 {
-    public class ChatBackgroundPresenter : Grid, IHandle<UpdateSelectedBackground>
+    public class ChatBackgroundPresenter : Grid, IHandle<Unigram.Services.UpdateSelectedBackground>
     {
         private int _session;
         private IProtoService _protoService;
@@ -89,7 +89,7 @@ namespace Unigram.Controls.Chats
             }
         }
 
-        public void Handle(UpdateSelectedBackground update)
+        public void Handle(Unigram.Services.UpdateSelectedBackground update)
         {
             this.BeginOnUIThread(() =>
             {
@@ -244,7 +244,11 @@ namespace Unigram.Controls.Chats
 
                 _blurBrush = effectBrush;
                 _blurVisual = _compositor.CreateSpriteVisual();
+#if MODERN_TDLIB
+                DropShadowEx.SetRelativeSize(_blurVisual, _imageBackground);
+#else
                 _blurVisual.RelativeSizeAdjustment = Vector2.One;
+#endif
                 _blurVisual.Brush = _blurBrush;
 
                 ElementCompositionPreview.SetElementChildVisual(_imageBackground, _blurVisual);

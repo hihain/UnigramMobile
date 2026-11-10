@@ -1,0 +1,12 @@
+diff --git a/system_wrappers/source/denormal_disabler.cc b/system_wrappers/source/denormal_disabler.cc
+index b64b5ec21..95ed12657 100644
+--- a/system_wrappers/source/denormal_disabler.cc
++++ b/system_wrappers/source/denormal_disabler.cc
+@@ -20,6 +20,6 @@ namespace {
+ #endif
+ 
+ #if defined(WEBRTC_DENORMAL_DISABLER_X86_SUPPORTED) || \
+-    (defined(WEBRTC_ARCH_ARM_FAMILY) && !defined(_M_ARM64))
++    (defined(WEBRTC_ARCH_ARM_FAMILY) && !defined(_M_ARM64) && defined(__clang__))
+ #define WEBRTC_DENORMAL_DISABLER_SUPPORTED
+ #endif

@@ -26,6 +26,7 @@
                             <Setter Target="Footer.Background" Value="{ThemeResource MessageServiceBackgroundBrush}"/>
                             <Setter Target="Footer.Foreground" Value="White"/>
                             <Setter Target="Footer.Stroke" Value="White"/>
+                            <Setter Target="Footer.ReadStroke" Value="White"/>
                             <Setter Target="ContentPanel.Background" Value="{x:Null}"/>
                             <Setter Target="ContentPanel.BorderThickness" Value="0"/>
                             <Setter Target="Header.Background" Value="{ThemeResource MessageServiceBackgroundBrush}"/>
@@ -50,6 +51,7 @@
                             <Setter Target="Footer.Background" Value="{ThemeResource MessageServiceBackgroundBrush}"/>
                             <Setter Target="Footer.Foreground" Value="White"/>
                             <Setter Target="Footer.Stroke" Value="White"/>
+                            <Setter Target="Footer.ReadStroke" Value="White"/>
                             <Setter Target="ContentPanel.Background" Value="{x:Null}"/>
                             <Setter Target="ContentPanel.BorderThickness" Value="0"/>
                             <Setter Target="Header.Background" Value="{ThemeResource MessageServiceBackgroundBrush}"/>
@@ -74,6 +76,7 @@
                             <Setter Target="Footer.Background" Value="{ThemeResource MessageOverlayBackgroundBrush}"/>
                             <Setter Target="Footer.Foreground" Value="White"/>
                             <Setter Target="Footer.Stroke" Value="White"/>
+                            <Setter Target="Footer.ReadStroke" Value="White"/>
                             <!--<Setter Target="ContentPanel.BorderThickness" Value="0"/>-->
                         </VisualState.Setters>
                     </VisualState>
@@ -91,6 +94,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -164,12 +168,22 @@
             <local:MessageFooter
                 x:Name="Footer"
                 Stroke="{ThemeResource MessageSubtleLabelBrush}"
+                ReadStroke="{ThemeResource TelegramForegroundAccentBrush}"
                 VerticalAlignment="Bottom"
                 HorizontalAlignment="Right"
                 SizeChanged="OnSizeChanged"
                 Margin="-8,0,-6,-2"
                 Grid.Column="1"
                 Grid.Row="4"/>
+
+            <controls:WrapPanel
+                x:Name="Reactions"
+                Margin="0,4,0,0"
+                HorizontalAlignment="Left"
+                Orientation="Horizontal"
+                Visibility="Collapsed"
+                Grid.Column="1"
+                Grid.Row="5"/>
 
             <HyperlinkButton
                 x:Name="Thread"
@@ -181,7 +195,7 @@
                 Margin="-10,4,-10,-6"
                 Padding="0"
                 Grid.Column="1"
-                Grid.Row="5">
+                Grid.Row="6">
                 <Grid
                     BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
                     BorderThickness="0,1,0,0"

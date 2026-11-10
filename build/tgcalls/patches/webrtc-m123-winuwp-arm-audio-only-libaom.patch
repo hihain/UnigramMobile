@@ -1,0 +1,52 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 6239c14911..b3c96bb61b 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -24,6 +24,7 @@
+ import("//build/config/linux/pkg_config.gni")
+ import("//build/config/sanitizers/sanitizers.gni")
+ import("webrtc.gni")
++import("//third_party/libaom/options.gni")
+ if (rtc_enable_protobuf) {
+   import("//third_party/protobuf/proto_library.gni")
+ }
+@@ -514,13 +515,8 @@ if (!build_with_chromium) {
+       "api/task_queue:default_task_queue_factory",
+       "api/test/metrics",
+       "api/video_codecs:video_decoder_factory_template",
+-      "api/video_codecs:video_decoder_factory_template_libvpx_vp8_adapter",
+-      "api/video_codecs:video_decoder_factory_template_libvpx_vp9_adapter",
+       "api/video_codecs:video_decoder_factory_template_open_h264_adapter",
+       "api/video_codecs:video_encoder_factory_template",
+-      "api/video_codecs:video_encoder_factory_template_libaom_av1_adapter",
+-      "api/video_codecs:video_encoder_factory_template_libvpx_vp8_adapter",
+-      "api/video_codecs:video_encoder_factory_template_libvpx_vp9_adapter",
+       "api/video_codecs:video_encoder_factory_template_open_h264_adapter",
+       "audio",
+       "call",
+@@ -537,6 +533,25 @@ if (!build_with_chromium) {
+       "video",
+     ]
+ 
++    if (enable_libaom) {
++      deps += [
++        "api/video_codecs:video_encoder_factory_template_libaom_av1_adapter",
++      ]
++    }
++
++    if (rtc_build_libvpx) {
++      deps += [
++        "api/video_codecs:video_decoder_factory_template_libvpx_vp8_adapter",
++        "api/video_codecs:video_encoder_factory_template_libvpx_vp8_adapter",
++      ]
++      if (rtc_libvpx_build_vp9) {
++        deps += [
++          "api/video_codecs:video_decoder_factory_template_libvpx_vp9_adapter",
++          "api/video_codecs:video_encoder_factory_template_libvpx_vp9_adapter",
++        ]
++      }
++    }
++
+     if (rtc_include_dav1d_in_internal_decoder_factory) {
+       deps += [
+         "api/video_codecs:video_decoder_factory_template_dav1d_adapter",

@@ -314,4 +314,28 @@
     <value>Auto-download voice messages</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="DoubleTapAction" xml:space="preserve">
+    <value>Double-tap on message</value>
+    <comment>SettingsAppearanceView</comment>
+  </data>
+  <data name="DoubleTapActionNone" xml:space="preserve">
+    <value>Nothing</value>
+    <comment>SettingsAppearanceView</comment>
+  </data>
+  <data name="DoubleTapActionReaction" xml:space="preserve">
+    <value>Quick reaction</value>
+    <comment>SettingsAppearanceView</comment>
+  </data>
+  <data name="MoreReactions" xml:space="preserve">
+    <value>More reactions</value>
+    <comment>ChatView</comment>
+  </data>
+  <data name="ReportSelectMessages" xml:space="preserve">
+    <value>Select the messages you want to report, then choose Report.</value>
+    <comment>ChatView</comment>
+  </data>
+  <data name="ReportSkip" xml:space="preserve">
+    <value>Skip</value>
+    <comment>ChatView</comment>
+  </data>
 </root>

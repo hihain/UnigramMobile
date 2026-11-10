@@ -34,25 +34,37 @@ namespace Unigram.Collections
             {
                 IsLoading = true;
 
-                var response = await _protoService.SendAsync(new SearchChatMessages(_chatId, _query, null, _lastMaxId, 0, 50, _filter, 0));
-                if (response is Messages messages)
+                var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                    ModernTdlibCompatibility.CreateSearchChatMessages(_chatId, null, _query, null, _lastMaxId, 0, 50, _filter)
+#else
+                    new SearchChatMessages(_chatId, _query, null, _lastMaxId, 0, 50, _filter, 0)
+#endif
+                );
+                if (ModernTdlibCompatibility.TryGetSearchChatMessages(
+                    response,
+                    out _,
+                    out var messages,
+                    out var nextFromMessageId))
                 {
-                    if (messages.MessagesValue.Count > 0)
+                    if (messages.Count > 0)
                     {
-                        _lastMaxId = messages.MessagesValue.Min(x => x.Id);
-                        _hasMore = true;
+                        _lastMaxId = nextFromMessageId != 0
+                            ? nextFromMessageId
+                            : messages.Min(x => x.Id);
+                        _hasMore = nextFromMessageId != 0;
                     }
                     else
                     {
                         _hasMore = false;
                     }
 
-                    var result = messages.MessagesValue.ToArray();
+                    var result = messages.ToArray();
                     ProcessFiles(result);
 
                     IsLoading = false;
 
-                    return messages.MessagesValue;
+                    return result;
                 }
             }
             catch { }
@@ -86,13 +98,13 @@ namespace Unigram.Collections
                 var previousDate = Utils.UnixTimestampToDateTime(previous.Date);
                 if (previousDate.Year != itemDate.Year || previousDate.Month != itemDate.Month)
                 {
-                    var service = new Message(0, previous.SenderId, previous.ChatId, null, null, previous.IsOutgoing, false, false, false, false, true, false, false, false, false, false, false, previous.IsChannelPost, false, previous.Date, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderDate(), null);
+                    var service = CreateSeparatorMessage(previous);
                     return service;
                 }
             }
             else if (item == null && previous != null)
             {
-                var service = new Message(0, previous.SenderId, previous.ChatId, null, null, previous.IsOutgoing, false, false, false, false, true, false, false, false, false, false, false, previous.IsChannelPost, false, previous.Date, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderDate(), null);
+                var service = CreateSeparatorMessage(previous);
                 return service;
             }
 
@@ -106,6 +118,15 @@ namespace Unigram.Collections
             {
                 base.InsertItem(index + 1, service);
             }
+        }
+
+        private static Message CreateSeparatorMessage(Message previous)
+        {
+#if MODERN_TDLIB
+            return ModernTdlibCompatibility.CreateMessage(0, previous.SenderId, previous.ChatId, null, null, previous.IsOutgoing, previous.IsChannelPost, previous.Date, new MessageHeaderDate());
+#else
+            return new Message(0, previous.SenderId, previous.ChatId, null, null, previous.IsOutgoing, false, false, false, false, true, false, false, false, false, false, false, previous.IsChannelPost, false, previous.Date, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, string.Empty, new MessageHeaderDate(), null);
+#endif
         }
 
 
@@ -138,10 +159,6 @@ namespace Unigram.Collections
                     {
                         content = gameMessage.Game.Photo;
                     }
-                }
-                else if (content is MessageInvoice invoiceMessage)
-                {
-                    content = invoiceMessage.Photo;
                 }
                 else if (content is MessageLocation locationMessage)
                 {
@@ -309,22 +326,34 @@ namespace Unigram.Collections
         {
             try
             {
-                var response = await _protoService.SendAsync(new SearchChatMessages(_chatId, _query, null, _lastMaxId, 0, 50, _filter, 0));
-                if (response is Messages messages)
+                var response = await _protoService.SendAsync(
+#if MODERN_TDLIB
+                    ModernTdlibCompatibility.CreateSearchChatMessages(_chatId, null, _query, null, _lastMaxId, 0, 50, _filter)
+#else
+                    new SearchChatMessages(_chatId, _query, null, _lastMaxId, 0, 50, _filter, 0)
+#endif
+                );
+                if (ModernTdlibCompatibility.TryGetSearchChatMessages(
+                    response,
+                    out _,
+                    out var messages,
+                    out var nextFromMessageId))
                 {
-                    ProcessFiles(messages.MessagesValue);
+                    ProcessFiles(messages);
 
-                    if (messages.MessagesValue.Count > 0)
+                    if (messages.Count > 0)
                     {
-                        _lastMaxId = messages.MessagesValue.Min(x => x.Id);
-                        _hasMore = true;
+                        _lastMaxId = nextFromMessageId != 0
+                            ? nextFromMessageId
+                            : messages.Min(x => x.Id);
+                        _hasMore = nextFromMessageId != 0;
                     }
                     else
                     {
                         _hasMore = false;
                     }
 
-                    return messages.MessagesValue.GroupBy(x =>
+                    return messages.GroupBy(x =>
                     {
                         var dateTime = Utils.UnixTimestampToDateTime(x.Date);
                         return new DateTime(dateTime.Year, dateTime.Month, 1);
@@ -378,7 +407,7 @@ namespace Unigram.Collections
                 }
                 else if (content is MessageInvoice invoiceMessage)
                 {
-                    content = invoiceMessage.Photo;
+                    content = invoiceMessage.GetPhoto();
                 }
                 else if (content is MessageLocation locationMessage)
                 {

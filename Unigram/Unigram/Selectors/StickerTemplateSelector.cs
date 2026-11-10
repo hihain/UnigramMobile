@@ -17,7 +17,7 @@ namespace Unigram.Selectors
         {
             if (item is ViewModels.Dialogs.StickerViewModel sticker)
             {
-                if (sticker.IsAnimated)
+                if (sticker.GetIsAnimated())
                 {
                     return AnimatedTemplate;
                 }

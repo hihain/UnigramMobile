@@ -1,4 +1,5 @@
 ﻿using Telegram.Td.Api;
+using Unigram.Common;
 using Unigram.ViewModels;
 using Windows.UI.Xaml.Controls;
 
@@ -27,15 +28,15 @@ namespace Unigram.Controls.Messages.Content
                 return;
             }
 
-            Title.Text = invoice.Title;
-            Description.Text = invoice.Description;
+            Title.Text = invoice.GetTitle();
+            Description.Text = invoice.GetDescription();
 
             Footer.UpdateMessage(message);
         }
 
         public bool IsValid(MessageContent content, bool primary)
         {
-            return content is MessageInvoice invoice && invoice.Photo == null;
+            return content is MessageInvoice invoice && invoice.GetPhoto() == null;
         }
     }
 }

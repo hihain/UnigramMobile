@@ -8,11 +8,13 @@
     xmlns:dataView="using:Unigram.Charts.DataView"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:td="using:Telegram.Td.Api"
+    xmlns:stats="using:Unigram.Views.Chats"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
     <Page.Resources>
+        <stats:ChatStatisticsChannelMeanConverter x:Key="ChatStatisticsChannelMeanConverter"/>
         <DataTemplate x:Key="UserTemplate">
             <Button Style="{StaticResource EmptyButtonStyle}">
                 <Grid Margin="12,6">
@@ -65,12 +67,12 @@
 
                 <controls:ChatStatisticsOverview
                     Title="{CustomResource ViewsPerPost}"
-                    Value="{x:Bind MeanViewCount}"
+                    Value="{Binding Converter={StaticResource ChatStatisticsChannelMeanConverter}, ConverterParameter=view}"
                     Grid.Row="1"/>
 
                 <controls:ChatStatisticsOverview
                     Title="{CustomResource SharesPerPost}"
-                    Value="{x:Bind MeanShareCount}"
+                    Value="{Binding Converter={StaticResource ChatStatisticsChannelMeanConverter}, ConverterParameter=shares}"
                     Grid.Column="1"
                     Grid.Row="1"/>
             </Grid>

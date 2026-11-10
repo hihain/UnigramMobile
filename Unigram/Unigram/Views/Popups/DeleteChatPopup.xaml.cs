@@ -80,7 +80,7 @@ namespace Unigram.Views.Popups
                     {
                         TextBlockHelper.SetMarkdown(Subtitle, string.Format(Strings.Resources.AreYouSureClearHistoryChannel));
                     }
-                    else if (string.IsNullOrEmpty(supergroup.Username))
+                    else if (string.IsNullOrEmpty(supergroup.GetUsername()))
                     {
                         TextBlockHelper.SetMarkdown(Subtitle, string.Format(Strings.Resources.AreYouSureClearHistoryWithChat, chat.Title));
                     }

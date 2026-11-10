@@ -34,7 +34,7 @@ namespace Unigram.Controls.Chats
         {
             if (selector.ContentTemplateRoot is FrameworkElement root && root.Tag is MessageViewModel message)
             {
-                ViewModel.ReplyToMessage(message);
+                ViewModel.DoubleTapMessage(message);
             }
         }
 

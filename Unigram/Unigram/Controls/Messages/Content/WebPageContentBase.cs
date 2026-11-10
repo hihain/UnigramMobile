@@ -20,7 +20,7 @@ namespace Unigram.Controls.Messages.Content
         {
             var empty = true;
 
-            if (string.Equals(webPage.Type, "telegram_background", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_background", StringComparison.OrdinalIgnoreCase))
             {
                 empty = false;
                 title.Text = Strings.Resources.ChatBackground;
@@ -103,7 +103,7 @@ namespace Unigram.Controls.Messages.Content
                     button.Visibility = Visibility.Visible;
                 }
             }
-            else if (string.Equals(webPage.Type, "telegram_megagroup", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_megagroup", StringComparison.OrdinalIgnoreCase))
             {
                 if (run1 != null)
                 {
@@ -114,7 +114,7 @@ namespace Unigram.Controls.Messages.Content
 
                 button.Visibility = Visibility.Visible;
             }
-            else if (string.Equals(webPage.Type, "telegram_channel", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_channel", StringComparison.OrdinalIgnoreCase))
             {
                 if (run1 != null)
                 {
@@ -125,7 +125,7 @@ namespace Unigram.Controls.Messages.Content
 
                 button.Visibility = Visibility.Visible;
             }
-            else if (string.Equals(webPage.Type, "telegram_message", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_message", StringComparison.OrdinalIgnoreCase))
             {
                 if (run1 != null)
                 {
@@ -136,7 +136,7 @@ namespace Unigram.Controls.Messages.Content
 
                 button.Visibility = Visibility.Visible;
             }
-            else if (string.Equals(webPage.Type, "telegram_background", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(ModernTdlibCompatibility.GetWebPageTypeName(webPage), "telegram_background", StringComparison.OrdinalIgnoreCase))
             {
                 if (run1 != null)
                 {
@@ -198,18 +198,18 @@ namespace Unigram.Controls.Messages.Content
         {
             var result = 0;
 
-            foreach (var block in webPage.PageBlocks)
+            foreach (var block in webPage.GetPageBlocks())
             {
                 if (block is PageBlockSlideshow slideshow)
                 {
-                    foreach (var item in slideshow.PageBlocks)
+                    foreach (var item in slideshow.GetPageBlocks())
                     {
                         result = CountBlock(webPage, item, result);
                     }
                 }
                 else if (block is PageBlockCollage collage)
                 {
-                    foreach (var item in collage.PageBlocks)
+                    foreach (var item in collage.GetPageBlocks())
                     {
                         result = CountBlock(webPage, item, result);
                     }

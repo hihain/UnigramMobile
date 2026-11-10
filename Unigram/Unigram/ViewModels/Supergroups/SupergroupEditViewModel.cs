@@ -261,7 +261,11 @@ namespace Unigram.ViewModels.Supergroups
 
                 if (item.IsChannel && _isSignatures != item.SignMessages)
                 {
+#if MODERN_TDLIB
+                    var response = await ProtoService.SendAsync(new ToggleSupergroupSignMessages(item.Id, _isSignatures, true));
+#else
                     var response = await ProtoService.SendAsync(new ToggleSupergroupSignMessages(item.Id, _isSignatures));
+#endif
                     if (response is Error)
                     {
                         // TODO:
