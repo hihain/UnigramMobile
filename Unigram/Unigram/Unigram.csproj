@@ -1502,6 +1502,7 @@
     <Content Include="Assets\Emojis\2753.png" />
     <Content Include="Assets\Emojis\2757.png" />
     <Content Include="Assets\Emoji\apple.png" />
+    <Content Include="Assets\Emoji\fluent.png" />
     <Content Include="Assets\Emoji\microsoft.png" />
     <Compile Include="Controls\GlyphToggleButton.cs" />
     <Compile Include="Controls\ProgressShape.cs" />
@@ -1663,6 +1664,8 @@
     <Content Include="Assets\Fonts\SegMVR2.ttf" />
     <Content Include="Assets\Fonts\SEGMDL2.TTF" />
     <Content Include="Assets\Emoji\apple.ttf" />
+    <Content Include="Assets\Emoji\fluent.ttf" />
+    <Content Include="Assets\Emoji\fluent-LICENSE.txt" />
     <Content Include="Assets\Animations\SendingGrams.tgs" />
     <Content Include="Assets\Animations\TwoFactorSetupDone.tgs" />
     <Content Include="Assets\Animations\TwoFactorSetupHint.tgs" />

@@ -107,7 +107,12 @@ namespace Unigram.Controls.Drawers
                 ? "SidebarState"
                 : "NarrowState", false);
 
+#if MODERN_TDLIB
+            // Neither Fluent Emoji nor the Windows system emoji font has country-flag glyphs.
+            var microsoft = true;
+#else
             var microsoft = string.Equals(SettingsService.Current.Appearance.EmojiSet.Id, "microsoft");
+#endif
             var tone = SettingsService.Current.Stickers.SkinTone;
 
             if (Toolbar.ItemsSource is List<EmojiGroup> groups)

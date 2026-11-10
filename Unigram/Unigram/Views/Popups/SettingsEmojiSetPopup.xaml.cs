@@ -65,7 +65,7 @@ namespace Unigram.Views.Popups
             }
 
 #if MODERN_TDLIB
-            Theme.Current["EmojiThemeFontFamily"] = new FontFamily("XamlAutoFontFamily");
+            Theme.Current["EmojiThemeFontFamily"] = Theme.CreateEmojiFontFamily(emojiSet.Id);
 #else
             switch (emojiSet.Id)
             {
@@ -294,7 +294,8 @@ namespace Unigram.Views.Popups
                 return AsyncInfo.Run(async (token) =>
                 {
 #if MODERN_TDLIB
-                    Add(new EmojiSet { Id = "microsoft", Title = "Microsoft", IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });
+                    Add(new EmojiSet { Id = Theme.FluentEmojiSetId, Title = "Fluent", Version = 1, IsOfficial = true, IsDefault = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "fluent.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "fluent.png") } } });
+                    Add(new EmojiSet { Id = Theme.SystemEmojiSetId, Title = "Microsoft (system)", Version = 1, IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });
 #else
                     Add(new EmojiSet { Id = "apple", Title = "Apple", IsOfficial = true, IsDefault = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.png") } } });
                     Add(new EmojiSet { Id = "microsoft", Title = "Microsoft", IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });

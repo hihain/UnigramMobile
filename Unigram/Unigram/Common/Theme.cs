@@ -19,6 +19,25 @@ namespace Unigram.Common
 
         private readonly ApplicationDataContainer isolatedStore;
 
+#if MODERN_TDLIB
+        public const string FluentEmojiSetId = "fluent";
+        public const string SystemEmojiSetId = "microsoft";
+
+        // Windows 10 Mobile's DirectWrite does not composite CBDT/CBLC colour-bitmap fonts
+        // (the bundled apple.ttf and the downloadable sets), which painted every emoji blank.
+        // fluent.ttf is Microsoft Fluent Emoji (flat, MIT) converted to COLRv0 layered vector
+        // glyphs, which Windows has composited since 8.1. It deliberately covers no ordinary
+        // text (letters, digits, #, *, space, (c), (R), TM, arrows), so the rest of the string
+        // - and emoji it lacks, such as flags and keycaps - fall back to Segoe UI and then the
+        // system Segoe UI Emoji. Its vertical metrics match Segoe UI so line heights are kept.
+        public static FontFamily CreateEmojiFontFamily(string emojiSetId)
+        {
+            return emojiSetId == FluentEmojiSetId
+                ? new FontFamily("ms-appx:///Assets/Emoji/fluent.ttf#Unigram Emoji, Segoe UI")
+                : new FontFamily("XamlAutoFontFamily");
+        }
+#endif
+
         public Theme()
         {
             try
@@ -35,15 +54,6 @@ namespace Unigram.Common
                 this.Add("MessageFontSize", GetValueOrDefault("MessageFontSize", ApiInfo.IsUniversalApiContract7Present ? 14d : 15d));
 
 #if MODERN_TDLIB
-                // The bundled emoji sets (Assets\Emoji\apple.ttf and the downloadable ones) are
-                // CBDT/CBLC colour-BITMAP fonts: 13.8 MB of CBDT bitmap data against an 87 KB
-                // glyf table, so emoji codepoints carry no outlines whatsoever. Windows 10
-                // Mobile's DirectWrite loads the font and honours its advance widths, but does
-                // not composite the CBDT bitmaps, so every emoji painted as blank space of the
-                // correct size - no glyph, and no .notdef box either. Use the system font and
-                // let DirectWrite fall back to the platform's own Segoe UI Emoji, which
-                // Windows 10 Mobile does render natively.
-                //
                 // Resolved in its own scope so neither an earlier failure in this constructor
                 // nor a failure reading the setting can leave EmojiThemeFontFamily unregistered:
                 // the enclosing catch is silent, and a missing key leaves every emoji-bearing
@@ -58,8 +68,8 @@ namespace Unigram.Common
                     emojiSetId = "error_" + ex.GetType().Name;
                 }
 
-                this.Add("EmojiThemeFontFamily", new FontFamily("XamlAutoFontFamily"));
-                Logs.PushDiagnostics.Write("theme.emoji", $"set={emojiSetId};font=system;reason=cbdt_bitmap_not_composited");
+                this.Add("EmojiThemeFontFamily", CreateEmojiFontFamily(emojiSetId));
+                Logs.PushDiagnostics.Write("theme.emoji", $"set={emojiSetId};font={(emojiSetId == FluentEmojiSetId ? "fluent_colrv0" : "system")}");
 #else
                 var emojiSet = SettingsService.Current.Appearance.EmojiSet;
                 switch (emojiSet.Id)

@@ -159,10 +159,18 @@ namespace Unigram.Services.Settings
                 if (_emojiSet == null)
                 {
 #if MODERN_TDLIB
-                    // Windows 10 Mobile cannot render the bundled or downloadable colour-bitmap
-                    // fonts. Keep persisted state aligned with the system font used by Theme.
+                    // Only the bundled COLRv0 Fluent font and the system font render on Windows
+                    // 10 Mobile; normalize anything else (apple, cloud sets) to the default.
+                    // Builds before 26.11.6291 forced "microsoft", so move those users to
+                    // Fluent once; an explicit later choice of the system font is respected.
                     var emojiSet = GetDefaultEmojiSet();
                     var storedId = GetValueOrDefault(_container, "EmojiSetId", emojiSet.Id);
+                    var revision = GetValueOrDefault(_container, "EmojiSetDefaultRevision", 0);
+                    if (revision >= FluentEmojiSetRevision && storedId == Theme.SystemEmojiSetId)
+                    {
+                        emojiSet = GetSystemEmojiSet();
+                    }
+
                     var storedTitle = GetValueOrDefault(_container, "EmojiSet", emojiSet.Title);
                     var storedVersion = GetValueOrDefault(_container, "EmojiSetVersion", emojiSet.Version);
                     if (storedId != emojiSet.Id || storedTitle != emojiSet.Title || storedVersion != emojiSet.Version)
@@ -170,6 +178,11 @@ namespace Unigram.Services.Settings
                         AddOrUpdateValue(_container, "EmojiSetId", emojiSet.Id);
                         AddOrUpdateValue(_container, "EmojiSet", emojiSet.Title);
                         AddOrUpdateValue(_container, "EmojiSetVersion", emojiSet.Version);
+                    }
+
+                    if (revision < FluentEmojiSetRevision)
+                    {
+                        AddOrUpdateValue(_container, "EmojiSetDefaultRevision", FluentEmojiSetRevision);
                     }
 
                     _emojiSet = emojiSet;
@@ -188,6 +201,14 @@ namespace Unigram.Services.Settings
             set
             {
                 var fallback = GetDefaultEmojiSet();
+#if MODERN_TDLIB
+                if (value != null && value.Id != Theme.FluentEmojiSetId && value.Id != Theme.SystemEmojiSetId)
+                {
+                    value = fallback;
+                }
+
+                AddOrUpdateValue(_container, "EmojiSetDefaultRevision", FluentEmojiSetRevision);
+#endif
 
                 _emojiSet = value ?? fallback;
                 AddOrUpdateValue(_container, "EmojiSetId", value?.Id ?? fallback.Id);
@@ -196,13 +217,27 @@ namespace Unigram.Services.Settings
             }
         }
 
+#if MODERN_TDLIB
+        private const int FluentEmojiSetRevision = 1;
+
+        private InstalledEmojiSet GetSystemEmojiSet()
+        {
+            return new InstalledEmojiSet
+            {
+                Id = Theme.SystemEmojiSetId,
+                Title = "Microsoft (system)",
+                Version = 1
+            };
+        }
+#endif
+
         private InstalledEmojiSet GetDefaultEmojiSet()
         {
             return new InstalledEmojiSet
             {
 #if MODERN_TDLIB
-                Id = "microsoft",
-                Title = "Microsoft",
+                Id = Theme.FluentEmojiSetId,
+                Title = "Fluent",
 #else
                 Id = "apple",
                 Title = "Apple",

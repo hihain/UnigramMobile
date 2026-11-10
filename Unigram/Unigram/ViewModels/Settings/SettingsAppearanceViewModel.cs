@@ -39,6 +39,7 @@ namespace Unigram.ViewModels.Settings
 
             switch (emojiSet.Id)
             {
+                case "fluent":
                 case "microsoft":
                 case "apple":
                     EmojiSetId = $"ms-appx:///Assets/Emoji/{emojiSet.Id}.png";
@@ -287,6 +288,7 @@ namespace Unigram.ViewModels.Settings
 
             switch (emojiSet.Id)
             {
+                case "fluent":
                 case "microsoft":
                 case "apple":
                     EmojiSetId = $"ms-appx:///Assets/Emoji/{emojiSet.Id}.png";

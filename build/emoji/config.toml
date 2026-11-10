@@ -1,0 +1,21 @@
+family = "Unigram Emoji"
+output_file = "UnigramEmoji-raw.ttf"
+color_format = "glyf_colr_0"
+upem = 2048
+width = 2812
+ascender = 1958
+descender = -513
+linegap = 0
+keep_glyph_names = true
+clip_to_viewbox = true
+
+[axis.wght]
+name = "Weight"
+default = 400
+
+[master.regular]
+style_name = "Regular"
+srcs = ["staged/*.svg"]
+
+[master.regular.position]
+wght = 400
