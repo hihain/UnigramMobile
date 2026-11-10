@@ -157,20 +157,31 @@ namespace Unigram.Services.Settings
             get
             {
                 if (_emojiSet == null)
+                {
+#if MODERN_TDLIB
+                    // Windows 10 Mobile cannot render the bundled or downloadable colour-bitmap
+                    // fonts. Keep persisted state aligned with the system font used by Theme.
+                    var emojiSet = GetDefaultEmojiSet();
+                    var storedId = GetValueOrDefault(_container, "EmojiSetId", emojiSet.Id);
+                    var storedTitle = GetValueOrDefault(_container, "EmojiSet", emojiSet.Title);
+                    var storedVersion = GetValueOrDefault(_container, "EmojiSetVersion", emojiSet.Version);
+                    if (storedId != emojiSet.Id || storedTitle != emojiSet.Title || storedVersion != emojiSet.Version)
+                    {
+                        AddOrUpdateValue(_container, "EmojiSetId", emojiSet.Id);
+                        AddOrUpdateValue(_container, "EmojiSet", emojiSet.Title);
+                        AddOrUpdateValue(_container, "EmojiSetVersion", emojiSet.Version);
+                    }
+
+                    _emojiSet = emojiSet;
+#else
                     _emojiSet = new InstalledEmojiSet
                     {
-#if MODERN_TDLIB
-                        // See Theme.cs: the bundled colour-bitmap emoji fonts do not render on
-                        // Windows 10 Mobile, so this build uses the system emoji font. Default
-                        // the stored set to match, so Settings reflects what is actually drawn.
-                        Id = GetValueOrDefault(_container, "EmojiSetId", "microsoft"),
-                        Title = GetValueOrDefault(_container, "EmojiSet", "Microsoft"),
-#else
                         Id = GetValueOrDefault(_container, "EmojiSetId", "apple"),
                         Title = GetValueOrDefault(_container, "EmojiSet", "Apple"),
-#endif
                         Version = GetValueOrDefault(_container, "EmojiSetVersion", 1),
                     };
+#endif
+                }
 
                 return _emojiSet;
             }

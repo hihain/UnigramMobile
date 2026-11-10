@@ -64,10 +64,13 @@ namespace Unigram.Views.Popups
                 return;
             }
 
+#if MODERN_TDLIB
+            Theme.Current["EmojiThemeFontFamily"] = new FontFamily("XamlAutoFontFamily");
+#else
             switch (emojiSet.Id)
             {
                 case "microsoft":
-                    Theme.Current["EmojiThemeFontFamily"] = new FontFamily($"XamlAutoFontFamily");
+                    Theme.Current["EmojiThemeFontFamily"] = new FontFamily("XamlAutoFontFamily");
                     break;
                 case "apple":
                     Theme.Current["EmojiThemeFontFamily"] = new FontFamily($"ms-appx:///Assets/Emoji/{emojiSet.Id}.ttf#Segoe UI Emoji");
@@ -76,7 +79,7 @@ namespace Unigram.Views.Popups
                     Theme.Current["EmojiThemeFontFamily"] = new FontFamily($"ms-appdata:///local/emoji/{emojiSet.Id}.{emojiSet.Version}.ttf#Segoe UI Emoji");
                     break;
             }
-
+#endif
             SettingsService.Current.Appearance.EmojiSet = emojiSet.ToInstalled();
             TLContainer.Current.Resolve<IThemeService>().Refresh();
         }
@@ -290,6 +293,9 @@ namespace Unigram.Views.Popups
             {
                 return AsyncInfo.Run(async (token) =>
                 {
+#if MODERN_TDLIB
+                    Add(new EmojiSet { Id = "microsoft", Title = "Microsoft", IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });
+#else
                     Add(new EmojiSet { Id = "apple", Title = "Apple", IsOfficial = true, IsDefault = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.png") } } });
                     Add(new EmojiSet { Id = "microsoft", Title = "Microsoft", IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });
 
@@ -299,6 +305,7 @@ namespace Unigram.Views.Popups
                     {
                         Add(item);
                     }
+#endif
 
                     _hasMoreItems = false;
                     return new LoadMoreItemsResult { Count = 0 };
