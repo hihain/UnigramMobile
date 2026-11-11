@@ -7,12 +7,14 @@ using System.Text;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Controls;
 using Unigram.Navigation;
 using Unigram.Services.Settings;
 using Windows.Storage;
 using Windows.UI;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
 
 namespace Compatibility
 {
@@ -87,6 +89,8 @@ namespace Unigram.Services
 
         Task InstallThemeAsync(StorageFile file);
         Task SetThemeAsync(ThemeInfoBase info);
+
+        Task PromptRestartIfThemeMismatchAsync();
 
         void Refresh();
     }
@@ -320,6 +324,70 @@ namespace Unigram.Services
 
             _aggregator.Publish(new UpdateSelectedBackground(true, _protoService.GetSelectedBackground(true)));
             _aggregator.Publish(new UpdateSelectedBackground(false, _protoService.GetSelectedBackground(false)));
+
+            await PromptRestartIfThemeMismatchAsync();
+        }
+
+        private static ElementTheme? _restartPromptedFor;
+
+        // Application.RequestedTheme can only be set at launch. Switching between light and dark
+        // at runtime only changes the root element's RequestedTheme, and on Windows 10 Mobile the
+        // ThemeResource setters of control default styles (RadioButton, BadgeButton, ...) keep
+        // resolving against the launch theme, which leaves labels white-on-white (or black-on-black).
+        // The device has no CoreApplication.RequestRestartAsync (UniversalApiContract 5), so offer
+        // to close the app; the next launch applies the new theme to the whole application.
+        public async Task PromptRestartIfThemeMismatchAsync()
+        {
+            ElementTheme element;
+            ElementTheme application;
+
+            try
+            {
+                element = _settingsService.Appearance.GetCalculatedElementTheme();
+                application = Application.Current.RequestedTheme == ApplicationTheme.Dark ? ElementTheme.Dark : ElementTheme.Light;
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("theme.restart_prompt", ex);
+                return;
+            }
+
+            if (element == application)
+            {
+                _restartPromptedFor = null;
+                return;
+            }
+
+            if (_restartPromptedFor == element)
+            {
+                return;
+            }
+
+            _restartPromptedFor = element;
+
+            var details = $"app={application};element={element}";
+
+            try
+            {
+                var name = element == ElementTheme.Dark ? "dark" : "light";
+                var confirm = await MessagePopup.ShowAsync(
+                    $"Unigram needs to restart to finish switching to the {name} theme. Until then, some text may be hard to read.\r\n\r\nClose Unigram now? Open it again to continue.",
+                    "Restart required",
+                    "Close now",
+                    "Later");
+
+                Logs.PushDiagnostics.Write("theme.restart_prompt", details + (confirm == ContentDialogResult.Primary ? ";result=exit" : ";result=later"));
+
+                if (confirm == ContentDialogResult.Primary)
+                {
+                    Application.Current.Exit();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.Write("theme.restart_prompt", details + ";result=error");
+                Logs.PushDiagnostics.WriteException("theme.restart_prompt", ex);
+            }
         }
 
         public async void Refresh()

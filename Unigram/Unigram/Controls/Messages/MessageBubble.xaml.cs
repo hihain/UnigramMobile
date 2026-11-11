@@ -1542,12 +1542,13 @@ namespace Unigram.Controls.Messages
             }
 
             var message = _message;
-            if (message == null)
+            if (message == null && !_placeholder)
             {
                 return;
             }
 
-            var content = message.GeneratedContent ?? message.Content;
+            // Mockups (settings previews) have no message, but still need room for the footer.
+            var content = message?.GeneratedContent ?? message?.Content;
             if (content is MessageSticker || content is MessageDice || content is MessageVideoNote || content is MessageBigEmoji || _placeholder) //TODO: check & also ignored changes...
             {
                 var footerWidth = Footer.ActualWidth - 5;

@@ -5,6 +5,7 @@ using Unigram.Controls;
 using Unigram.Navigation;
 using Unigram.Services;
 using Unigram.Services.Settings;
+using Unigram.Views;
 using Windows.Devices.Geolocation;
 using Windows.Services.Maps;
 using Windows.System;
@@ -73,6 +74,8 @@ namespace Unigram.ViewModels.Settings
 
             Aggregator.Publish(new UpdateSelectedBackground(true, ProtoService.GetSelectedBackground(true)));
             Aggregator.Publish(new UpdateSelectedBackground(false, ProtoService.GetSelectedBackground(false)));
+
+            await TLContainer.Current.Resolve<IThemeService>().PromptRestartIfThemeMismatchAsync();
         }
 
         public NightMode Mode
