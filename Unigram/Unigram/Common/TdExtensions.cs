@@ -642,12 +642,24 @@ namespace Unigram.Common
 #endif
             }
 
+            // Only TGS (Lottie) stickers can animate here. WebM video stickers need
+            // VP9 + matroska, which the bundled ffmpeg 4.1.3 build doesn't include,
+            // so they're rendered statically from their thumbnail (see GetIsVideo).
             public static bool GetIsAnimated(this Sticker sticker)
             {
 #if MODERN_TDLIB
-                return sticker?.Format is StickerFormatTgs || sticker?.Format is StickerFormatWebm;
+                return sticker?.Format is StickerFormatTgs;
 #else
                 return sticker?.IsAnimated == true;
+#endif
+            }
+
+            public static bool GetIsVideo(this Sticker sticker)
+            {
+#if MODERN_TDLIB
+                return sticker?.Format is StickerFormatWebm;
+#else
+                return false;
 #endif
             }
 

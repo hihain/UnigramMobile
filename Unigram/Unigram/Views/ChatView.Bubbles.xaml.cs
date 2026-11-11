@@ -701,7 +701,15 @@ namespace Unigram.Views
                 //        item.Presenter.MediaPlayer.Pause();
                 //    }
                 //}
-                if (_old.TryGetValue(message.Id, out MediaPlayerItem item))
+                // Play() keys inline players by AnimationHash(), not by message id.
+                var key = message.AnimationHash();
+                if (!_old.ContainsKey(key))
+                {
+                    // Not attached yet (e.g. download just finished): attach the visible players first.
+                    ViewVisibleMessages(false);
+                }
+
+                if (_old.TryGetValue(key, out MediaPlayerItem item))
                 {
                     if (item.MediaPlayerPresenter?.MediaPlayer == null)
                     {
@@ -714,7 +722,7 @@ namespace Unigram.Views
                         item.MediaPlayerPresenter.MediaPlayer.IsMuted = false;
                         item.MediaPlayerPresenter.MediaPlayer.IsLoopingEnabled = false;
                         item.MediaPlayerPresenter.MediaPlayer.PlaybackSession.Position = TimeSpan.Zero;
-                        PauseAllOtherVideoNotes(message.Id);
+                        PauseAllOtherVideoNotes(key);
 
                         // Mark it as viewed if needed
                         if (message.Content is MessageVideoNote videoNote && !message.IsOutgoing && !videoNote.IsViewed)
@@ -727,8 +735,15 @@ namespace Unigram.Views
                             progress.Maximum = item.MediaPlayerPresenter.MediaPlayer.PlaybackSession.NaturalDuration.TotalSeconds;
                             async void ProgressHandler(Windows.Media.Playback.MediaPlaybackSession session, object args)
                             {
+                                var duration = session.NaturalDuration.TotalSeconds;
                                 await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                                 {
+                                    // A freshly attached player has no duration yet when Maximum is first set.
+                                    if (duration > 0 && progress.Maximum != duration)
+                                    {
+                                        progress.Maximum = duration;
+                                    }
+
                                     progress.Value = session.Position.TotalSeconds;
                                 });
                             }
@@ -762,7 +777,7 @@ namespace Unigram.Views
                     {
                         item.MediaPlayerPresenter.MediaPlayer.IsMuted = false;
                         item.MediaPlayerPresenter.MediaPlayer.Play();
-                        PauseAllOtherVideoNotes(message.Id);
+                        PauseAllOtherVideoNotes(key);
                         if (item.Container.FindName("MutedIcon") is StackPanel mutedIcon)
                             mutedIcon.Visibility = Visibility.Collapsed;
                     }
@@ -810,11 +825,11 @@ namespace Unigram.Views
             }
         }
 
-        private void PauseAllOtherVideoNotes(long messageId)
+        private void PauseAllOtherVideoNotes(long key)
         {
             foreach (var item in _old)
             {
-                if (item.Key == messageId ||
+                if (item.Key == key ||
                     !(item.Value.MediaPlayerPresenter?.MediaPlayer is Windows.Media.Playback.MediaPlayer player) ||
                     !(item.Value.Container.FindName("MutedIcon") is StackPanel mutedIcon)) continue;
                 player.IsMuted = true;

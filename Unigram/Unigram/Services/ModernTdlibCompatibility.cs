@@ -573,7 +573,8 @@ namespace Unigram.Services
 
         public static bool GetStickerIsAnimated(Sticker sticker)
         {
-            return sticker?.Format is StickerFormatTgs || sticker?.Format is StickerFormatWebm;
+            // Lottie-renderable only; WebM video stickers can't be decoded on W10M.
+            return sticker?.Format is StickerFormatTgs;
         }
 
         public static bool GetStickerSetIsAnimated(StickerSet stickerSet)

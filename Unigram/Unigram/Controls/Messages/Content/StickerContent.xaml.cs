@@ -6,6 +6,7 @@ using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 
 namespace Unigram.Controls.Messages.Content
 {
@@ -34,6 +35,16 @@ namespace Unigram.Controls.Messages.Content
             Texture.Source = null;
             Texture.Constraint = message;
 
+            if (sticker.GetIsVideo())
+            {
+                if (sticker.Thumbnail != null)
+                {
+                    UpdateVideoThumbnail(message, sticker.Thumbnail, sticker.Thumbnail.File);
+                }
+
+                return;
+            }
+
             if (sticker.Thumbnail != null && !sticker.StickerValue.Local.IsDownloadingCompleted)
             {
                 UpdateThumbnail(message, sticker.Thumbnail, sticker.Thumbnail.File);
@@ -49,6 +60,16 @@ namespace Unigram.Controls.Messages.Content
             var sticker = GetContent(message.Content);
             if (sticker == null)
             {
+                return;
+            }
+
+            if (sticker.GetIsVideo())
+            {
+                if (sticker.Thumbnail != null && sticker.Thumbnail.File.Id == file.Id)
+                {
+                    UpdateVideoThumbnail(message, sticker.Thumbnail, file);
+                }
+
                 return;
             }
 
@@ -77,6 +98,27 @@ namespace Unigram.Controls.Messages.Content
             if (file.Local.IsDownloadingCompleted && thumbnail.Format is ThumbnailFormatWebp)
             {
                 Background = new ImageBrush { ImageSource = PlaceholderHelper.GetWebPFrame(file.Local.Path) };
+            }
+            else if (file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive)
+            {
+                message.ProtoService.DownloadFile(file.Id, 1);
+            }
+        }
+
+        // WebM video stickers can't be decoded on W10M, so show the static
+        // thumbnail (WEBP, or JPEG/PNG) at full sticker size instead.
+        private void UpdateVideoThumbnail(MessageViewModel message, Thumbnail thumbnail, File file)
+        {
+            if (file.Local.IsDownloadingCompleted)
+            {
+                if (thumbnail.Format is ThumbnailFormatWebp)
+                {
+                    Texture.Source = PlaceholderHelper.GetWebPFrame(file.Local.Path);
+                }
+                else if (thumbnail.Format is ThumbnailFormatJpeg || thumbnail.Format is ThumbnailFormatPng)
+                {
+                    Texture.Source = new BitmapImage(UriEx.GetLocal(file.Local.Path));
+                }
             }
             else if (file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive)
             {

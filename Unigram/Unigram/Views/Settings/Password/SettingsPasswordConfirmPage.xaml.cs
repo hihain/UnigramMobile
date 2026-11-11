@@ -14,15 +14,5 @@ namespace Unigram.Views.Settings.Password
 
             Transitions = ApiInfo.CreateSlideTransition();
         }
-
-        #region Binding
-
-        private string ConvertPattern(string pattern)
-        {
-            return string.Format("[Please enter code we've just emailed at **{0}**]", pattern);
-        }
-
-        #endregion
-
     }
 }

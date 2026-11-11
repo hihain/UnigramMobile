@@ -21,6 +21,7 @@ namespace Unigram.ViewModels.Settings.Password
 
         private string _password;
         private string _hint;
+        private bool _isSending;
 
         private string _address;
         public string Address
@@ -47,6 +48,11 @@ namespace Unigram.ViewModels.Settings.Password
         public RelayCommand SendCommand { get; }
         private async void SendExecute()
         {
+            if (_isSending)
+            {
+                return;
+            }
+
             var password = _password;
             var hint = _hint;
             var address = _address;
@@ -64,7 +70,11 @@ namespace Unigram.ViewModels.Settings.Password
                 }
             }
 
+            _isSending = true;
+
             var response = await ProtoService.SendAsync(new SetPassword(string.Empty, password, hint, addressValid, address));
+            _isSending = false;
+
             if (response is PasswordState passwordState)
             {
                 if (passwordState.RecoveryEmailAddressCodeInfo != null)
@@ -87,7 +97,11 @@ namespace Unigram.ViewModels.Settings.Password
             {
                 if (error.TypeEquals(ErrorType.EMAIL_INVALID))
                 {
-                    await MessagePopup.ShowAsync(Strings.Resources.PasswordEmailInvalid, Strings.Resources.AppName, Strings.Resources.OK, Strings.Resources.Cancel);
+                    await MessagePopup.ShowAsync(Strings.Resources.PasswordEmailInvalid, Strings.Resources.AppName, Strings.Resources.OK);
+                }
+                else
+                {
+                    await MessagePopup.ShowAsync(error.Message, Strings.Resources.AppName, Strings.Resources.OK);
                 }
             }
         }

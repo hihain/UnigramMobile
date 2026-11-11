@@ -197,6 +197,7 @@
                 Grid.Column="1"
                 Grid.Row="6">
                 <Grid
+                    x:Name="ThreadPanel"
                     BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
                     BorderThickness="0,1,0,0"
                     Padding="10,4,10,4">

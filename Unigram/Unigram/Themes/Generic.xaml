@@ -2263,8 +2263,11 @@
                         
                         <ScrollViewer
                             x:Name="ScrollingHost"
+                            HorizontalScrollMode="Disabled"
+                            HorizontalScrollBarVisibility="Disabled"
                             VerticalScrollBarVisibility="Auto"
-                            VerticalScrollMode="Auto">
+                            VerticalScrollMode="Auto"
+                            ZoomMode="Disabled">
                             
                             <Grid MaxWidth="360">
                                 <Grid.RowDefinitions>
@@ -2297,7 +2300,7 @@
                                 <ContentPresenter
                                     HorizontalContentAlignment="Stretch"
                                     VerticalContentAlignment="Stretch"
-                                    Margin="0,16"
+                                    Margin="12,16"
                                     Grid.Row="2"/>
 
                                 <StackPanel
@@ -2318,18 +2321,11 @@
                             </Grid>
                         </ScrollViewer>
 
-                        <local:GlyphButton
+                        <local:BackButton
                             x:Name="BackButton"
-                            Glyph="&#xE72B;"
-                            Height="{ThemeResource AppBarThemeCompactHeight}"
-                            FontSize="15"
                             Width="40"
                             Margin="0,0,-12,0"
-                            Visibility="{TemplateBinding BackVisibility}"
-                            AutomationProperties.Name="{CustomResource AccDescrGoBack}"
-                            ToolTipService.ToolTip="{CustomResource AccDescrGoBack}"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"/>
+                            Visibility="{TemplateBinding BackVisibility}"/>
 
                     </Grid>
                 </ControlTemplate>

@@ -680,6 +680,7 @@ namespace Unigram.Controls.Messages
                 if (Thread == null)
                 {
                     FindName(nameof(Thread));
+                    UpdateLightLayout();
                 }
 
                 RecentRepliers.Children.Clear();
@@ -1496,7 +1497,15 @@ namespace Unigram.Controls.Messages
 
         private void FooterToLightMedia(bool isOut)
         {
+            if (ContentPanel.Background != null)
+            {
+                _bubbleBackground = ContentPanel.Background;
+            }
+
             VisualStateManager.GoToState(LayoutRoot, "LightState" + (isOut ? "Out" : string.Empty), false);
+            _isLightState = true;
+            _isLightStateOut = isOut;
+            UpdateLightLayout();
 
             if (Reply != null)
             {
@@ -1504,8 +1513,47 @@ namespace Unigram.Controls.Messages
             }
         }
 
+        private bool _isLightState;
+        private bool _isLightStateOut;
+        private Brush _bubbleBackground;
+
+        // Bubble-less content (stickers, round videos) moves Media to an outer
+        // column with a -10 edge margin; keep reactions and the comments row
+        // aligned with it instead of the empty middle column.
+        private void UpdateLightLayout()
+        {
+            var column = _isLightState ? 0 : 1;
+            var span = _isLightState ? 3 : 1;
+
+            Grid.SetColumn(Reactions, column);
+            Grid.SetColumnSpan(Reactions, span);
+            Reactions.Margin = !_isLightState
+                ? new Thickness(0, 4, 0, 0)
+                : _isLightStateOut
+                    ? new Thickness(0, 4, -10, 0)
+                    : new Thickness(-10, 4, 0, 0);
+
+            if (Thread != null)
+            {
+                Grid.SetColumn(Thread, column);
+                Grid.SetColumnSpan(Thread, span);
+                Thread.Margin = _isLightState ? new Thickness(-10, 4, -10, 0) : new Thickness(-10, 4, -10, -6);
+                ThreadPanel.Background = _isLightState ? _bubbleBackground : null;
+            }
+        }
+
+        private void LeaveLightState()
+        {
+            if (_isLightState)
+            {
+                _isLightState = false;
+                UpdateLightLayout();
+            }
+        }
+
         private void FooterToMedia()
         {
+            LeaveLightState();
             VisualStateManager.GoToState(LayoutRoot, "MediaState", false);
 
             if (Reply != null)
@@ -1516,6 +1564,7 @@ namespace Unigram.Controls.Messages
 
         private void FooterToHidden()
         {
+            LeaveLightState();
             VisualStateManager.GoToState(LayoutRoot, "HiddenState", false);
 
             if (Reply != null)
@@ -1526,6 +1575,7 @@ namespace Unigram.Controls.Messages
 
         private void FooterToNormal()
         {
+            LeaveLightState();
             VisualStateManager.GoToState(LayoutRoot, "Normal", false);
 
             if (Reply != null)

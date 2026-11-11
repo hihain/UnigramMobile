@@ -36,7 +36,7 @@ namespace Unigram.ViewModels.Settings.Password
 
             if (string.IsNullOrWhiteSpace(field1))
             {
-                // Error
+                await MessagePopup.ShowAsync(Strings.Resources.PleaseEnterPassword, Strings.Resources.AppName, Strings.Resources.OK);
                 return;
             }
 
