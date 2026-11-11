@@ -89,12 +89,20 @@ namespace Unigram.ViewModels
         public RelayCommand BrowserCommand { get; }
         private async void BrowserExecute()
         {
-            await Launcher.LaunchUriAsync(ShareLink);
+            if (ShareLink != null)
+            {
+                await Launcher.LaunchUriAsync(ShareLink);
+            }
         }
 
         public RelayCommand CopyCommand { get; }
         private async void CopyExecute()
         {
+            if (ShareLink == null)
+            {
+                return;
+            }
+
             var dataPackage = new DataPackage();
             dataPackage.SetText(ShareLink.AbsoluteUri);
             ClipboardEx.TrySetContent(dataPackage);

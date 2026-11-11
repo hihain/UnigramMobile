@@ -164,6 +164,35 @@ namespace Unigram.Views
 
             ViewModel.IsLoading = true;
 
+            if (RichMessageRenderer.TryParseNavigationParameter(url, out long richChatId, out long richMessageId))
+            {
+#if MODERN_TDLIB
+                ViewModel.ShareLink = null;
+                ViewModel.ShareTitle = null;
+
+                var link = await ViewModel.ProtoService.SendAsync(ModernTdlibCompatibility.CreateGetMessageLink(richChatId, richMessageId, 0, 0, string.Empty, false, false));
+                if (link is MessageLink messageLink && Uri.TryCreate(messageLink.Link, UriKind.Absolute, out Uri messageUri))
+                {
+                    ViewModel.ShareLink = messageUri;
+                    ViewModel.ShareTitle = messageLink.Link;
+                }
+
+                var rich = await ViewModel.ProtoService.SendAsync(new GetFullRichMessage(richChatId, richMessageId));
+                if (rich is RichMessage richMessage)
+                {
+                    UpdateView(richMessage.Blocks, richMessage.IsRtl, 0);
+                }
+                else
+                {
+                    Logs.Logger.Warning(Logs.Target.API, "GetFullRichMessage failed: " + (rich is Error error ? error.Code.ToString() : rich?.GetType().Name));
+                }
+
+                ViewModel.IsLoading = false;
+#endif
+                base.OnNavigatedTo(e);
+                return;
+            }
+
             var response = await ViewModel.ProtoService.SendAsync(new GetWebPageInstantView(url, true));
             if (response is WebPageInstantView instantView)
             {
@@ -185,17 +214,18 @@ namespace Unigram.Views
             base.OnNavigatedTo(e);
         }
 
-        private WebPageInstantView _instantView;
-
         private void UpdateView(WebPageInstantView instantView)
         {
-            _instantView = instantView;
+            UpdateView(instantView.GetPageBlocks(), instantView.IsRtl, instantView.ViewCount);
+        }
 
-            ScrollingHost.FlowDirection = instantView.IsRtl ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        private void UpdateView(IList<PageBlock> blocks, bool isRtl, int viewCount)
+        {
+            ScrollingHost.FlowDirection = isRtl ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
 
-            if (instantView.ViewCount > 0)
+            if (viewCount > 0)
             {
-                ViewsLabel.Text = Locale.Declension("Views", instantView.ViewCount);
+                ViewsLabel.Text = Locale.Declension("Views", viewCount);
             }
             else
             {
@@ -206,7 +236,7 @@ namespace Unigram.Views
             PageBlock previousBlock = null;
             FrameworkElement previousElement = null;
             FrameworkElement firstElement = null;
-            foreach (var block in instantView.GetPageBlocks())
+            foreach (var block in blocks)
             {
                 var element = ProcessBlock(block);
                 var spacing = SpacingBetweenBlocks(previousBlock, block);
@@ -275,6 +305,12 @@ namespace Unigram.Views
                 case PageBlockParagraph paragraph:
                 case PageBlockKicker kicker:
                     return ProcessText(block, false);
+#if MODERN_TDLIB
+                case PageBlockSectionHeading _:
+                case PageBlockThinking _:
+                case PageBlockMathematicalExpression _:
+                    return ProcessText(block, false);
+#endif
                 case PageBlockBlockQuote blockquote:
                     return ProcessBlockquote(blockquote);
                 case PageBlockDivider divider:
@@ -664,6 +700,17 @@ namespace Unigram.Views
                 case PageBlockKicker kicker:
                     text = kicker.Kicker;
                     break;
+#if MODERN_TDLIB
+                case PageBlockSectionHeading sectionHeading:
+                    text = sectionHeading.Text;
+                    break;
+                case PageBlockThinking thinking:
+                    text = thinking.Text;
+                    break;
+                case PageBlockMathematicalExpression mathematicalExpression:
+                    text = new RichTextFixed(new RichTextPlain(mathematicalExpression.Expression));
+                    break;
+#endif
             }
 
             if (text == null || text is RichTextPlain plain && string.IsNullOrEmpty(plain.Text))
@@ -710,6 +757,19 @@ namespace Unigram.Views
                 case PageBlockParagraph paragraphz:
                     textBlock.Style = Resources["BlockBodyTextBlockStyle"] as Style;
                     break;
+#if MODERN_TDLIB
+                case PageBlockSectionHeading sectionHeading:
+                    textBlock.Style = Resources[sectionHeading.Size <= 1 ? "BlockHeaderTextBlockStyle" : "BlockSubheaderTextBlockStyle"] as Style;
+                    break;
+                case PageBlockThinking _:
+                    textBlock.Style = Resources["BlockBodyTextBlockStyle"] as Style;
+                    textBlock.FontStyle = FontStyle.Italic;
+                    break;
+                case PageBlockMathematicalExpression _:
+                    textBlock.Style = Resources["BlockBodyTextBlockStyle"] as Style;
+                    textBlock.TextAlignment = TextAlignment.Center;
+                    break;
+#endif
                 case PageBlockPreformatted preformatted:
                     textBlock.FontSize = 16;
                     break;
@@ -1435,6 +1495,22 @@ namespace Unigram.Views
                     Typography.SetVariants(span, FontVariants.Superscript);
                     ProcessRichText(superscript.Text, span, textBlock, effects, ref offset);
                     break;
+#if MODERN_TDLIB
+                default:
+                    if (RichMessageRenderer.TryUnwrap(text, out RichText inner, out string plain))
+                    {
+                        if (inner != null)
+                        {
+                            ProcessRichText(inner, span, textBlock, effects, ref offset);
+                        }
+                        else if (!string.IsNullOrEmpty(plain))
+                        {
+                            span.Inlines.Add(new Run { Text = plain });
+                            offset += plain.Length;
+                        }
+                    }
+                    break;
+#endif
             }
         }
 
@@ -1574,6 +1650,10 @@ namespace Unigram.Views
         }
 
         public void OpenWebPage(WebPage webPage)
+        {
+        }
+
+        public void OpenRichMessage(MessageViewModel message)
         {
         }
 

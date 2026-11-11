@@ -792,6 +792,12 @@ namespace Unigram.Controls.Cells
 
                 return result + (missed ? (outgoing ? Strings.Resources.CallMessageOutgoingMissed : Strings.Resources.CallMessageIncomingMissed) : (outgoing ? Strings.Resources.CallMessageOutgoing : Strings.Resources.CallMessageIncoming));
             }
+#if MODERN_TDLIB
+            else if (message.Content is MessageRichMessage richMessage)
+            {
+                return result + RichMessageRenderer.GetSummary(richMessage.Message);
+            }
+#endif
             else if (message.Content is MessageUnsupported)
             {
                 return result + Strings.Resources.UnsupportedAttachment;

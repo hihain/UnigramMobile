@@ -510,6 +510,10 @@ namespace Unigram.ViewModels.Chats
         {
         }
 
+        public void OpenRichMessage(MessageViewModel message)
+        {
+        }
+
         public void OpenSticker(Sticker sticker)
         {
         }

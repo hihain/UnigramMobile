@@ -258,6 +258,7 @@
     <Compile Include="Common\TitleBar.cs" />
     <Compile Include="Common\TLContainer.cs" />
     <Compile Include="Common\CameraRotationHelper.cs" />
+    <Compile Include="Common\RichMessageRenderer.cs" />
     <Compile Include="Common\InactivityHelper.cs" />
     <Compile Include="Common\Locale.cs" />
     <Compile Include="Common\MosaicMedia.cs" />

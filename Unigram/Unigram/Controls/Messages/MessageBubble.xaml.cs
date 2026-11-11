@@ -835,6 +835,16 @@ namespace Unigram.Controls.Messages
                 Grid.SetRow(Footer, 2);
                 Grid.SetRow(Message, 2);
             }
+#if MODERN_TDLIB
+            else if (content is MessageRichMessage)
+            {
+                Media.Margin = new Thickness(0);
+                _placeholder = true;
+                FooterToNormal();
+                Grid.SetRow(Footer, 2);
+                Grid.SetRow(Message, 2);
+            }
+#endif
             else if (IsFullMedia(content))
             {
                 var left = -10;
@@ -1150,6 +1160,13 @@ namespace Unigram.Controls.Messages
                 result = true;
             }
 #if MODERN_TDLIB
+            else if (content is MessageRichMessage richMessage)
+            {
+                result = RichMessageRenderer.Render(message, Span, richMessage.Message, GetBrush("MessageForegroundLinkBrush"));
+                var isRtl = richMessage.Message?.IsRtl == true;
+                Message.FlowDirection = isRtl ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+                adjust = isRtl != (ApiInfo.FlowDirection == FlowDirection.RightToLeft);
+            }
             else if (content is MessageAnimatedEmoji animatedEmoji)
             {
                 // Safety net for the TDLib 1.8.66 content type: if ProcessEmojiAsync has not

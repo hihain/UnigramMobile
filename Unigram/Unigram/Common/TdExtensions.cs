@@ -555,7 +555,23 @@ namespace Unigram.Common
                     return ToPlainText(underlineText.Text);
                 case RichTextUrl urlText:
                     return ToPlainText(urlText.Text);
+                case RichTextMarked markedText:
+                    return ToPlainText(markedText.Text);
+                case RichTextSubscript subscriptText:
+                    return ToPlainText(subscriptText.Text);
+                case RichTextSuperscript superscriptText:
+                    return ToPlainText(superscriptText.Text);
+                case RichTextPhoneNumber phoneText:
+                    return ToPlainText(phoneText.Text);
+                case RichTextAnchorLink anchorLinkText:
+                    return ToPlainText(anchorLinkText.Text);
                 default:
+#if MODERN_TDLIB
+                    if (RichMessageRenderer.TryUnwrap(text, out RichText inner, out string plain))
+                    {
+                        return inner != null ? ToPlainText(inner) : plain;
+                    }
+#endif
                     return null;
             }
         }

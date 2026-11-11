@@ -19,6 +19,7 @@ namespace Unigram.ViewModels.Delegates
 
         void OpenFile(File file);
         void OpenWebPage(WebPage webPage);
+        void OpenRichMessage(MessageViewModel message);
         void OpenSticker(Sticker sticker);
         void OpenLocation(Location location, string title);
         void OpenLiveLocation(MessageViewModel message);

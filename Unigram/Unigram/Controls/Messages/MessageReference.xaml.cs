@@ -207,6 +207,10 @@ namespace Unigram.Controls.Messages
                     return SetStickerTemplate(message, sticker, title);
                 case MessageUnsupported unsupported:
                     return SetUnsupportedMediaTemplate(message, title);
+#if MODERN_TDLIB
+                case MessageRichMessage richMessage:
+                    return SetRichMessageTemplate(message, richMessage, title);
+#endif
                 case MessageVenue venue:
                     return SetVenueTemplate(message, venue, title);
                 case MessageVideo video:
@@ -539,6 +543,22 @@ namespace Unigram.Controls.Messages
 
             return true;
         }
+
+#if MODERN_TDLIB
+        private bool SetRichMessageTemplate(MessageViewModel message, MessageRichMessage richMessage, string title)
+        {
+            Visibility = Visibility.Visible;
+
+            if (ThumbRoot != null)
+                ThumbRoot.Visibility = Visibility.Collapsed;
+
+            TitleLabel.Text = GetFromLabel(message, title);
+            ServiceLabel.Text = string.Empty;
+            MessageLabel.Text = RichMessageRenderer.GetSummary(richMessage.Message).Replace("\r\n", "\n").Replace('\n', ' ');
+
+            return true;
+        }
+#endif
 
         private bool SetVoiceNoteTemplate(MessageViewModel message, MessageVoiceNote voiceNote, string title)
         {
@@ -916,6 +936,12 @@ namespace Unigram.Controls.Messages
             {
                 return call.ToOutcomeText(message.IsOutgoing);
             }
+#if MODERN_TDLIB
+            else if (message.Content is MessageRichMessage richMessage)
+            {
+                return RichMessageRenderer.GetSummary(richMessage.Message);
+            }
+#endif
             else if (message.Content is MessageUnsupported)
             {
                 return Strings.Resources.UnsupportedAttachment;

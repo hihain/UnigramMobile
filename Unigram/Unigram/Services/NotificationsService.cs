@@ -1445,6 +1445,12 @@ namespace Unigram.Services
             {
                 return result + call.ToOutcomeText(message.IsOutgoing);
             }
+#if MODERN_TDLIB
+            else if (message.Content is MessageRichMessage richMessage)
+            {
+                return result + RichMessageRenderer.GetSummary(richMessage.Message);
+            }
+#endif
             else if (message.Content is MessageUnsupported)
             {
                 return result + Strings.Resources.UnsupportedAttachment;

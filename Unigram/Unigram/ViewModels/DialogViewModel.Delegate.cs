@@ -367,6 +367,11 @@ namespace Unigram.ViewModels
             }
         }
 
+        public void OpenRichMessage(MessageViewModel message)
+        {
+            NavigationService.NavigateToInstant(RichMessageRenderer.GetNavigationParameter(message.ChatId, message.Id));
+        }
+
         public async void OpenSticker(Sticker sticker)
         {
             if (sticker.SetId != 0)
