@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Telegram.Td.Api;
 using Unigram.Converters;
 using Unigram.Logs;
 using Unigram.Services;
 using Unigram.ViewModels;
+using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
@@ -414,19 +417,125 @@ namespace Unigram.Common
             }
         }
 
-        private static void RenderMediaGroup(RenderContext context, Span span, System.Collections.Generic.IList<PageBlock> blocks, PageBlockCaption caption, bool tight)
+        // Mirrors upstream PageBlockCollageContent: consecutive photos are laid out with the
+        // album mosaic. Chunks are capped at the Telegram album size because the mosaic
+        // only produces layouts for up to 3 items per row and 4 rows.
+        private const int MaxMosaicItems = 10;
+        private const double MosaicLayoutSize = 432;
+
+        private static void RenderMediaGroup(RenderContext context, Span span, IList<PageBlock> blocks, PageBlockCaption caption, bool tight)
         {
             var first = true;
+            var pending = new List<PhotoSize>();
+
+            void Flush()
+            {
+                for (int start = 0; start < pending.Count; start += MaxMosaicItems)
+                {
+                    var count = Math.Min(MaxMosaicItems, pending.Count - start);
+                    var chunk = pending.GetRange(start, count);
+
+                    BeginBlock(context, span, first ? tight : true);
+                    first = false;
+
+                    if (chunk.Count == 1)
+                    {
+                        AddImage(context, span, chunk[0].Photo, chunk[0].Width, chunk[0].Height);
+                    }
+                    else
+                    {
+                        AddMosaic(context, span, chunk);
+                    }
+                }
+
+                pending.Clear();
+            }
+
             foreach (var inner in blocks)
             {
+                var size = inner is PageBlockPhoto photo ? SelectPhotoSize(photo.Photo) : null;
+                if (size != null && size.Width > 0 && size.Height > 0)
+                {
+                    pending.Add(size);
+                    continue;
+                }
+
+                Flush();
                 RenderBlock(context, span, inner, first ? tight : true);
                 first = false;
             }
 
+            Flush();
             AddCaption(context, span, caption, true);
         }
 
-        private static bool AddPhotoBlock(RenderContext context, Span span, Photo photo, PageBlockCaption caption, bool tight)
+        private static void AddMosaic(RenderContext context, Span span, List<PhotoSize> sizes)
+        {
+            var layout = MosaicAlbumLayout.chatMessageBubbleMosaicLayout(new Size(MosaicLayoutSize, MosaicLayoutSize), sizes.Select(x => new Size(x.Width, x.Height)));
+            if (layout.Item1 == null || layout.Item1.Length != sizes.Count || layout.Item2.Width <= 0 || layout.Item2.Height <= 0)
+            {
+                PushDiagnostics.Write("richmessage.collage.fallback", "items=" + sizes.Count.ToString(CultureInfo.InvariantCulture));
+
+                for (int i = 0; i < sizes.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        BeginBlock(context, span, true);
+                    }
+
+                    AddImage(context, span, sizes[i].Photo, sizes[i].Width, sizes[i].Height);
+                }
+
+                return;
+            }
+
+            var ratio = MaxImageWidth / layout.Item2.Width;
+            var panel = new Grid
+            {
+                Width = Math.Round(layout.Item2.Width * ratio),
+                Height = Math.Round(layout.Item2.Height * ratio),
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+
+            for (int i = 0; i < sizes.Count; i++)
+            {
+                var rect = layout.Item1[i].Item1;
+                var position = layout.Item1[i].Item2;
+
+                var x = Math.Round(rect.X * ratio);
+                var y = Math.Round(rect.Y * ratio);
+                var width = Math.Round(rect.Width * ratio);
+                var height = Math.Round(rect.Height * ratio);
+
+                // Same 1px seams as upstream MessageAlbumBase.GetPositionsForWidth.
+                if (height >= 1 && !position.HasFlag(MosaicItemPosition.Top))
+                {
+                    y += 1;
+                    height -= 1;
+                }
+
+                if (width >= 1 && !position.HasFlag(MosaicItemPosition.Left))
+                {
+                    x += 1;
+                    width -= 1;
+                }
+
+                if (width < 1 || height < 1)
+                {
+                    continue;
+                }
+
+                var tile = CreateImageTile(context, sizes[i].Photo, width, height);
+                tile.HorizontalAlignment = HorizontalAlignment.Left;
+                tile.VerticalAlignment = VerticalAlignment.Top;
+                tile.Margin = new Thickness(x, y, 0, 0);
+                panel.Children.Add(tile);
+            }
+
+            span.Inlines.Add(new InlineUIContainer { Child = panel });
+        }
+
+        private static PhotoSize SelectPhotoSize(Photo photo)
         {
             PhotoSize best = null;
             if (photo?.Sizes != null)
@@ -447,6 +556,12 @@ namespace Unigram.Common
                 }
             }
 
+            return best;
+        }
+
+        private static bool AddPhotoBlock(RenderContext context, Span span, Photo photo, PageBlockCaption caption, bool tight)
+        {
+            var best = SelectPhotoSize(photo);
             if (best == null)
             {
                 return false;
@@ -494,12 +609,18 @@ namespace Unigram.Common
                 height = MaxImageHeight;
             }
 
+            var border = CreateImageTile(context, file, width, height);
+            border.Margin = new Thickness(0, 2, 0, 2);
+            span.Inlines.Add(new InlineUIContainer { Child = border });
+        }
+
+        private static Border CreateImageTile(RenderContext context, File file, double width, double height)
+        {
             var image = new Image { Stretch = Stretch.UniformToFill, Width = width, Height = height };
             var border = new Border
             {
                 Width = width,
                 Height = height,
-                Margin = new Thickness(0, 2, 0, 2),
                 Background = new SolidColorBrush(Color.FromArgb(0x33, 0x80, 0x80, 0x80)),
                 Child = image
             };
@@ -511,8 +632,8 @@ namespace Unigram.Common
                 message.Delegate?.OpenRichMessage(message);
             };
 
-            span.Inlines.Add(new InlineUIContainer { Child = border });
             LoadImage(message.ProtoService, file, image, (int)Math.Ceiling(width));
+            return border;
         }
 
         private static async void LoadImage(IProtoService protoService, File file, Image image, int decodeWidth)
