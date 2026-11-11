@@ -537,10 +537,11 @@ void NotificationTask::UpdatePrimaryTile(String^ launch, String^ caption, String
 			image += L"'/>";
 		}
 
+		// The body is repeated in three bindings and the payload limit is 5 KB.
 		std::wstring body = L"<text hint-style='body'>";
-		body += Escape(caption->Data());
+		body += Escape(TruncateTileText(caption->Data(), 48));
 		body += L"</text><text hint-style='captionSubtle' hint-wrap='true'>";
-		body += Escape(message->Data());
+		body += Escape(TruncateTileText(message->Data(), 160));
 		body += L"</text>";
 
 		std::wstring xml = L"<tile><visual arguments='";
@@ -640,6 +641,22 @@ void NotificationTask::LogDiagnostic(String^ eventName, String^ details)
 	{
 		OutputDebugStringW(L"[Notifications] Unable to write persistent diagnostics.\r\n");
 	}
+}
+
+std::wstring NotificationTask::TruncateTileText(std::wstring data, size_t maximum)
+{
+	if (data.size() <= maximum)
+	{
+		return data;
+	}
+
+	auto length = maximum;
+	if (data[length - 1] >= 0xD800 && data[length - 1] <= 0xDBFF)
+	{
+		length--;
+	}
+
+	return data.substr(0, length) + L"\u2026";
 }
 
 std::wstring NotificationTask::Escape(std::wstring data)

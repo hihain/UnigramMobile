@@ -121,8 +121,10 @@ namespace Unigram.Services
         {
             try
             {
-                var safeCaption = EscapeXml(caption);
-                var safeMessage = EscapeXml(message);
+                // The body is repeated in three bindings and the payload limit is 5 KB, so a long
+                // message would otherwise make the whole tile update fail (0x803E0115).
+                var safeCaption = EscapeXml(TruncateTileText(caption, 48));
+                var safeMessage = EscapeXml(TruncateTileText(message, 160));
                 var safePicture = EscapeXml(picture);
                 var image = string.IsNullOrEmpty(safePicture)
                     ? string.Empty
@@ -146,6 +148,22 @@ namespace Unigram.Services
                 WriteForegroundTileDiagnosticException("managed.tile.update.failed", ex);
                 return false;
             }
+        }
+
+        private static string TruncateTileText(string text, int maximum)
+        {
+            if (text == null || text.Length <= maximum)
+            {
+                return text;
+            }
+
+            var length = maximum;
+            if (char.IsHighSurrogate(text[length - 1]))
+            {
+                length--;
+            }
+
+            return text.Substring(0, length) + "\u2026";
         }
 
         private void UpdateManagedTile(string caption, string message, string launch, string picture)

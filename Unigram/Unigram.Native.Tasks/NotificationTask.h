@@ -44,6 +44,7 @@ namespace Unigram
 				static void LogError(String^ operation, Exception^ exception);
 				static void LogDiagnostic(String^ eventName, String^ details);
 				static std::wstring Escape(std::wstring data);
+				static std::wstring TruncateTileText(std::wstring data, size_t maximum);
 			};
 		}
 	}

@@ -55,8 +55,8 @@ namespace Unigram.Controls.Chats
             {
                 IsChecked = value == ChatRecordMode.Video;
 
+                // No tooltip: on touch it opens during the press-and-hold that starts recording.
                 AutomationProperties.SetName(this, value == ChatRecordMode.Video ? Strings.Resources.AccDescrVideoMessage : Strings.Resources.AccDescrVoiceMessage);
-                ToolTipService.SetToolTip(this, value == ChatRecordMode.Video ? Strings.Resources.AccDescrVideoMessage : Strings.Resources.AccDescrVoiceMessage);
             }
         }
 
@@ -82,7 +82,7 @@ namespace Unigram.Controls.Chats
             _recorder = Recorder.Current;
             _recorder.RecordingStarted += Current_RecordingStarted;
             _recorder.RecordingStopped += Current_RecordingStopped;
-            _recorder.RecordingFailed += Current_RecordingStopped;
+            _recorder.RecordingFailed += Current_RecordingFailed;
 
             DetectVideoRecording();
         }
@@ -118,6 +118,11 @@ namespace Unigram.Controls.Chats
             _calledRecordRunnable = true;
             _recordAudioVideoRunnableStarted = false;
 
+            if (Mode == ChatRecordMode.Video)
+            {
+                PushDiagnostics.Write("recording.request", "mode=Video");
+            }
+
             var permissions = await CheckAccessAsync(Mode);
             if (permissions == false)
             {
@@ -141,6 +146,17 @@ namespace Unigram.Controls.Chats
                 {
                     LockRecording();
                 }
+            }
+        }
+
+        private void Current_RecordingFailed(object sender, EventArgs e)
+        {
+            Current_RecordingStopped(sender, e);
+
+            var failure = _recorder.LastFailure;
+            if (_recorder.LastFailureMode == ChatRecordMode.Video && failure != null)
+            {
+                ShowRecordingError(failure);
             }
         }
 
@@ -379,19 +395,36 @@ namespace Unigram.Controls.Chats
         private async Task<bool> CheckDeviceAccessAsync(bool audio, ChatRecordMode mode)
         {
             var access = DeviceAccessInformation.CreateFromDeviceClass(audio ? DeviceClass.AudioCapture : DeviceClass.VideoCapture);
-            if (access.CurrentStatus == DeviceAccessStatus.Unspecified)
+            var status = access.CurrentStatus;
+            var device = audio ? "audio" : "video";
+
+            if (status == DeviceAccessStatus.Unspecified)
             {
+                // Windows 10 Mobile can keep reporting Unspecified for a device the app may use.
+                // Opening the device shows the consent prompt where one exists; if it opens, the
+                // device is usable now and recording continues instead of failing silently.
                 MediaCapture capture = null;
                 try
                 {
                     capture = new MediaCapture();
                     var settings = new MediaCaptureInitializationSettings();
-                    settings.StreamingCaptureMode = mode == ChatRecordMode.Video
-                        ? StreamingCaptureMode.AudioAndVideo
-                        : StreamingCaptureMode.Audio;
+                    settings.StreamingCaptureMode = audio ? StreamingCaptureMode.Audio : StreamingCaptureMode.Video;
                     await capture.InitializeAsync(settings);
+
+                    PushDiagnostics.Write("recording.access", $"device={device};status=unspecified;probe=ok");
+                    return true;
                 }
-                catch { }
+                catch (UnauthorizedAccessException)
+                {
+                    PushDiagnostics.Write("recording.access", $"device={device};status=unspecified;probe=denied");
+                    status = DeviceAccessStatus.DeniedByUser;
+                }
+                catch (Exception ex)
+                {
+                    PushDiagnostics.WriteException("recording.access", ex, $"device={device};status=unspecified;probe=error");
+                    ShowRecordingError((audio ? "microphone" : "camera") + $", 0x{ex.HResult:X8}");
+                    return false;
+                }
                 finally
                 {
                     if (capture != null)
@@ -400,11 +433,12 @@ namespace Unigram.Controls.Chats
                         capture = null;
                     }
                 }
-
-                return false;
             }
-            else if (access.CurrentStatus != DeviceAccessStatus.Allowed)
+
+            if (status != DeviceAccessStatus.Allowed)
             {
+                PushDiagnostics.Write("recording.access", $"device={device};status={status}");
+
                 var message = audio
                     ? mode == ChatRecordMode.Voice
                     ? Strings.Resources.PermissionNoAudio
@@ -424,6 +458,14 @@ namespace Unigram.Controls.Chats
             }
 
             return true;
+        }
+
+        private void ShowRecordingError(string failure)
+        {
+            this.BeginOnUIThread(async () =>
+            {
+                await MessagePopup.ShowAsync("Unable to start recording (" + failure + ").", Strings.Resources.AppName, Strings.Resources.OK);
+            });
         }
 
         private bool _hasRecordVideo;
@@ -518,6 +560,27 @@ namespace Unigram.Controls.Chats
 
             public VideoPreview CurrentVideoPreview { get; private set; }
 
+            // Privacy-safe description (stage and HRESULT) of the last start failure, shown to the user.
+            public string LastFailure { get; private set; }
+            public ChatRecordMode LastFailureMode { get; private set; }
+
+            private void ReportFailure(ChatRecordMode mode, string stage, Exception exception)
+            {
+                LastFailureMode = mode;
+                LastFailure = exception == null ? stage : $"{stage}, 0x{exception.HResult:X8}";
+
+                if (exception == null)
+                {
+                    PushDiagnostics.Write("recording.start.failed", $"mode={mode};stage={stage}");
+                }
+                else
+                {
+                    PushDiagnostics.WriteException("recording.start.failed", exception, $"mode={mode};stage={stage}");
+                }
+
+                RecordingFailed?.Invoke(this, EventArgs.Empty);
+            }
+
             public Recorder()
             {
                 _recordQueue = new ConcurrentQueueWorker(1);
@@ -538,18 +601,21 @@ namespace Unigram.Controls.Chats
                     {
                         Logger.Debug(Target.Recording, "_recorder != null, abort");
 
-                        RecordingFailed?.Invoke(this, EventArgs.Empty);
+                        ReportFailure(mode, "busy", null);
                         return;
                     }
 
-                    // Create a new temporary file for the recording
-                    var fileName = string.Format(mode == ChatRecordMode.Video
-                        ? "video_{0:yyyy}-{0:MM}-{0:dd}_{0:HH}-{0:mm}-{0:ss}.mp4"
-                        : "voice_{0:yyyy}-{0:MM}-{0:dd}_{0:HH}-{0:mm}-{0:ss}.ogg", DateTime.Now);
-                    var cache = await ApplicationData.Current.TemporaryFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
+                    LastFailure = null;
+                    var stage = "file";
 
                     try
                     {
+                        // Create a new temporary file for the recording
+                        var fileName = string.Format(mode == ChatRecordMode.Video
+                            ? "video_{0:yyyy}-{0:MM}-{0:dd}_{0:HH}-{0:mm}-{0:ss}.mp4"
+                            : "voice_{0:yyyy}-{0:MM}-{0:dd}_{0:HH}-{0:mm}-{0:ss}.ogg", DateTime.Now);
+                        var cache = await ApplicationData.Current.TemporaryFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
+
                         _mode = mode;
                         _file = cache;
                         _chat = chat;
@@ -559,6 +625,7 @@ namespace Unigram.Controls.Chats
 
                         if (mode == ChatRecordMode.Video)
                         {
+                            stage = "camera";
                             var cameraDevice = await _recorder.FindCameraDeviceByPanelAsync(Windows.Devices.Enumeration.Panel.Front);
                             if (cameraDevice == null)
                             {
@@ -605,12 +672,33 @@ namespace Unigram.Controls.Chats
                             Logger.Debug(Target.Recording, "Camera rotation, capture: " + _recorder._captureRotation + ", preview: " + _recorder._previewRotation + ", mirror: " + _recorder._mirroringPreview);
                         }
 
-                        await _recorder.m_mediaCapture.InitializeAsync(_recorder.settings);
+                        stage = "initialize";
+                        try
+                        {
+                            await _recorder.m_mediaCapture.InitializeAsync(_recorder.settings);
+                        }
+                        catch (Exception ex) when (mode == ChatRecordMode.Video && !(ex is UnauthorizedAccessException))
+                        {
+                            // The access probe may have released the camera a moment ago.
+                            PushDiagnostics.WriteException("recording.start.retry", ex, "mode=Video;stage=initialize");
+
+                            _recorder.m_mediaCapture.Dispose();
+                            _recorder.m_mediaCapture = new MediaCapture();
+
+                            await Task.Delay(500);
+                            await _recorder.m_mediaCapture.InitializeAsync(_recorder.settings);
+                        }
 
                         Logger.Debug(Target.Recording, "Devices initialized, starting");
 
+                        stage = "start";
                         //await InitializeQuantumAsync();
                         await _recorder.StartAsync();
+
+                        if (mode == ChatRecordMode.Video)
+                        {
+                            PushDiagnostics.Write("recording.start", $"mode=Video;result=ok;quality={_recorder.VideoQuality};panel={(_recorder._externalCamera ? "external" : _recorder._mirroringPreview ? "front" : "back")}");
+                        }
 
                         Logger.Debug(Target.Recording, "Recording started at " + DateTime.Now);
 
@@ -645,7 +733,7 @@ namespace Unigram.Controls.Chats
 
                         _file = null;
 
-                        RecordingFailed?.Invoke(this, EventArgs.Empty);
+                        ReportFailure(mode, stage, ex);
                         return;
                     }
 
@@ -1006,7 +1094,9 @@ namespace Unigram.Controls.Chats
                 private void InitializeSettings()
                 {
                     settings = new MediaCaptureInitializationSettings();
-                    settings.MediaCategory = MediaCategory.Speech;
+                    // Speech selects a voice-communications audio path that W10M rejects for
+                    // camera capture, so video messages use the general-purpose category.
+                    settings.MediaCategory = m_isVideo ? MediaCategory.Other : MediaCategory.Speech;
                     settings.AudioProcessing = m_isVideo ? AudioProcessing.Default : AudioProcessing.Raw;
                     settings.MemoryPreference = MediaCaptureMemoryPreference.Auto;
                     settings.SharingMode = m_isVideo ? MediaCaptureSharingMode.ExclusiveControl : MediaCaptureSharingMode.SharedReadOnly;
@@ -1025,17 +1115,47 @@ namespace Unigram.Controls.Chats
                     return desiredDevice ?? allVideoDevices.FirstOrDefault();
                 }
 
+                public VideoEncodingQuality VideoQuality { get; private set; }
+
+                private async Task StartVideoAsync(VideoEncodingQuality quality)
+                {
+                    var profile = MediaEncodingProfile.CreateMp4(quality);
+                    var rotationAngle = CameraRotationHelper.ConvertSimpleOrientationToClockwiseDegrees(Windows.Devices.Sensors.SimpleOrientation.NotRotated); // _rotationHelper.GetCameraCaptureOrientation());
+                    profile.Video.Properties.Add(new Guid("C380465D-2271-428C-9B83-ECEA3B4A85C1"), PropertyValue.CreateInt32(rotationAngle));
+
+                    m_lowLag = await m_mediaCapture.PrepareLowLagRecordToStorageFileAsync(profile, m_file);
+                    await m_lowLag.StartAsync();
+
+                    VideoQuality = quality;
+                }
+
                 public async Task StartAsync()
                 {
                     if (m_isVideo)
                     {
-                        var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Auto);
-                        var rotationAngle = CameraRotationHelper.ConvertSimpleOrientationToClockwiseDegrees(Windows.Devices.Sensors.SimpleOrientation.NotRotated); // _rotationHelper.GetCameraCaptureOrientation());
-                        profile.Video.Properties.Add(new Guid("C380465D-2271-428C-9B83-ECEA3B4A85C1"), PropertyValue.CreateInt32(rotationAngle));
+                        // Auto picks the camera's native profile; some W10M cameras reject it, so
+                        // fall back to VGA, which every round video message is cropped from anyway.
+                        try
+                        {
+                            await StartVideoAsync(VideoEncodingQuality.Auto);
+                        }
+                        catch (Exception ex)
+                        {
+                            PushDiagnostics.WriteException("recording.start.fallback", ex, "mode=Video;quality=Auto");
 
-                        m_lowLag = await m_mediaCapture.PrepareLowLagRecordToStorageFileAsync(profile, m_file);
+                            if (m_lowLag != null)
+                            {
+                                try
+                                {
+                                    await m_lowLag.FinishAsync();
+                                }
+                                catch { }
 
-                        await m_lowLag.StartAsync();
+                                m_lowLag = null;
+                            }
+
+                            await StartVideoAsync(VideoEncodingQuality.Vga);
+                        }
                     }
                     else
                     {
