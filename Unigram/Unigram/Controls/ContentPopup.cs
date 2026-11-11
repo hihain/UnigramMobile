@@ -31,7 +31,13 @@ namespace Unigram.Controls
 
                 if (app != frame && SettingsService.Current.Appearance.RequestedTheme != ElementTheme.Default)
                 {
-                    RequestedTheme = SettingsService.Current.Appearance.GetCalculatedElementTheme();
+                    // Before RS5 (all of Windows 10 Mobile) ThemeResources in style setters keep
+                    // resolving against the launch theme, so a dialog themed to the element theme
+                    // gets its background from one theme and its text from the other. Until the
+                    // app restarts, keep dialogs entirely in the launch theme so they stay readable.
+                    RequestedTheme = ApiInfo.IsUniversalApiContract7Present
+                        ? SettingsService.Current.Appearance.GetCalculatedElementTheme()
+                        : app;
                 }
             }
 

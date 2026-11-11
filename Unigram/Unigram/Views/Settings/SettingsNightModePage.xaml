@@ -28,6 +28,7 @@
 
                 <controls:HeaderedControl>
                     <controls:PivotRadioButton
+                        Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
                         Content="{CustomResource AutoNightDisabled}"
                         SelectedValue="{x:Bind ConvertMode(ViewModel.Mode), BindBack=ConvertModeBack, Mode=TwoWay}"
                         Index="0"
@@ -36,6 +37,7 @@
                     <Rectangle Fill="{ThemeResource TelegramSeparatorMediumBrush}" Height="1" Margin="12,6,0,6"/>
 
                     <controls:PivotRadioButton
+                        Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
                         Content="{CustomResource AutoNightScheduled}"
                         SelectedValue="{x:Bind ConvertMode(ViewModel.Mode), BindBack=ConvertModeBack, Mode=TwoWay}"
                         Index="1"
@@ -44,6 +46,7 @@
                     <Rectangle Fill="{ThemeResource TelegramSeparatorMediumBrush}" Height="1" Margin="12,6,0,0"/>
 
                     <controls:PivotRadioButton
+                        Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
                         x:Name="Automatic"
                         x:DeferLoadStrategy="Lazy"
                         Content="{CustomResource AutoNightAutomatic}"
@@ -61,6 +64,7 @@
                     Visibility="{x:Bind ConvertModeVisibility(ViewModel.Mode, settings:NightMode.Scheduled), Mode=OneWay}">
 
                     <CheckBox x:Name="AutoNightLocation"
+                              Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
                               Content="{CustomResource AutoNightLocation}"
                               IsChecked="{x:Bind ViewModel.IsLocationBased, Mode=TwoWay}"
                               Click="UpdateTheme_Click"
@@ -68,13 +72,17 @@
                     <Rectangle Fill="{ThemeResource TelegramSeparatorMediumBrush}" Height="1" Margin="12,6,0,0"/>
 
                     <StackPanel Visibility="{x:Bind ViewModel.IsLocationBased, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=invert}">
-                        <controls:BadgeButton Content="{CustomResource AutoNightFrom}"
+                        <controls:BadgeButton Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
+                                              BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
+                                              Content="{CustomResource AutoNightFrom}"
                                               Badge="{x:Bind ConvertTimeSpan(ViewModel.From), Mode=OneWay}">
                             <Button.Flyout>
                                 <TimePickerFlyout x:Name="FromPicker" Time="{x:Bind ViewModel.From, Mode=TwoWay}" TimePicked="UpdateTheme_Picked"/>
                             </Button.Flyout>
                         </controls:BadgeButton>
-                        <controls:BadgeButton Content="{CustomResource AutoNightTo}"
+                        <controls:BadgeButton Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
+                                              BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
+                                              Content="{CustomResource AutoNightTo}"
                                               Badge="{x:Bind ConvertTimeSpan(ViewModel.To), Mode=OneWay}">
                             <Button.Flyout>
                                 <TimePickerFlyout x:Name="ToPicker" Time="{x:Bind ViewModel.To, Mode=TwoWay}" TimePicked="UpdateTheme_Picked"/>
@@ -83,7 +91,9 @@
                     </StackPanel>
 
                     <StackPanel Visibility="{x:Bind ViewModel.IsLocationBased, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <controls:BadgeButton Content="{CustomResource AutoNightUpdateLocation}"
+                        <controls:BadgeButton Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
+                                              BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
+                                              Content="{CustomResource AutoNightUpdateLocation}"
                                               Command="{x:Bind ViewModel.UpdateLocationCommand}"
                                               Badge="{x:Bind ViewModel.Town, Mode=OneWay}"/>
                     </StackPanel>
