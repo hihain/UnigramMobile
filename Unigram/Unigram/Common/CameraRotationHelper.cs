@@ -22,8 +22,18 @@ namespace Unigram.Common
         public event EventHandler<bool> OrientationChanged;
 
         public CameraRotationHelper(EnclosureLocation cameraEnclosureLocation)
+            : this(cameraEnclosureLocation, true)
+        {
+        }
+
+        public CameraRotationHelper(EnclosureLocation cameraEnclosureLocation, bool observeChanges)
         {
             _cameraEnclosureLocation = cameraEnclosureLocation;
+            if (!observeChanges)
+            {
+                return;
+            }
+
             if (!IsEnclosureLocationExternal(_cameraEnclosureLocation) && _orientationSensor != null)
             {
                 _orientationSensor.OrientationChanged += SimpleOrientationSensor_OrientationChanged;

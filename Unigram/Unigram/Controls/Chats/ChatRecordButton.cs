@@ -83,7 +83,35 @@ namespace Unigram.Controls.Chats
             _recorder.RecordingStarted += Current_RecordingStarted;
             _recorder.RecordingStopped += Current_RecordingStopped;
             _recorder.RecordingFailed += Current_RecordingStopped;
+
+            DetectVideoRecording();
         }
+
+        private static Task<bool> _hasVideoCaptureDevice;
+
+        // Tap-to-switch and round video messages are only offered when the device has a camera.
+        private async void DetectVideoRecording()
+        {
+            try
+            {
+                _hasVideoCaptureDevice = _hasVideoCaptureDevice ?? HasVideoCaptureDeviceAsync();
+                _hasRecordVideo = await _hasVideoCaptureDevice;
+            }
+            catch
+            {
+                _hasRecordVideo = false;
+            }
+
+            Logger.Debug(Target.Recording, "Video messages available: " + _hasRecordVideo);
+        }
+
+        private static async Task<bool> HasVideoCaptureDeviceAsync()
+        {
+            var devices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
+            return devices.Count > 0;
+        }
+
+        public Recorder.VideoPreview CurrentVideoPreview => _recorder.CurrentVideoPreview;
 
         private async void RecordAudioVideoRunnable()
         {
@@ -398,7 +426,7 @@ namespace Unigram.Controls.Chats
             return true;
         }
 
-        private bool _hasRecordVideo = false;
+        private bool _hasRecordVideo;
 
         private bool _calledRecordRunnable;
         private bool _recordAudioVideoRunnableStarted;
@@ -481,6 +509,15 @@ namespace Unigram.Controls.Chats
 
             //private MediaFrameReader _reader;
 
+            public sealed class VideoPreview
+            {
+                public MediaCapture Capture { get; set; }
+                public int Rotation { get; set; }
+                public bool Mirror { get; set; }
+            }
+
+            public VideoPreview CurrentVideoPreview { get; private set; }
+
             public Recorder()
             {
                 _recordQueue = new ConcurrentQueueWorker(1);
@@ -489,6 +526,9 @@ namespace Unigram.Controls.Chats
             public async void Start(ChatRecordMode mode, Chat chat)
             {
                 Logger.Debug(Target.Recording, "Start invoked, mode: " + mode);
+
+                // DisplayInformation (needed for camera rotation) is only available on the UI thread.
+                var dispatcher = Windows.UI.Core.CoreWindow.GetForCurrentThread()?.Dispatcher;
 
                 await _recordQueue.Enqueue(async () =>
                 {
@@ -522,7 +562,7 @@ namespace Unigram.Controls.Chats
                             var cameraDevice = await _recorder.FindCameraDeviceByPanelAsync(Windows.Devices.Enumeration.Panel.Front);
                             if (cameraDevice == null)
                             {
-                                // TODO: ...
+                                throw new InvalidOperationException("No video capture device available");
                             }
 
                             // Figure out where the camera is located
@@ -541,6 +581,28 @@ namespace Unigram.Controls.Chats
                             }
 
                             _recorder.settings.VideoDeviceId = cameraDevice.Id;
+
+                            if (!_recorder._externalCamera && dispatcher != null)
+                            {
+                                var recorder = _recorder;
+                                var location = cameraDevice.EnclosureLocation;
+
+                                await dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                                {
+                                    try
+                                    {
+                                        var helper = new CameraRotationHelper(location, false);
+                                        recorder._captureRotation = CameraRotationHelper.ConvertSimpleOrientationToClockwiseDegrees(helper.GetCameraCaptureOrientation());
+                                        recorder._previewRotation = CameraRotationHelper.ConvertSimpleOrientationToClockwiseDegrees(helper.GetCameraPreviewOrientation());
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.Debug(Target.Recording, "Unable to compute camera rotation: " + ex.GetType().Name);
+                                    }
+                                });
+                            }
+
+                            Logger.Debug(Target.Recording, "Camera rotation, capture: " + _recorder._captureRotation + ", preview: " + _recorder._previewRotation + ", mirror: " + _recorder._mirroringPreview);
                         }
 
                         await _recorder.m_mediaCapture.InitializeAsync(_recorder.settings);
@@ -553,6 +615,16 @@ namespace Unigram.Controls.Chats
                         Logger.Debug(Target.Recording, "Recording started at " + DateTime.Now);
 
                         _start = DateTime.Now;
+
+                        if (mode == ChatRecordMode.Video)
+                        {
+                            CurrentVideoPreview = new VideoPreview
+                            {
+                                Capture = _recorder.m_mediaCapture,
+                                Rotation = _recorder._previewRotation,
+                                Mirror = _recorder._mirroringPreview
+                            };
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -565,6 +637,8 @@ namespace Unigram.Controls.Chats
                         //    _reader.Dispose();
                         //    _reader = null;
                         //}
+
+                        CurrentVideoPreview = null;
 
                         _recorder?.Dispose();
                         _recorder = null;
@@ -753,6 +827,7 @@ namespace Unigram.Controls.Chats
                         return;
                     }
 
+                    CurrentVideoPreview = null;
                     RecordingStopped?.Invoke(this, EventArgs.Empty);
 
                     var now = DateTime.Now;
@@ -793,7 +868,7 @@ namespace Unigram.Controls.Chats
                     {
                         Logger.Debug(Target.Recording, "sending recorded file");
 
-                        Send(viewModel, mode, chat, file, recorder._mirroringPreview, (int)elapsed.TotalSeconds);
+                        Send(viewModel, mode, chat, file, recorder._mirroringPreview, recorder._captureRotation, (int)elapsed.TotalSeconds);
                     }
 
                     _recorder = null;
@@ -803,7 +878,22 @@ namespace Unigram.Controls.Chats
                 });
             }
 
-            private async void Send(DialogViewModel viewModel, ChatRecordMode mode, Chat chat, StorageFile file, bool mirroring, int duration)
+            private static MediaRotation ToMediaRotation(int clockwiseDegrees)
+            {
+                switch (clockwiseDegrees)
+                {
+                    case 90:
+                        return MediaRotation.Clockwise90Degrees;
+                    case 180:
+                        return MediaRotation.Clockwise180Degrees;
+                    case 270:
+                        return MediaRotation.Clockwise270Degrees;
+                    default:
+                        return MediaRotation.None;
+                }
+            }
+
+            private async void Send(DialogViewModel viewModel, ChatRecordMode mode, Chat chat, StorageFile file, bool mirroring, int rotation, int duration)
             {
                 if (mode == ChatRecordMode.Video)
                 {
@@ -812,6 +902,14 @@ namespace Unigram.Controls.Chats
                     var height = props.GetHeight();
                     var x = 0d;
                     var y = 0d;
+
+                    // The Video Processor expects the crop rectangle in the rotated frame's coordinates.
+                    if (rotation == 90 || rotation == 270)
+                    {
+                        var swap = width;
+                        width = height;
+                        height = swap;
+                    }
 
                     if (width > height)
                     {
@@ -827,6 +925,8 @@ namespace Unigram.Controls.Chats
                     var transform = new VideoTransformEffectDefinition();
                     transform.CropRectangle = new Rect(x, y, width, height);
                     transform.OutputSize = new Size(240, 240);
+                    // The recording holds raw sensor frames; rotation is applied first, then the selfie mirror.
+                    transform.Rotation = ToMediaRotation(rotation);
                     transform.Mirror = mirroring ? MediaMirroringOptions.Horizontal : MediaMirroringOptions.None;
 
                     var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Vga);
@@ -871,6 +971,8 @@ namespace Unigram.Controls.Chats
                 // Information about the camera device
                 public bool _mirroringPreview;
                 public bool _externalCamera;
+                public int _captureRotation;
+                public int _previewRotation;
 
                 // Rotation Helper to simplify handling rotation compensation for the camera streams
 #pragma warning disable CS0649 // Never assigned field, always null - TODO!
@@ -907,7 +1009,7 @@ namespace Unigram.Controls.Chats
                     settings.MediaCategory = MediaCategory.Speech;
                     settings.AudioProcessing = m_isVideo ? AudioProcessing.Default : AudioProcessing.Raw;
                     settings.MemoryPreference = MediaCaptureMemoryPreference.Auto;
-                    settings.SharingMode = MediaCaptureSharingMode.SharedReadOnly;
+                    settings.SharingMode = m_isVideo ? MediaCaptureSharingMode.ExclusiveControl : MediaCaptureSharingMode.SharedReadOnly;
                     settings.StreamingCaptureMode = m_isVideo ? StreamingCaptureMode.AudioAndVideo : StreamingCaptureMode.Audio;
                 }
 

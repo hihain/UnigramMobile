@@ -3037,10 +3037,130 @@ namespace Unigram.Views
             ViewModel.ChatActionManager.SetTyping(btnVoiceMessage.IsChecked.Value ? (ChatAction)new ChatActionRecordingVideoNote() : new ChatActionRecordingVoiceNote());
             PositionRecordingUI(TextField.IsFormattingVisible);
             Grid.SetColumnSpan(TextFieldPanel, 4);
+
+            ShowVideoNotePreview(btnVoiceMessage.CurrentVideoPreview);
+        }
+
+        private Popup _videoNotePreview;
+
+        private async void ShowVideoNotePreview(ChatRecordButton.Recorder.VideoPreview preview)
+        {
+            HideVideoNotePreview();
+
+            if (preview?.Capture == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var bounds = Window.Current.Bounds;
+                var bottom = TextArea.TransformToVisual(Window.Current.Content).TransformPoint(new Point()).Y;
+
+                var width = bounds.Width;
+                var height = Math.Max(0, bottom);
+                var size = Math.Min(272, Math.Min(width, height) - 48);
+                if (size < 96)
+                {
+                    return;
+                }
+
+                var transform = new TransformGroup();
+                transform.Children.Add(new RotateTransform { Angle = preview.Rotation });
+                if (preview.Mirror)
+                {
+                    transform.Children.Add(new ScaleTransform { ScaleX = -1 });
+                }
+
+                var capture = new CaptureElement
+                {
+                    Source = preview.Capture,
+                    Stretch = Stretch.UniformToFill,
+                    Width = size,
+                    Height = size,
+                    RenderTransformOrigin = new Point(0.5, 0.5),
+                    RenderTransform = transform
+                };
+
+                // Corner-radius clipping needs a newer OS than Windows 10 Mobile, so mask everything outside the circle instead.
+                var mask = new Windows.UI.Xaml.Shapes.Path
+                {
+                    Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(0xE6, 0x00, 0x00, 0x00)),
+                    Data = new GeometryGroup
+                    {
+                        FillRule = FillRule.EvenOdd,
+                        Children =
+                        {
+                            new RectangleGeometry { Rect = new Rect(0, 0, width, height) },
+                            new EllipseGeometry { Center = new Point(width / 2, height / 2), RadiusX = size / 2, RadiusY = size / 2 }
+                        }
+                    }
+                };
+
+                var ring = new Windows.UI.Xaml.Shapes.Ellipse
+                {
+                    Width = size + 4,
+                    Height = size + 4,
+                    Stroke = new SolidColorBrush(Windows.UI.Colors.White),
+                    StrokeThickness = 2
+                };
+
+                var root = new Grid
+                {
+                    Width = width,
+                    Height = height,
+                    IsHitTestVisible = false
+                };
+
+                root.Children.Add(capture);
+                root.Children.Add(mask);
+                root.Children.Add(ring);
+
+                _videoNotePreview = new Popup
+                {
+                    Child = root,
+                    IsHitTestVisible = false,
+                    IsOpen = true
+                };
+
+                await preview.Capture.StartPreviewAsync();
+            }
+            catch (Exception ex)
+            {
+                // The recording may already have been stopped and its MediaCapture disposed.
+                Logger.Debug(Target.Recording, "Video message preview unavailable: " + ex.GetType().Name);
+            }
+        }
+
+        private void HideVideoNotePreview()
+        {
+            var popup = _videoNotePreview;
+            _videoNotePreview = null;
+
+            if (popup == null)
+            {
+                return;
+            }
+
+            popup.IsOpen = false;
+
+            if (popup.Child is Grid root)
+            {
+                foreach (var capture in root.Children.OfType<CaptureElement>())
+                {
+                    capture.Source = null;
+                }
+
+                root.Children.Clear();
+            }
+
+            popup.Child = null;
         }
 
         private void VoiceButton_RecordingStopped(object sender, EventArgs e)
         {
+            HideVideoNotePreview();
+
             AttachExpression();
             AttachTextAreaExpression();
 

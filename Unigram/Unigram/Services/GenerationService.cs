@@ -339,6 +339,21 @@ namespace Unigram.Services
             }
         }
 
+        private static BitmapRotation ToBitmapRotation(MediaRotation rotation, bool flipped)
+        {
+            switch (rotation)
+            {
+                case MediaRotation.Clockwise90Degrees:
+                    return flipped ? BitmapRotation.Clockwise270Degrees : BitmapRotation.Clockwise90Degrees;
+                case MediaRotation.Clockwise180Degrees:
+                    return BitmapRotation.Clockwise180Degrees;
+                case MediaRotation.Clockwise270Degrees:
+                    return flipped ? BitmapRotation.Clockwise90Degrees : BitmapRotation.Clockwise270Degrees;
+                default:
+                    return BitmapRotation.None;
+            }
+        }
+
         private async Task ThumbnailTranscodeAsync(UpdateFileGenerationStart update, string[] args)
         {
             try
@@ -378,6 +393,8 @@ namespace Unigram.Services
                         transform.ScaledHeight = height;
                         transform.InterpolationMode = BitmapInterpolationMode.Linear;
                         transform.Flip = conversion.Mirror == MediaMirroringOptions.Horizontal ? BitmapFlip.Horizontal : BitmapFlip.None;
+                        // BitmapTransform flips before rotating, while the video transform rotates before mirroring.
+                        transform.Rotation = ToBitmapRotation(conversion.Rotation, transform.Flip != BitmapFlip.None);
 
                         var pixelData = await decoder.GetSoftwareBitmapAsync(decoder.BitmapPixelFormat, decoder.BitmapAlphaMode, transform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.DoNotColorManage);
 
