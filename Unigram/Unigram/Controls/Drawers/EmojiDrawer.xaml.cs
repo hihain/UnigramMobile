@@ -108,8 +108,10 @@ namespace Unigram.Controls.Drawers
                 : "NarrowState", false);
 
 #if MODERN_TDLIB
-            // Neither Fluent Emoji nor the Windows system emoji font has country-flag glyphs.
-            var microsoft = true;
+            // Neither Fluent Emoji nor the Windows system emoji font has country-flag glyphs;
+            // Apple and the downloadable sets do.
+            var emojiSetId = SettingsService.Current.Appearance.EmojiSet.Id;
+            var microsoft = emojiSetId == Theme.FluentEmojiSetId || emojiSetId == Theme.SystemEmojiSetId;
 #else
             var microsoft = string.Equals(SettingsService.Current.Appearance.EmojiSet.Id, "microsoft");
 #endif

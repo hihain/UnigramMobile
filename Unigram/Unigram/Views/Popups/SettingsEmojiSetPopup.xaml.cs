@@ -48,7 +48,7 @@ namespace Unigram.Views.Popups
             _aggregator.Unsubscribe(this);
         }
 
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+        private async void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
         {
             var emojiSet = _selectedSet;
             if (emojiSet == null)
@@ -65,7 +65,29 @@ namespace Unigram.Views.Popups
             }
 
 #if MODERN_TDLIB
-            Theme.Current["EmojiThemeFontFamily"] = Theme.CreateEmojiFontFamily(emojiSet.Id);
+            if (emojiSet.Id != Theme.FluentEmojiSetId && emojiSet.Id != Theme.SystemEmojiSetId && emojiSet.Id != Theme.AppleEmojiSetId)
+            {
+                var deferral = args.GetDeferral();
+                try
+                {
+                    var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("emoji", CreationCollisionOption.OpenIfExists);
+                    await EmojiSetService.TryCopyPartLocally(folder, file.Local.Path, emojiSet.Id, emojiSet.Version, true);
+
+                    if (!Theme.IsEmojiSetAvailable(emojiSet.Id, emojiSet.Version))
+                    {
+                        Logs.PushDiagnostics.Write("theme.emoji.select", $"set={emojiSet.Id};result=font_missing");
+                        args.Cancel = true;
+                        return;
+                    }
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+            }
+
+            Theme.Current["EmojiThemeFontFamily"] = Theme.CreateEmojiFontFamily(emojiSet.Id, emojiSet.Version);
+            Logs.PushDiagnostics.Write("theme.emoji.select", $"set={emojiSet.Id};result=ok");
 #else
             switch (emojiSet.Id)
             {
@@ -296,6 +318,16 @@ namespace Unigram.Views.Popups
 #if MODERN_TDLIB
                     Add(new EmojiSet { Id = Theme.FluentEmojiSetId, Title = "Fluent", Version = 1, IsOfficial = true, IsDefault = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "fluent.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "fluent.png") } } });
                     Add(new EmojiSet { Id = Theme.SystemEmojiSetId, Title = "Microsoft (system)", Version = 1, IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });
+                    Add(new EmojiSet { Id = Theme.AppleEmojiSetId, Title = "Apple", Version = 1, IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.png") } } });
+
+                    var cloudSets = await _emojiSetService.GetCloudSetsAsync();
+                    foreach (var item in cloudSets)
+                    {
+                        if (item.Id != Theme.AppleEmojiSetId && item.Id != Theme.SystemEmojiSetId && item.Id != Theme.FluentEmojiSetId)
+                        {
+                            Add(item);
+                        }
+                    }
 #else
                     Add(new EmojiSet { Id = "apple", Title = "Apple", IsOfficial = true, IsDefault = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "apple.png") } } });
                     Add(new EmojiSet { Id = "microsoft", Title = "Microsoft", IsOfficial = true, Document = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.ttf") } }, Thumbnail = new File { Local = new LocalFile { IsDownloadingCompleted = true, Path = System.IO.Path.Combine(Package.Current.InstalledLocation.Path, "Assets", "Emoji", "microsoft.png") } } });

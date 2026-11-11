@@ -22,19 +22,59 @@ namespace Unigram.Common
 #if MODERN_TDLIB
         public const string FluentEmojiSetId = "fluent";
         public const string SystemEmojiSetId = "microsoft";
+        public const string AppleEmojiSetId = "apple";
 
-        // Windows 10 Mobile's DirectWrite does not composite CBDT/CBLC colour-bitmap fonts
-        // (the bundled apple.ttf and the downloadable sets), which painted every emoji blank.
         // fluent.ttf is Microsoft Fluent Emoji (flat, MIT) converted to COLRv0 layered vector
-        // glyphs, which Windows has composited since 8.1. It deliberately covers no ordinary
-        // text (letters, digits, #, *, space, (c), (R), TM, arrows), so the rest of the string
-        // - and emoji it lacks, such as flags and keycaps - fall back to Segoe UI and then the
-        // system Segoe UI Emoji. Its vertical metrics match Segoe UI so line heights are kept.
-        public static FontFamily CreateEmojiFontFamily(string emojiSetId)
+        // glyphs. It deliberately covers no ordinary text (letters, digits, #, *, space, (c),
+        // (R), TM, arrows), so the rest of the string - and emoji it lacks, such as flags and
+        // keycaps - fall back to Segoe UI and then the system Segoe UI Emoji. Its vertical
+        // metrics match Segoe UI so line heights are kept. The CBDT/CBLC sets (bundled
+        // apple.ttf and the downloadable sets) also render on Windows 10 Mobile, as the
+        // stable 26.11.6040 build shows, and are resolved exactly as that build does.
+        public static FontFamily CreateEmojiFontFamily(string emojiSetId, int version)
         {
-            return emojiSetId == FluentEmojiSetId
-                ? new FontFamily("ms-appx:///Assets/Emoji/fluent.ttf#Unigram Emoji, Segoe UI")
-                : new FontFamily("XamlAutoFontFamily");
+            switch (emojiSetId)
+            {
+                case FluentEmojiSetId:
+                    return new FontFamily("ms-appx:///Assets/Emoji/fluent.ttf#Unigram Emoji, Segoe UI");
+                case AppleEmojiSetId:
+                    return new FontFamily("ms-appx:///Assets/Emoji/apple.ttf#Segoe UI Emoji");
+                case SystemEmojiSetId:
+                case null:
+                    return new FontFamily("XamlAutoFontFamily");
+                default:
+                    return new FontFamily($"ms-appdata:///local/emoji/{emojiSetId}.{version}.ttf#Segoe UI Emoji");
+            }
+        }
+
+        public static bool IsEmojiSetAvailable(string emojiSetId, int version)
+        {
+            switch (emojiSetId)
+            {
+                case FluentEmojiSetId:
+                case AppleEmojiSetId:
+                case SystemEmojiSetId:
+                    return true;
+                case null:
+                    return false;
+                default:
+                    return File.Exists(Path.Combine(ApplicationData.Current.LocalFolder.Path, "emoji", $"{emojiSetId}.{version}.ttf"));
+            }
+        }
+
+        private static string GetEmojiFontKind(string emojiSetId)
+        {
+            switch (emojiSetId)
+            {
+                case FluentEmojiSetId:
+                    return "fluent_colrv0";
+                case AppleEmojiSetId:
+                    return "apple_cbdt";
+                case SystemEmojiSetId:
+                    return "system";
+                default:
+                    return "downloaded_cbdt";
+            }
         }
 #endif
 
@@ -58,18 +98,24 @@ namespace Unigram.Common
                 // nor a failure reading the setting can leave EmojiThemeFontFamily unregistered:
                 // the enclosing catch is silent, and a missing key leaves every emoji-bearing
                 // control with no font at all.
-                string emojiSetId;
+                string emojiSetId = null;
+                var emojiSetVersion = 1;
+                string emojiSetError = null;
                 try
                 {
-                    emojiSetId = SettingsService.Current.Appearance.EmojiSet.Id ?? "null";
+                    var emojiSet = SettingsService.Current.Appearance.EmojiSet;
+                    emojiSetId = emojiSet.Id;
+                    emojiSetVersion = emojiSet.Version;
                 }
                 catch (Exception ex)
                 {
-                    emojiSetId = "error_" + ex.GetType().Name;
+                    emojiSetError = ex.GetType().Name;
                 }
 
-                this.Add("EmojiThemeFontFamily", CreateEmojiFontFamily(emojiSetId));
-                Logs.PushDiagnostics.Write("theme.emoji", $"set={emojiSetId};font={(emojiSetId == FluentEmojiSetId ? "fluent_colrv0" : "system")}");
+                this.Add("EmojiThemeFontFamily", CreateEmojiFontFamily(emojiSetId, emojiSetVersion));
+                Logs.PushDiagnostics.Write("theme.emoji", emojiSetError == null
+                    ? $"set={emojiSetId ?? "null"};font={GetEmojiFontKind(emojiSetId)}"
+                    : $"set=error_{emojiSetError};font=system");
 #else
                 var emojiSet = SettingsService.Current.Appearance.EmojiSet;
                 switch (emojiSet.Id)

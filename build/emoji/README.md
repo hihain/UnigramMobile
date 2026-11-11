@@ -1,11 +1,13 @@
 # Fluent emoji font (`Assets\Emoji\fluent.ttf`)
 
-Windows 10 Mobile cannot render the CBDT/CBLC colour-bitmap emoji fonts (`apple.ttf`
-and the Telegram cloud sets), and its system Segoe UI Emoji predates many emoji.
-Modern-TDLib builds therefore bundle `fluent.ttf`: the **Flat** style of
+Modern-TDLib builds bundle `fluent.ttf` as the default emoji font: the **Flat** style of
 [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT, see
 `Assets\Emoji\fluent-LICENSE.txt`) converted to COLRv0 layered vector glyphs, which
-Windows composites natively.
+Windows composites natively. Windows 10 Mobile's system Segoe UI Emoji predates many
+emoji. The CBDT/CBLC colour-bitmap sets (`apple.ttf` and the Telegram cloud sets) also
+render on Windows 10 Mobile (confirmed on device with stable 26.11.6040) and can be
+selected under Settings > Appearance > Emoji Set from 26.11.6299.0 on. An earlier
+assumption that they could not render was never device-verified.
 
 The font deliberately covers no ordinary text (letters, digits, `#`, `*`, space,
 `©`, `®`, `™`, arrows, and text-default symbols below U+2600 or in U+3000-32FF), because

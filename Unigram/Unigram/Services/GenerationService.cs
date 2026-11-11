@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Entities;
+using Unigram.Logs;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
 using Windows.Media.Effects;
@@ -298,11 +299,25 @@ namespace Unigram.Services
 
                     if (conversion.Transform)
                     {
+                        var crop = conversion.CropRectangle.IsEmpty() ? Rect.Empty : conversion.CropRectangle;
+                        var rotate = conversion.Rotation != MediaRotation.None || conversion.Mirror != MediaMirroringOptions.None;
+
+                        // Crop and scale in the source frame's coordinates first; rotating and mirroring the
+                        // result separately keeps the crop rectangle independent of the camera orientation.
                         var transform = new VideoTransformEffectDefinition();
-                        transform.Rotation = conversion.Rotation;
                         transform.OutputSize = conversion.OutputSize;
+                        transform.CropRectangle = crop;
+
+                        if (rotate && !crop.IsEmpty)
+                        {
+                            transcoder.AddVideoEffect(transform.ActivatableClassId, true, transform.Properties);
+
+                            transform = new VideoTransformEffectDefinition();
+                            transform.OutputSize = conversion.OutputSize;
+                        }
+
+                        transform.Rotation = conversion.Rotation;
                         transform.Mirror = conversion.Mirror;
-                        transform.CropRectangle = conversion.CropRectangle.IsEmpty() ? Rect.Empty : conversion.CropRectangle;
 
                         profile.Video.Width = (uint)conversion.OutputSize.Width;
                         profile.Video.Height = (uint)conversion.OutputSize.Height;
@@ -313,18 +328,28 @@ namespace Unigram.Services
                     var prepare = await transcoder.PrepareFileTranscodeAsync(file, temp, profile);
                     if (prepare.CanTranscode)
                     {
-                        var progress = prepare.TranscodeAsync();
-                        progress.Progress = (result, delta) =>
+                        var operation = prepare.TranscodeAsync();
+                        operation.Progress = (result, delta) =>
                         {
                             _protoService.Send(new SetFileGenerationProgress(update.GenerationId, 100, (int)delta));
                         };
-                        progress.Completed = (result, delta) =>
+
+                        // As upstream: only a transcode that actually completed is handed to TDLib.
+                        await operation;
+
+                        ulong bytes = 0;
+                        try
                         {
-                            _protoService.Send(new FinishFileGeneration(update.GenerationId, prepare.FailureReason == TranscodeFailureReason.None ? null : new Error(500, prepare.FailureReason.ToString())));
-                        };
+                            bytes = (await temp.GetBasicPropertiesAsync()).Size;
+                        }
+                        catch { }
+
+                        PushDiagnostics.Write("media.transcode", $"result=ok;transform={(conversion.Transform ? 1 : 0)};rotation={conversion.Rotation};output={profile.Video.Width}x{profile.Video.Height};size_kb={bytes / 1024}");
+                        _protoService.Send(new FinishFileGeneration(update.GenerationId, bytes > 0 ? null : new Error(500, "FILE_GENERATE_LOCATION_INVALID Empty transcode output")));
                     }
                     else
                     {
+                        PushDiagnostics.Write("media.transcode", $"result=failed;stage=prepare;reason={prepare.FailureReason}");
                         _protoService.Send(new FinishFileGeneration(update.GenerationId, new Error(500, prepare.FailureReason.ToString())));
                     }
                 }
@@ -335,6 +360,7 @@ namespace Unigram.Services
             }
             catch (Exception ex)
             {
+                PushDiagnostics.WriteException("media.transcode", ex, "result=failed;stage=transcode");
                 _protoService.Send(new FinishFileGeneration(update.GenerationId, new Error(500, "FILE_GENERATE_LOCATION_INVALID " + ex.ToString())));
             }
         }

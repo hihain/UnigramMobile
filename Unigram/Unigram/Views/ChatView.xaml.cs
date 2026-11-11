@@ -3052,6 +3052,8 @@ namespace Unigram.Views
                 return;
             }
 
+            var result = "skipped;reason=size";
+
             try
             {
                 var bounds = Window.Current.Bounds;
@@ -3124,11 +3126,17 @@ namespace Unigram.Views
                 };
 
                 await preview.Capture.StartPreviewAsync();
+                result = "started";
             }
             catch (Exception ex)
             {
                 // The recording may already have been stopped and its MediaCapture disposed.
-                Logger.Debug(Target.Recording, "Video message preview unavailable: " + ex.GetType().Name);
+                result = $"failed;hresult=0x{ex.HResult:X8}";
+            }
+            finally
+            {
+                PushDiagnostics.Write("recording.preview", "result=" + result);
+                preview.Started.TrySetResult(result == "started");
             }
         }
 

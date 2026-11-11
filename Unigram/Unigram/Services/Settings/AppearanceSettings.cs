@@ -159,21 +159,35 @@ namespace Unigram.Services.Settings
                 if (_emojiSet == null)
                 {
 #if MODERN_TDLIB
-                    // Only the bundled COLRv0 Fluent font and the system font render on Windows
-                    // 10 Mobile; normalize anything else (apple, cloud sets) to the default.
                     // Builds before 26.11.6291 forced "microsoft", so move those users to
-                    // Fluent once; an explicit later choice of the system font is respected.
+                    // Fluent once; any later explicit choice (system, Apple or a downloaded
+                    // set) is respected. A downloaded set whose font file is gone falls back
+                    // to the default.
                     var emojiSet = GetDefaultEmojiSet();
-                    var storedId = GetValueOrDefault(_container, "EmojiSetId", emojiSet.Id);
                     var revision = GetValueOrDefault(_container, "EmojiSetDefaultRevision", 0);
-                    if (revision >= FluentEmojiSetRevision && storedId == Theme.SystemEmojiSetId)
+                    if (revision >= FluentEmojiSetRevision)
                     {
-                        emojiSet = GetSystemEmojiSet();
+                        var storedId = GetValueOrDefault(_container, "EmojiSetId", emojiSet.Id);
+                        var storedVersion = GetValueOrDefault(_container, "EmojiSetVersion", emojiSet.Version);
+                        if (storedId == Theme.SystemEmojiSetId)
+                        {
+                            emojiSet = GetSystemEmojiSet();
+                        }
+                        else if (storedId != emojiSet.Id && Theme.IsEmojiSetAvailable(storedId, storedVersion))
+                        {
+                            emojiSet = new InstalledEmojiSet
+                            {
+                                Id = storedId,
+                                Title = GetValueOrDefault(_container, "EmojiSet", storedId),
+                                Version = storedVersion
+                            };
+                        }
                     }
 
                     var storedTitle = GetValueOrDefault(_container, "EmojiSet", emojiSet.Title);
-                    var storedVersion = GetValueOrDefault(_container, "EmojiSetVersion", emojiSet.Version);
-                    if (storedId != emojiSet.Id || storedTitle != emojiSet.Title || storedVersion != emojiSet.Version)
+                    var currentId = GetValueOrDefault(_container, "EmojiSetId", emojiSet.Id);
+                    var currentVersion = GetValueOrDefault(_container, "EmojiSetVersion", emojiSet.Version);
+                    if (currentId != emojiSet.Id || storedTitle != emojiSet.Title || currentVersion != emojiSet.Version)
                     {
                         AddOrUpdateValue(_container, "EmojiSetId", emojiSet.Id);
                         AddOrUpdateValue(_container, "EmojiSet", emojiSet.Title);
@@ -202,7 +216,7 @@ namespace Unigram.Services.Settings
             {
                 var fallback = GetDefaultEmojiSet();
 #if MODERN_TDLIB
-                if (value != null && value.Id != Theme.FluentEmojiSetId && value.Id != Theme.SystemEmojiSetId)
+                if (value != null && !Theme.IsEmojiSetAvailable(value.Id, value.Version))
                 {
                     value = fallback;
                 }

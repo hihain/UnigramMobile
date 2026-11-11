@@ -556,6 +556,9 @@ namespace Unigram.Controls.Chats
                 public MediaCapture Capture { get; set; }
                 public int Rotation { get; set; }
                 public bool Mirror { get; set; }
+
+                // Completed by the chat once the preview runs (or can't), so recording starts after it, as upstream does.
+                public TaskCompletionSource<bool> Started { get; } = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
             public VideoPreview CurrentVideoPreview { get; private set; }
@@ -691,6 +694,27 @@ namespace Unigram.Controls.Chats
 
                         Logger.Debug(Target.Recording, "Devices initialized, starting");
 
+                        if (mode == ChatRecordMode.Video)
+                        {
+                            // Upstream Unigram shows the camera preview as soon as the device is initialized and only
+                            // then records; starting the preview while a low-lag recording already runs leaves it blank.
+                            var preview = new VideoPreview
+                            {
+                                Capture = _recorder.m_mediaCapture,
+                                Rotation = _recorder._previewRotation,
+                                Mirror = _recorder._mirroringPreview
+                            };
+
+                            CurrentVideoPreview = preview;
+                            RecordingStarted?.Invoke(this, EventArgs.Empty);
+
+                            stage = "preview";
+                            if (await Task.WhenAny(preview.Started.Task, Task.Delay(3000)) != preview.Started.Task)
+                            {
+                                PushDiagnostics.Write("recording.preview", "result=timeout");
+                            }
+                        }
+
                         stage = "start";
                         //await InitializeQuantumAsync();
                         await _recorder.StartAsync();
@@ -703,16 +727,6 @@ namespace Unigram.Controls.Chats
                         Logger.Debug(Target.Recording, "Recording started at " + DateTime.Now);
 
                         _start = DateTime.Now;
-
-                        if (mode == ChatRecordMode.Video)
-                        {
-                            CurrentVideoPreview = new VideoPreview
-                            {
-                                Capture = _recorder.m_mediaCapture,
-                                Rotation = _recorder._previewRotation,
-                                Mirror = _recorder._mirroringPreview
-                            };
-                        }
                     }
                     catch (Exception ex)
                     {
@@ -737,7 +751,10 @@ namespace Unigram.Controls.Chats
                         return;
                     }
 
-                    RecordingStarted?.Invoke(this, EventArgs.Empty);
+                    if (mode != ChatRecordMode.Video)
+                    {
+                        RecordingStarted?.Invoke(this, EventArgs.Empty);
+                    }
                 });
             }
             private async void RotationHelper_OrientationChanged(object sender, bool updatePreview)
@@ -986,19 +1003,16 @@ namespace Unigram.Controls.Chats
                 if (mode == ChatRecordMode.Video)
                 {
                     var props = await file.Properties.GetVideoPropertiesAsync();
-                    var width = props.GetWidth();
-                    var height = props.GetHeight();
+                    // Stored (unrotated) frame size, which is what the crop applies to.
+                    var sourceWidth = props.Width;
+                    var sourceHeight = props.Height;
+                    var width = sourceWidth;
+                    var height = sourceHeight;
                     var x = 0d;
                     var y = 0d;
 
-                    // The Video Processor expects the crop rectangle in the rotated frame's coordinates.
-                    if (rotation == 90 || rotation == 270)
-                    {
-                        var swap = width;
-                        width = height;
-                        height = swap;
-                    }
-
+                    // As upstream: the centred square of the recorded (unrotated) frame. The transcoder
+                    // crops first and rotates the square afterwards.
                     if (width > height)
                     {
                         x = (width - height) / 2;
@@ -1009,6 +1023,15 @@ namespace Unigram.Controls.Chats
                         y = (height - width) / 2;
                         height = width;
                     }
+
+                    ulong bytes = 0;
+                    try
+                    {
+                        bytes = (await file.GetBasicPropertiesAsync()).Size;
+                    }
+                    catch { }
+
+                    PushDiagnostics.Write("recording.stop", $"mode=Video;width={sourceWidth};height={sourceHeight};rotation={rotation};mirror={(mirroring ? 1 : 0)};duration_s={duration};size_kb={bytes / 1024}");
 
                     var transform = new VideoTransformEffectDefinition();
                     transform.CropRectangle = new Rect(x, y, width, height);
