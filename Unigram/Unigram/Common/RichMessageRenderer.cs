@@ -2,11 +2,16 @@ using System;
 using System.Globalization;
 using Telegram.Td.Api;
 using Unigram.Converters;
+using Unigram.Logs;
+using Unigram.Services;
 using Unigram.ViewModels;
+using Windows.UI;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 
 namespace Unigram.Common
 {
@@ -293,13 +298,18 @@ namespace Unigram.Common
                     }
                     break;
                 case PageBlockPhoto photo:
-                    AddMediaBlock(context, span, Strings.Resources.AttachPhoto, photo.Caption, tight);
+                    if (!AddPhotoBlock(context, span, photo.Photo, photo.Caption, tight))
+                    {
+                        AddMediaBlock(context, span, Strings.Resources.AttachPhoto, photo.Caption, tight);
+                    }
                     break;
                 case PageBlockVideo video:
-                    AddMediaBlock(context, span, Strings.Resources.AttachVideo, video.Caption, tight);
+                    AddThumbnailBlock(context, span, video.Video?.Thumbnail);
+                    AddMediaBlock(context, span, Strings.Resources.AttachVideo, video.Caption, true);
                     break;
                 case PageBlockAnimation animation:
-                    AddMediaBlock(context, span, Strings.Resources.AttachGif, animation.Caption, tight);
+                    AddThumbnailBlock(context, span, animation.Animation?.Thumbnail);
+                    AddMediaBlock(context, span, Strings.Resources.AttachGif, animation.Caption, true);
                     break;
                 case PageBlockAudio audio:
                     AddMediaBlock(context, span, Strings.Resources.AttachMusic, audio.Caption, tight);
@@ -308,10 +318,10 @@ namespace Unigram.Common
                     AddMediaBlock(context, span, Strings.Resources.AttachAudio, voiceNote.Caption, tight);
                     break;
                 case PageBlockCollage collage:
-                    AddMediaBlock(context, span, Strings.Resources.AttachPhoto + " \u00D7" + collage.Blocks.Count.ToString(CultureInfo.InvariantCulture), collage.Caption, tight);
+                    RenderMediaGroup(context, span, collage.Blocks, collage.Caption, tight);
                     break;
                 case PageBlockSlideshow slideshow:
-                    AddMediaBlock(context, span, Strings.Resources.AttachPhoto + " \u00D7" + slideshow.Blocks.Count.ToString(CultureInfo.InvariantCulture), slideshow.Caption, tight);
+                    RenderMediaGroup(context, span, slideshow.Blocks, slideshow.Caption, tight);
                     break;
                 case PageBlockMap map:
                     AddMediaBlock(context, span, Strings.Resources.AttachLocation, map.Caption, tight);
@@ -401,6 +411,137 @@ namespace Unigram.Common
                 }
 
                 context.SuppressBreak = false;
+            }
+        }
+
+        private static void RenderMediaGroup(RenderContext context, Span span, System.Collections.Generic.IList<PageBlock> blocks, PageBlockCaption caption, bool tight)
+        {
+            var first = true;
+            foreach (var inner in blocks)
+            {
+                RenderBlock(context, span, inner, first ? tight : true);
+                first = false;
+            }
+
+            AddCaption(context, span, caption, true);
+        }
+
+        private static bool AddPhotoBlock(RenderContext context, Span span, Photo photo, PageBlockCaption caption, bool tight)
+        {
+            PhotoSize best = null;
+            if (photo?.Sizes != null)
+            {
+                foreach (var size in photo.Sizes)
+                {
+                    if (size?.Photo == null)
+                    {
+                        continue;
+                    }
+
+                    if (best == null
+                        || (size.Width <= PreferredSourceWidth && (best.Width > PreferredSourceWidth || size.Width > best.Width))
+                        || (size.Width > PreferredSourceWidth && best.Width > PreferredSourceWidth && size.Width < best.Width))
+                    {
+                        best = size;
+                    }
+                }
+            }
+
+            if (best == null)
+            {
+                return false;
+            }
+
+            BeginBlock(context, span, tight);
+            AddImage(context, span, best.Photo, best.Width, best.Height);
+            AddCaption(context, span, caption, true);
+            return true;
+        }
+
+        private static void AddThumbnailBlock(RenderContext context, Span span, Thumbnail thumbnail)
+        {
+            if (thumbnail?.File == null || !(thumbnail.Format is ThumbnailFormatJpeg))
+            {
+                return;
+            }
+
+            BeginBlock(context, span, false);
+            AddImage(context, span, thumbnail.File, thumbnail.Width, thumbnail.Height);
+        }
+
+        private static void AddCaption(RenderContext context, Span span, PageBlockCaption caption, bool tight)
+        {
+            if (caption == null)
+            {
+                return;
+            }
+
+            AddTextBlock(context, span, caption.Text, x => { x.FontStyle = FontStyle.Italic; x.FontSize = 13; }, tight);
+            AddTextBlock(context, span, caption.Credit, x => x.FontSize = 13, true);
+        }
+
+        private const int PreferredSourceWidth = 800;
+        private const double MaxImageWidth = 260;
+        private const double MaxImageHeight = 360;
+
+        private static void AddImage(RenderContext context, Span span, File file, int sourceWidth, int sourceHeight)
+        {
+            var width = sourceWidth > 0 ? Math.Min(MaxImageWidth, sourceWidth) : MaxImageWidth;
+            var height = sourceWidth > 0 && sourceHeight > 0 ? width * sourceHeight / sourceWidth : width * 2 / 3;
+            if (height > MaxImageHeight)
+            {
+                width = width * MaxImageHeight / height;
+                height = MaxImageHeight;
+            }
+
+            var image = new Image { Stretch = Stretch.UniformToFill, Width = width, Height = height };
+            var border = new Border
+            {
+                Width = width,
+                Height = height,
+                Margin = new Thickness(0, 2, 0, 2),
+                Background = new SolidColorBrush(Color.FromArgb(0x33, 0x80, 0x80, 0x80)),
+                Child = image
+            };
+
+            var message = context.Message;
+            border.Tapped += (s, args) =>
+            {
+                args.Handled = true;
+                message.Delegate?.OpenRichMessage(message);
+            };
+
+            span.Inlines.Add(new InlineUIContainer { Child = border });
+            LoadImage(message.ProtoService, file, image, (int)Math.Ceiling(width));
+        }
+
+        private static async void LoadImage(IProtoService protoService, File file, Image image, int decodeWidth)
+        {
+            try
+            {
+                if (!file.Local.IsDownloadingCompleted)
+                {
+                    var response = await protoService.SendAsync(new DownloadFile(file.Id, 1, 0, 0, true));
+                    if (!(response is File downloaded))
+                    {
+                        return;
+                    }
+
+                    file = downloaded;
+                }
+
+                if (file.Local.IsDownloadingCompleted && !string.IsNullOrEmpty(file.Local.Path))
+                {
+                    image.Source = new BitmapImage(new Uri("file:///" + file.Local.Path))
+                    {
+                        DecodePixelType = DecodePixelType.Logical,
+                        DecodePixelWidth = decodeWidth
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                PushDiagnostics.WriteException("richmessage.image.failed", ex);
             }
         }
 
