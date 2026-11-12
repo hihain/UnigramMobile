@@ -675,6 +675,18 @@ namespace Unigram.Controls.Chats
                             }
 
                             Logger.Debug(Target.Recording, "Camera rotation, capture: " + _recorder._captureRotation + ", preview: " + _recorder._previewRotation + ", mirror: " + _recorder._mirroringPreview);
+
+                            if (mode == ChatRecordMode.Video)
+                            {
+                                var model = string.Empty;
+                                try
+                                {
+                                    model = new Windows.Security.ExchangeActiveSyncProvisioning.EasClientDeviceInformation().SystemProductName;
+                                }
+                                catch { }
+
+                                PushDiagnostics.Write("recording.rotation", $"capture={_recorder._captureRotation};preview={_recorder._previewRotation};mirror={(_recorder._mirroringPreview ? 1 : 0)};mount={cameraDevice.EnclosureLocation?.RotationAngleInDegreesClockwise};model={model}");
+                            }
                         }
 
                         stage = "initialize";
@@ -698,6 +710,9 @@ namespace Unigram.Controls.Chats
 
                         if (mode == ChatRecordMode.Video)
                         {
+                            stage = "stream";
+                            PushDiagnostics.Write("recording.stream", await _recorder.MatchPreviewToRecordAsync());
+
                             // Upstream Unigram shows the camera preview as soon as the device is initialized and only
                             // then records; starting the preview while a low-lag recording already runs leaves it blank.
                             var preview = new VideoPreview
@@ -1048,14 +1063,14 @@ namespace Unigram.Controls.Chats
                     var transform = new VideoTransformEffectDefinition();
                     transform.CropRectangle = new Rect(x, y, width, height);
                     transform.OutputSize = new Size(240, 240);
-                    // The recording holds raw sensor frames. The capture rotation is meant to be applied before the
-                    // selfie mirror (as the preview does), but Media Foundation mirrors first, so a quarter turn has
-                    // to go the other way when mirroring; otherwise the video note comes out upside down.
-                    var applied = mirroring && (rotation == 90 || rotation == 270) ? 360 - rotation : rotation;
+                    // The recording holds raw sensor frames: rotate by the capture rotation, then apply the selfie
+                    // mirror, as the preview does. GenerationService applies the two as separate effects in that
+                    // order, because a single effect's order differs between phones.
+                    var applied = rotation;
                     transform.Rotation = ToMediaRotation(applied);
                     transform.Mirror = mirroring ? MediaMirroringOptions.Horizontal : MediaMirroringOptions.None;
 
-                    PushDiagnostics.Write("recording.orientation", $"capture={rotation};applied={applied};mirror={(mirroring ? 1 : 0)}");
+                    PushDiagnostics.Write("recording.orientation", $"capture={rotation};applied={applied};mirror={(mirroring ? 1 : 0)};order=rotate_then_mirror");
 
                     var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Vga);
                     profile.Video.Width = 240;
@@ -1158,6 +1173,53 @@ namespace Unigram.Controls.Chats
                 public VideoEncodingQuality VideoQuality { get; private set; }
 
                 // Returns a privacy-safe description of the camera's auto exposure state for diagnostics.
+                // The front cameras of Windows 10 Mobile phones share one sensor stream between preview and recording:
+                // the preview opens 4:3 and switches to the record stream's 16:9 when recording starts, which the
+                // CaptureElement keeps drawing with the old scale (a squeezed, too wide face). As upstream's camera
+                // code does, give the preview the record stream's aspect ratio before it starts.
+                public async Task<string> MatchPreviewToRecordAsync()
+                {
+                    try
+                    {
+                        var controller = m_mediaCapture.VideoDeviceController;
+                        if (!(controller.GetMediaStreamProperties(MediaStreamType.VideoRecord) is VideoEncodingProperties record) || record.Width == 0 || record.Height == 0)
+                        {
+                            return "unknown";
+                        }
+
+                        var current = controller.GetMediaStreamProperties(MediaStreamType.VideoPreview) as VideoEncodingProperties;
+                        var aspect = (double)record.Width / record.Height;
+                        var info = $"record={record.Width}x{record.Height};preview={current?.Width}x{current?.Height}";
+
+                        bool Matches(VideoEncodingProperties properties) => properties != null && properties.Height > 0 && Math.Abs((double)properties.Width / properties.Height - aspect) < 0.02;
+
+                        if (Matches(current))
+                        {
+                            return info + ";result=matching";
+                        }
+
+                        var candidate = controller.GetAvailableMediaStreamProperties(MediaStreamType.VideoPreview)
+                            .OfType<VideoEncodingProperties>()
+                            .Where(Matches)
+                            .OrderBy(x => x.Width > record.Width ? 1 : 0)
+                            .ThenByDescending(x => x.Width * x.Height)
+                            .ThenByDescending(x => x.FrameRate.Denominator > 0 ? (double)x.FrameRate.Numerator / x.FrameRate.Denominator : 0)
+                            .FirstOrDefault();
+
+                        if (candidate == null)
+                        {
+                            return info + ";result=none";
+                        }
+
+                        await controller.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, candidate);
+                        return info + $";result=set_{candidate.Width}x{candidate.Height}";
+                    }
+                    catch (Exception ex)
+                    {
+                        return $"result=failed_0x{ex.HResult:X8}";
+                    }
+                }
+
                 public async Task<string> EnableAutoExposureAsync()
                 {
                     try

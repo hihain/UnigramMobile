@@ -300,7 +300,8 @@ namespace Unigram.Services
                     if (conversion.Transform)
                     {
                         var crop = conversion.CropRectangle.IsEmpty() ? Rect.Empty : conversion.CropRectangle;
-                        var rotate = conversion.Rotation != MediaRotation.None || conversion.Mirror != MediaMirroringOptions.None;
+                        var rotate = conversion.Rotation != MediaRotation.None;
+                        var mirror = conversion.Mirror != MediaMirroringOptions.None;
 
                         // Crop and scale in the source frame's coordinates first; rotating and mirroring the
                         // result separately keeps the crop rectangle independent of the camera orientation.
@@ -308,7 +309,7 @@ namespace Unigram.Services
                         transform.OutputSize = conversion.OutputSize;
                         transform.CropRectangle = crop;
 
-                        if (rotate && !crop.IsEmpty)
+                        if ((rotate || mirror) && !crop.IsEmpty)
                         {
                             transcoder.AddVideoEffect(transform.ActivatableClassId, true, transform.Properties);
 
@@ -317,6 +318,18 @@ namespace Unigram.Services
                         }
 
                         transform.Rotation = conversion.Rotation;
+
+                        // Within one effect the video processor applies rotation and mirroring in a driver-dependent
+                        // order (the Lumia 950 and 1520 differ, turning the same video note upside down on one of
+                        // them), so the mirror gets its own effect: always rotate, then mirror, like the preview.
+                        if (rotate && mirror)
+                        {
+                            transcoder.AddVideoEffect(transform.ActivatableClassId, true, transform.Properties);
+
+                            transform = new VideoTransformEffectDefinition();
+                            transform.OutputSize = conversion.OutputSize;
+                        }
+
                         transform.Mirror = conversion.Mirror;
 
                         profile.Video.Width = (uint)conversion.OutputSize.Width;
@@ -344,7 +357,7 @@ namespace Unigram.Services
                         }
                         catch { }
 
-                        PushDiagnostics.Write("media.transcode", $"result=ok;transform={(conversion.Transform ? 1 : 0)};rotation={conversion.Rotation};output={profile.Video.Width}x{profile.Video.Height};size_kb={bytes / 1024}");
+                        PushDiagnostics.Write("media.transcode", $"result=ok;transform={(conversion.Transform ? 1 : 0)};rotation={conversion.Rotation};mirror={conversion.Mirror};output={profile.Video.Width}x{profile.Video.Height};size_kb={bytes / 1024}");
                         _protoService.Send(new FinishFileGeneration(update.GenerationId, bytes > 0 ? null : new Error(500, "FILE_GENERATE_LOCATION_INVALID Empty transcode output")));
                     }
                     else
@@ -365,16 +378,16 @@ namespace Unigram.Services
             }
         }
 
-        private static BitmapRotation ToBitmapRotation(MediaRotation rotation)
+        private static BitmapRotation ToBitmapRotation(MediaRotation rotation, bool flipped)
         {
             switch (rotation)
             {
                 case MediaRotation.Clockwise90Degrees:
-                    return BitmapRotation.Clockwise90Degrees;
+                    return flipped ? BitmapRotation.Clockwise270Degrees : BitmapRotation.Clockwise90Degrees;
                 case MediaRotation.Clockwise180Degrees:
                     return BitmapRotation.Clockwise180Degrees;
                 case MediaRotation.Clockwise270Degrees:
-                    return BitmapRotation.Clockwise270Degrees;
+                    return flipped ? BitmapRotation.Clockwise90Degrees : BitmapRotation.Clockwise270Degrees;
                 default:
                     return BitmapRotation.None;
             }
@@ -419,8 +432,8 @@ namespace Unigram.Services
                         transform.ScaledHeight = height;
                         transform.InterpolationMode = BitmapInterpolationMode.Linear;
                         transform.Flip = conversion.Mirror == MediaMirroringOptions.Horizontal ? BitmapFlip.Horizontal : BitmapFlip.None;
-                        // Like the video transform (Media Foundation mirrors before rotating), BitmapTransform flips first.
-                        transform.Rotation = ToBitmapRotation(conversion.Rotation);
+                        // The video rotates, then mirrors; BitmapTransform flips first, so a quarter turn goes the other way.
+                        transform.Rotation = ToBitmapRotation(conversion.Rotation, transform.Flip != BitmapFlip.None);
 
                         var pixelData = await decoder.GetSoftwareBitmapAsync(decoder.BitmapPixelFormat, decoder.BitmapAlphaMode, transform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.DoNotColorManage);
 
