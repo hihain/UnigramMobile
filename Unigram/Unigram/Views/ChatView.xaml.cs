@@ -2991,6 +2991,10 @@ namespace Unigram.Views
 
         private void VoiceButton_RecordingStarted(object sender, EventArgs e)
         {
+            // First, so nothing below can keep the recorder waiting on the preview.
+            ShowVideoNotePreview(btnVoiceMessage.CurrentVideoPreview);
+            ShowRecordLockHint();
+
             var slideWidth = (float)SlidePanel.ActualWidth;
             var elapsedWidth = (float)ElapsedPanel.ActualWidth;
 
@@ -3037,8 +3041,60 @@ namespace Unigram.Views
             ViewModel.ChatActionManager.SetTyping(btnVoiceMessage.IsChecked.Value ? (ChatAction)new ChatActionRecordingVideoNote() : new ChatActionRecordingVoiceNote());
             PositionRecordingUI(TextField.IsFormattingVisible);
             Grid.SetColumnSpan(TextFieldPanel, 4);
+        }
 
-            ShowVideoNotePreview(btnVoiceMessage.CurrentVideoPreview);
+        private Popup _recordLockHint;
+
+        // As upstream, dragging the record button up locks the recording, after which it can be sent with the
+        // button or cancelled; this shows where to drag, above everything including the video note preview.
+        private void ShowRecordLockHint()
+        {
+            HideRecordLockHint();
+
+            if (btnVoiceMessage.IsLocked)
+            {
+                return;
+            }
+
+            var origin = btnVoiceMessage.TransformToVisual(Window.Current.Content).TransformPoint(new Point());
+
+            var hint = new Border
+            {
+                Width = 36,
+                Height = 64,
+                CornerRadius = new CornerRadius(18),
+                Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xCC, 0x30, 0x30, 0x30)),
+                Child = new StackPanel
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Children =
+                    {
+                        new FontIcon { Glyph = "\uE72E", FontSize = 16, Foreground = new SolidColorBrush(Windows.UI.Colors.White) },
+                        new FontIcon { Glyph = "\uE70E", FontSize = 12, Margin = new Thickness(0, 6, 0, 0), Foreground = new SolidColorBrush(Windows.UI.Colors.White) }
+                    }
+                }
+            };
+
+            _recordLockHint = new Popup
+            {
+                Child = hint,
+                IsHitTestVisible = false,
+                HorizontalOffset = origin.X + (btnVoiceMessage.ActualWidth - hint.Width) / 2,
+                VerticalOffset = Math.Max(0, origin.Y - 24 - 12 - hint.Height),
+                IsOpen = true
+            };
+        }
+
+        private void HideRecordLockHint()
+        {
+            var popup = _recordLockHint;
+            _recordLockHint = null;
+
+            if (popup != null)
+            {
+                popup.IsOpen = false;
+                popup.Child = null;
+            }
         }
 
         private Popup _videoNotePreview;
@@ -3168,6 +3224,7 @@ namespace Unigram.Views
         private void VoiceButton_RecordingStopped(object sender, EventArgs e)
         {
             HideVideoNotePreview();
+            HideRecordLockHint();
 
             AttachExpression();
             AttachTextAreaExpression();
@@ -3228,6 +3285,7 @@ namespace Unigram.Views
 
         private void VoiceButton_RecordingLocked(object sender, EventArgs e)
         {
+            HideRecordLockHint();
             DetachExpression();
 
             var ellipseAnimation = _compositor.CreateScalarKeyFrameAnimation();

@@ -563,6 +563,8 @@ namespace Unigram.Controls.Chats
 
             public VideoPreview CurrentVideoPreview { get; private set; }
 
+            private const int VideoWarmUpMilliseconds = 1000;
+
             // Privacy-safe description (stage and HRESULT) of the last start failure, shown to the user.
             public string LastFailure { get; private set; }
             public ChatRecordMode LastFailureMode { get; private set; }
@@ -712,6 +714,16 @@ namespace Unigram.Controls.Chats
                             if (await Task.WhenAny(preview.Started.Task, Task.Delay(3000)) != preview.Started.Task)
                             {
                                 PushDiagnostics.Write("recording.preview", "result=timeout");
+                            }
+                            else if (preview.Started.Task.Result)
+                            {
+                                // The camera only meters the scene while frames flow; recording the moment the preview
+                                // appears leaves the first seconds (or, on some W10M cameras, all of it) underexposed.
+                                stage = "warmup";
+                                var exposure = await _recorder.EnableAutoExposureAsync();
+                                await Task.Delay(VideoWarmUpMilliseconds);
+
+                                PushDiagnostics.Write("recording.warmup", $"exposure={exposure};ms={VideoWarmUpMilliseconds}");
                             }
                         }
 
@@ -1036,9 +1048,14 @@ namespace Unigram.Controls.Chats
                     var transform = new VideoTransformEffectDefinition();
                     transform.CropRectangle = new Rect(x, y, width, height);
                     transform.OutputSize = new Size(240, 240);
-                    // The recording holds raw sensor frames; rotation is applied first, then the selfie mirror.
-                    transform.Rotation = ToMediaRotation(rotation);
+                    // The recording holds raw sensor frames. The capture rotation is meant to be applied before the
+                    // selfie mirror (as the preview does), but Media Foundation mirrors first, so a quarter turn has
+                    // to go the other way when mirroring; otherwise the video note comes out upside down.
+                    var applied = mirroring && (rotation == 90 || rotation == 270) ? 360 - rotation : rotation;
+                    transform.Rotation = ToMediaRotation(applied);
                     transform.Mirror = mirroring ? MediaMirroringOptions.Horizontal : MediaMirroringOptions.None;
+
+                    PushDiagnostics.Write("recording.orientation", $"capture={rotation};applied={applied};mirror={(mirroring ? 1 : 0)}");
 
                     var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.Vga);
                     profile.Video.Width = 240;
@@ -1139,6 +1156,31 @@ namespace Unigram.Controls.Chats
                 }
 
                 public VideoEncodingQuality VideoQuality { get; private set; }
+
+                // Returns a privacy-safe description of the camera's auto exposure state for diagnostics.
+                public async Task<string> EnableAutoExposureAsync()
+                {
+                    try
+                    {
+                        var exposure = m_mediaCapture.VideoDeviceController.ExposureControl;
+                        if (!exposure.Supported)
+                        {
+                            return "unsupported";
+                        }
+
+                        if (exposure.Auto)
+                        {
+                            return "auto";
+                        }
+
+                        await exposure.SetAutoAsync(true);
+                        return "enabled";
+                    }
+                    catch (Exception ex)
+                    {
+                        return $"failed_0x{ex.HResult:X8}";
+                    }
+                }
 
                 private async Task StartVideoAsync(VideoEncodingQuality quality)
                 {

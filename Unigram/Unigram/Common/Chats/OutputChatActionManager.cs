@@ -69,7 +69,7 @@ namespace Unigram.Common.Chats
         private SendChatAction CreateSendChatAction(long chatId, ChatAction action)
         {
 #if MODERN_TDLIB
-            return new SendChatAction(chatId, ModernTdlibCompatibility.GetMessageTopic(_threadId), null, action);
+            return new SendChatAction(chatId, ModernTdlibCompatibility.GetMessageTopic(_threadId), string.Empty, action);
 #else
             return new SendChatAction(chatId, _threadId, action);
 #endif

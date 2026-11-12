@@ -391,9 +391,11 @@ namespace Unigram.Common
             {
                 await element.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, new Windows.UI.Core.DispatchedHandler(action));
             }
-            catch
+            catch (Exception ex)
             {
-                // Most likey Excep_InvalidComObject_NoRCW_Wrapper, so we can just ignore it
+                // Most likey Excep_InvalidComObject_NoRCW_Wrapper, so we can just ignore it,
+                // but record it: a handler throwing here otherwise fails without a trace.
+                Logs.PushDiagnostics.WriteException("ui.dispatch.failed", ex);
             }
         }
 
