@@ -124,9 +124,12 @@ unmistakable; the top-level `Properties/DisplayName` remains the localized
 `Unigram Mobile` resource required by APPX validation.
 
 The modern schema is not source-compatible with the 26.8 application surface.
-The experimental build explicitly disables VoIP, nearby chats, and chat-folder
-editing. Those areas are gated at compile time and emit a diagnostic event when
-invoked. Notification registration continues to use
+The only application features still disabled in the BETA are People Nearby
+(retired by Telegram; gated at compile time, logs
+`chats_nearby.disabled|result=unsupported;feature=experimental_tdlib`) and
+Microsoft App Center (see below). Calls (audio and experimental video), chat
+folder editing (Settings > Folders and the main-menu shortcut since
+26.11.6303.0), and reporting are ported to the modern API. Notification registration continues to use
 `RegisterDevice(DeviceTokenWindowsPush)` and preserves the existing
 `PushReceiverId` session mapping and native background-task entry point.
 The package manifest explicitly registers `Telegram.Td.Client` against
@@ -139,8 +142,8 @@ with the pinned WinMD and native payload when the ignored local
 public CER remain local-only; the current test certificate thumbprint is
 `B5E7EBF1650558A9D670BD1C5B9F82E24A213434`. The generated APPX and
 `.appxupload` files are under `Unigram\Unigram\bin\ARM\Release\Upload` and
-`Unigram\Unigram\AppPackages`. Modern chat/message reporting is compile-time
-disabled until the server-driven `ReportChatResult` option flow is implemented.
+`Unigram\Unigram\AppPackages`. Modern chat/message reporting uses the
+server-driven `ReportChatResult` option flow.
 Microsoft App Center (Analytics and Crashes) is also compile-time disabled on
 this branch. Its UWP session tracker reaches
 `Windows.System.Diagnostics.ProcessDiagnosticInfo` from a background thread, and
@@ -512,13 +515,12 @@ contract — the API is v7, so it would still fault on a contract v5 or v6 devic
 editor rather than on any in-scope path, and is pre-existing. It is recorded
 here rather than changed.
 
-#### Calls are intentionally unavailable
+#### Calls (historical note)
 
-`voip.disabled|result=unsupported;feature=experimental_tdlib` in the diagnostics
-is expected, not a regression. VoIP is one of the features explicitly disabled
-for this experimental build (see the disabled-feature list above); the modern
-TDLib call API was out of the ported scope. Placing or receiving a call logs
-that line and does nothing else.
+Builds before the call port logged
+`voip.disabled|result=unsupported;feature=experimental_tdlib`; that gate has
+since been removed and calls use the modern TDLib call API (see the call
+sections above). The note below is kept for history.
 
 The experimental branch began at 26.8.6012.4, so it does **not** inherit the
 stable 26.8.6012.5 call-protocol commit. 26.9.6122.0 carries that small source

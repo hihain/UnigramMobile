@@ -143,11 +143,7 @@ namespace Unigram.ViewModels
         public RelayCommand SetupFiltersCommand { get; }
         private void SetupFiltersExecute()
         {
-#if !MODERN_TDLIB
             NavigationService.Navigate(typeof(FoldersPage));
-#else
-            PushDiagnostics.Write("chat-folder.disabled", "result=unsupported;feature=experimental_tdlib");
-#endif
         }
 
         public bool CollapseArchivedChats
