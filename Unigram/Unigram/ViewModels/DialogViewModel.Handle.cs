@@ -19,7 +19,7 @@ namespace Unigram.ViewModels
         IHandle<UpdateChatUnreadMentionCount>,
         IHandle<UpdateChatReadOutbox>,
         IHandle<UpdateChatReadInbox>,
-        //IHandle<UpdateChatDraftMessage>,
+        IHandle<UpdateChatDraftMessage>,
         IHandle<UpdateChatDefaultDisableNotification>,
 #if MODERN_TDLIB
         IHandle<UpdateChatMessageSender>,
@@ -331,16 +331,27 @@ namespace Unigram.ViewModels
 
         public void Handle(UpdateChatDraftMessage update)
         {
-            if (update.ChatId == _chat?.Id)
+            // Only the chat on screen applies synced drafts; thread drafts don't come through this update.
+            var chat = _chat;
+            if (chat == null || update.ChatId != chat.Id || _thread != null || !_isDraftSyncActive)
             {
-                var header = _composerHeader;
-                if (header?.EditingMessage != null)
-                {
-                    return;
-                }
-
-                BeginOnUIThread(() => ShowDraftMessage(_chat));
+                return;
             }
+
+            var header = _composerHeader;
+            if (header?.EditingMessage != null)
+            {
+                return;
+            }
+
+            BeginOnUIThread(() =>
+            {
+                // The user may have switched chats between the update and this dispatch.
+                if (_isDraftSyncActive && _chat == chat && _thread == null)
+                {
+                    ShowDraftMessage(chat, false);
+                }
+            });
         }
 
         public void Handle(UpdateChatDefaultDisableNotification update)

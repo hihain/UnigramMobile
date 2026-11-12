@@ -2175,6 +2175,7 @@ namespace Unigram.ViewModels
 #endif
 
             Chat = chat;
+            _isDraftSyncActive = true;
             SetScrollMode(ItemsUpdatingScrollMode.KeepLastItemInView, true);
 
             if (state.TryGet("access_token", out string accessToken))
@@ -2405,6 +2406,7 @@ namespace Unigram.ViewModels
         public override void OnNavigatingFrom(NavigatingEventArgs args)
         {
             //Aggregator.Unsubscribe(this);
+            _isDraftSyncActive = false;
 
             var chat = _chat;
             if (chat == null)
@@ -2557,7 +2559,18 @@ namespace Unigram.ViewModels
             }
         }
 
-        private async void ShowDraftMessage(Chat chat)
+        // True only while this view model owns the visible chat, so cached instances ignore draft updates.
+        private bool _isDraftSyncActive;
+
+        // Composer text right after the last draft was applied; differs once the user starts typing.
+        private string _appliedDraftText;
+
+        private static string NormalizeDraftText(string text)
+        {
+            return string.IsNullOrEmpty(text) ? string.Empty : text.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd();
+        }
+
+        private async void ShowDraftMessage(Chat chat, bool force = true)
         {
             DraftMessage draft;
 
@@ -2571,18 +2584,40 @@ namespace Unigram.ViewModels
                 draft = chat.DraftMessage;
             }
 
+            var incoming = draft == null ? null : ModernTdlibCompatibility.GetDraftMessageText(draft);
+
+            if (!force)
+            {
+                var current = NormalizeDraftText(GetFormattedText()?.Text);
+
+                // Echo of our own SaveDraft, a cleared draft after sending, or no change: keep the caret.
+                if (current == NormalizeDraftText(incoming?.Text))
+                {
+                    _appliedDraftText = current;
+                    return;
+                }
+
+                // Never overwrite text the user typed after the last applied draft.
+                if (_appliedDraftText != null && current != _appliedDraftText)
+                {
+                    return;
+                }
+            }
+
             if (draft == null || (_type != DialogType.History && _type != DialogType.Thread))
             {
                 SetText(null as string);
                 ComposerHeader = null;
+                _appliedDraftText = NormalizeDraftText(GetFormattedText()?.Text);
             }
             else
             {
-                var text = ModernTdlibCompatibility.GetDraftMessageText(draft);
-                if (text != null)
+                if (incoming != null)
                 {
-                    SetText(text.Text);
+                    SetText(incoming.Text);
                 }
+
+                _appliedDraftText = NormalizeDraftText(GetFormattedText()?.Text);
 
                 var replyToMessageId = ModernTdlibCompatibility.GetDraftReplyToMessageId(draft);
                 if (replyToMessageId != 0)
