@@ -316,7 +316,7 @@ namespace Unigram.Views.Popups
 
         public void Accept()
         {
-            if (CaptionInput.HandwritingView.IsOpen)
+            if (ApiInfo.IsFullExperience && CaptionInput.HandwritingView.IsOpen)
             {
                 RoutedEventHandler handler = null;
                 handler = (s, args) =>
