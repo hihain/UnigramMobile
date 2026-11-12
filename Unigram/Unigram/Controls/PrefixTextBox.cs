@@ -1,4 +1,4 @@
-﻿using Windows.UI.Xaml;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
 namespace Unigram.Controls
@@ -11,20 +11,27 @@ namespace Unigram.Controls
         {
             DefaultStyleKey = typeof(PrefixTextBox);
 
-            BeforeTextChanging += OnBeforeTextChanging;
+            // TextBox.BeforeTextChanging needs UniversalApiContract 5 (1709), which Windows 10
+            // Mobile lacks: subscribing threw and XAML failed to instantiate this control.
+            TextChanging += OnTextChanging;
             TextChanged += OnTextChanged;
         }
 
-        private void OnBeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+        private void OnTextChanging(TextBox sender, TextBoxTextChangingEventArgs args)
         {
-            if (string.IsNullOrWhiteSpace(args.NewText))
+            var prefix = Prefix ?? string.Empty;
+            var text = Text ?? string.Empty;
+
+            if (text.StartsWith(prefix))
             {
-                Text = Prefix;
-                SelectionStart = Prefix.Length;
+                return;
             }
-            else
+
+            var restore = string.IsNullOrWhiteSpace(text) ? prefix : prefix + (_value ?? string.Empty);
+            if (text != restore)
             {
-                args.Cancel = !args.NewText.StartsWith(Prefix);
+                Text = restore;
+                SelectionStart = restore.Length;
             }
         }
 
