@@ -45,7 +45,10 @@ namespace Unigram.ViewModels.Channels
                             HasTooMuchUsernames = true;
                             LoadAdminedPublicChannels();
                         }
-                        // TODO:
+                        else
+                        {
+                            await ShowUsernameErrorAsync(error);
+                        }
 
                         return;
                     }

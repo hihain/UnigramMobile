@@ -1,5 +1,6 @@
 ﻿using Telegram.Td.Api;
 using Unigram.Common;
+using Unigram.Logs;
 using Unigram.Services;
 
 namespace Unigram.ViewModels.Supergroups
@@ -36,10 +37,10 @@ namespace Unigram.ViewModels.Supergroups
             if (chat.Type is ChatTypeSupergroup)
             {
                 var item = ProtoService.GetSupergroup(chat);
-                var cache = ProtoService.GetSupergroupFull(chat);
 
-                if (item == null || cache == null)
+                if (item == null)
                 {
+                    PushDiagnostics.Write("supergroup.username", "result=supergroup_unavailable");
                     return;
                 }
 
@@ -53,7 +54,10 @@ namespace Unigram.ViewModels.Supergroups
                             HasTooMuchUsernames = true;
                             LoadAdminedPublicChannels();
                         }
-                        // TODO:
+                        else
+                        {
+                            await ShowUsernameErrorAsync(error);
+                        }
 
                         return;
                     }

@@ -1,4 +1,5 @@
-﻿using Telegram.Td.Api;
+﻿using System;
+using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Logs;
@@ -85,7 +86,27 @@ namespace Unigram.ViewModels.Channels
                     // Keep the creation pages on the back stack until Step 2 completes.
                     // Step 2 uses GoBackAt to remove the whole wizard after it has
                     // acknowledged creation and opened the channel.
-                    NavigationService.Navigate(typeof(ChannelCreateStep2Page), chat.Id);
+                    PushDiagnostics.Write("channel.create", "result=created");
+
+                    var navigated = false;
+                    try
+                    {
+                        navigated = NavigationService.Navigate(typeof(ChannelCreateStep2Page), chat.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        PushDiagnostics.WriteException("channel.create.step2", ex);
+                    }
+
+                    if (!navigated)
+                    {
+                        // The channel already exists: never leave the user on the name
+                        // page, where tapping again would create a duplicate channel.
+                        PushDiagnostics.Write("channel.create", "result=step2_unavailable;fallback=open_chat");
+                        await MessagePopup.ShowAsync(Strings.Resources.ActionCreateChannel, chat.Title, Strings.Resources.OpenChannel);
+                        NavigationService.NavigateToChat(chat);
+                        NavigationService.GoBackAt(0, false);
+                    }
                 }
                 else if (response is Error error)
                 {

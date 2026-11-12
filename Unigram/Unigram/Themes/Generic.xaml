@@ -12,6 +12,7 @@
 
     <Style TargetType="local:PhoneTextBox" BasedOn="{StaticResource DefaultTextBoxStyle}" />
     <Style TargetType="local:ColorTextBox" BasedOn="{StaticResource DefaultTextBoxStyle}" />
+    <Style TargetType="local:PrefixTextBox" BasedOn="{StaticResource DefaultTextBoxStyle}" />
     <Style TargetType="local:FormattedTextBox" BasedOn="{StaticResource DefaultRichEditBoxStyle}" />
     
     <Style TargetType="local:NavigationView">

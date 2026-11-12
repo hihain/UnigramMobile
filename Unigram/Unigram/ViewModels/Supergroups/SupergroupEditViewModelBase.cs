@@ -5,6 +5,7 @@ using Unigram.Collections;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Converters;
+using Unigram.Logs;
 using Unigram.Services;
 using Unigram.ViewModels.Delegates;
 using Windows.UI.Xaml.Controls;
@@ -280,6 +281,28 @@ namespace Unigram.ViewModels.Supergroups
             }
         }
 
+        protected async Task ShowUsernameErrorAsync(Error error)
+        {
+            PushDiagnostics.Write("supergroup.username", $"result=error;code={error.Code}");
+
+            string message;
+            if (error.Message != null && error.Message.Contains("USERNAME_OCCUPIED"))
+            {
+                message = Strings.Resources.UsernameInUse;
+            }
+            else if (error.Message != null && error.Message.Contains("USERNAME_INVALID"))
+            {
+                message = Strings.Resources.UsernameInvalid;
+            }
+            else
+            {
+                message = Strings.Resources.ErrorOccurred;
+            }
+
+            ErrorMessage = message;
+            await MessagePopup.ShowAsync(message, Strings.Resources.AppName, Strings.Resources.OK);
+        }
+
         public RelayCommand SendCommand { get; }
         protected abstract void SendExecute();
 
@@ -418,11 +441,11 @@ namespace Unigram.ViewModels.Supergroups
                 {
                     ErrorMessage = null;
                 }
-                else if (_username.Length < 5)
+                else if (username.Length < 5)
                 {
                     ErrorMessage = Strings.Resources.UsernameInvalidShort;
                 }
-                else if (_username.Length > 32)
+                else if (username.Length > 32)
                 {
                     ErrorMessage = Strings.Resources.UsernameInvalidLong;
                 }
