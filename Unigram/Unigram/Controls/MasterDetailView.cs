@@ -43,8 +43,12 @@ namespace Unigram.Controls
             {
                 service = BootStrapper.Current.NavigationServiceFactory(BootStrapper.BackButton.Ignore, BootStrapper.ExistingContent.Exclude, session, key + session, false) as NavigationService;
                 service.Frame.DataContext = new object();
-                service.FrameFacade.BackRequested += OnBackRequested;
             }
+
+            // The detail service outlives MainPage (e.g. across account switches), and
+            // Dispose() unsubscribes the previous view, so always attach this instance.
+            service.FrameFacade.BackRequested -= OnBackRequested;
+            service.FrameFacade.BackRequested += OnBackRequested;
 
             NavigationService = service;
             DetailFrame = NavigationService.Frame;

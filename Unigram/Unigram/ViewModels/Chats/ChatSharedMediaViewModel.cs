@@ -43,6 +43,8 @@ namespace Unigram.ViewModels.Chats
         {
             var chatId = (long)parameter;
 
+            Aggregator.Subscribe(this);
+
             if (state.TryGet("selectedIndex", out int selectedIndex))
             {
                 SelectedIndex = selectedIndex;
@@ -99,6 +101,11 @@ namespace Unigram.ViewModels.Chats
 
         private void UpdateDeleteMessages(IList<Message> target, ImmutableHashSet<long> table)
         {
+            if (target == null)
+            {
+                return;
+            }
+
             for (int i = 0; i < target.Count; i++)
             {
                 var message = target[i];
