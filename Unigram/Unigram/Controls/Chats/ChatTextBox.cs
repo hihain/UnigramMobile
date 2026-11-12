@@ -186,7 +186,7 @@ namespace Unigram.Controls.Chats
                 var ctrl = Window.Current.CoreWindow.GetKeyState(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
                 var shift = Window.Current.CoreWindow.GetKeyState(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
 
-                if (e.Key == VirtualKey.Up && !alt && !ctrl && !shift && IsEmpty)
+                if (e.Key == VirtualKey.Up && !alt && !ctrl && !shift && IsEmpty && ViewModel.Autocomplete == null)
                 {
                     ViewModel.MessageEditLastCommand.Execute();
                     e.Handled = true;
@@ -219,7 +219,7 @@ namespace Unigram.Controls.Chats
                     }
                 }
             }
-            else if ((e.Key == VirtualKey.Tab || e.Key == VirtualKey.Enter) && Autocomplete != null && Autocomplete.Items.Count > 0 && ViewModel.Autocomplete != null && !(ViewModel.Autocomplete is SearchStickersCollection))
+            else if ((e.Key == VirtualKey.Tab || e.Key == VirtualKey.Enter) && Autocomplete != null && Autocomplete.Items.Count > 0 && ViewModel.Autocomplete != null && (!(ViewModel.Autocomplete is SearchStickersCollection) || Autocomplete.SelectedItem != null))
             {
                 var container = Autocomplete.ContainerFromIndex(Math.Max(0, Autocomplete.SelectedIndex)) as GridViewItem;
                 if (container != null)
@@ -456,6 +456,18 @@ namespace Unigram.Controls.Chats
 
             autocomplete = null;
             return false;
+        }
+
+        public void ToggleCommandsMenu()
+        {
+            if (ViewModel.Autocomplete is AutocompleteList<UserCommand>)
+            {
+                ViewModel.Autocomplete = null;
+                return;
+            }
+
+            ClearInlineBotResults();
+            ViewModel.Autocomplete = GetCommands(string.Empty);
         }
 
         private AutocompleteList<UserCommand> GetCommands(string command)

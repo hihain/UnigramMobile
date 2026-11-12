@@ -917,7 +917,7 @@ namespace Unigram.ViewModels
         protected async Task AddHeaderAsync()
         {
             var previous = Items.FirstOrDefault();
-            if (previous != null && (previous.Content is MessageHeaderDate /*|| previous.Id == 0*/))
+            if (previous != null && (previous.Content is MessageHeaderDate || (previous.Content is MessageText && previous.Id == 0)))
             {
                 return;
             }
@@ -2418,6 +2418,8 @@ namespace Unigram.ViewModels
             _hasLoadedLastPinnedMessage = false;
             _selectedItems = new List<MessageViewModel>();
             _chatActionManager = null;
+
+            OnlineCount = null;
 
             PinnedMessages.Clear();
             LastPinnedMessage = null;

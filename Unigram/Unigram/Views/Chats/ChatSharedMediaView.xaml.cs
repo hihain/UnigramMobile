@@ -420,10 +420,9 @@ namespace Unigram.Views.Chats
             {
                 if (selected.Contains(message))
                 {
-                    //TODO: New feature for later. ;) Needs Translation (Beta guys)
-                    //flyout.CreateFlyoutItem(ViewModel.MessagesForwardCommand, "Forward Selected", new FontIcon { Glyph = Icons.Share });
-                    //flyout.CreateFlyoutItem(ViewModel.MessagesDeleteCommand, "Delete Selected", new FontIcon { Glyph = Icons.Delete });
-                    //flyout.CreateFlyoutItem(ViewModel.MessagesUnselectCommand, "Clear Selection");
+                    flyout.CreateFlyoutItem(ViewModel.MessagesForwardCommand, Strings.Additional.SelectionForward, new FontIcon { Glyph = Icons.Share });
+                    flyout.CreateFlyoutItem(ViewModel.MessagesDeleteCommand, Strings.Additional.SelectionDelete, new FontIcon { Glyph = Icons.Delete });
+                    flyout.CreateFlyoutItem(ViewModel.MessagesUnselectCommand, Strings.Additional.SelectionClear);
                 }
                 else
                 {

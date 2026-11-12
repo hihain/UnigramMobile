@@ -1020,6 +1020,16 @@
                         HideFormatting="TextField_Formatting"/>
                 </Border>
                 <Border x:Name="btnAttach" Grid.Row="1">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <!-- Bot menu (ported from hihain beta): lists the bot's commands; private bot chats only -->
+                    <controls:GlyphButton x:Name="ButtonBotMenu"
+                                          Click="BotMenu_Click"
+                                          Glyph="&#xE700;"
+                                          AllowFocusOnInteraction="False"
+                                          VerticalAlignment="Bottom"
+                                          Visibility="Collapsed"
+                                          AutomationProperties.Name="{CustomResource AccDescrBotCommands}"
+                                          ToolTipService.ToolTip="{CustomResource AccDescrBotCommands}"/>
                     <controls:GlyphButton x:Name="ButtonAttach"
                                           Click="Attach_Click"
                                           Glyph="&#xE917;"
@@ -1113,6 +1123,7 @@
                             </MenuFlyout>
                         </FlyoutBase.AttachedFlyout>
                     </controls:GlyphButton>
+                    </StackPanel>
                 </Border>
 
                 <Border HorizontalAlignment="Left" Margin="0,0,48,0" Grid.ColumnSpan="4" Grid.Row="1">

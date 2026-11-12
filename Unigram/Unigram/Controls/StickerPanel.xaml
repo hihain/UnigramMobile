@@ -221,6 +221,7 @@
                         </Grid.ColumnDefinitions>
                         <controls:GlyphButton 
                             Glyph="&#xE750;"
+                            Tapped="GlyphButton_Tapped"
                             Width="{ThemeResource AppBarThemeCompactHeight}"
                             Height="{ThemeResource AppBarThemeCompactHeight}"/>
 

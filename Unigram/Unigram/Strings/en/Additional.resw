@@ -338,4 +338,64 @@
     <value>Skip</value>
     <comment>ChatView</comment>
   </data>
+  <data name="SelectionForward" xml:space="preserve">
+    <value>Forward Selected</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="SelectionDelete" xml:space="preserve">
+    <value>Delete Selected</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="SelectionClear" xml:space="preserve">
+    <value>Clear Selection</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="EventLogAutoDeleteChanged" xml:space="preserve">
+    <value>un1 set messages to auto-delete after {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogAutoDeleteDisabled" xml:space="preserve">
+    <value>un1 disabled auto-delete</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogEditedInviteLink" xml:space="preserve">
+    <value>un1 edited invite link {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogRevokedInviteLink" xml:space="preserve">
+    <value>un1 revoked invite link {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogDeletedInviteLink" xml:space="preserve">
+    <value>un1 deleted invite link {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogStartedVideoChat" xml:space="preserve">
+    <value>un1 started a video chat</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogEndedVideoChat" xml:space="preserve">
+    <value>un1 ended the video chat</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatNewParticipantsMuted" xml:space="preserve">
+    <value>un1 muted new video chat participants</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatNewParticipantsCanSpeak" xml:space="preserve">
+    <value>un1 allowed new video chat participants to speak</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatMuted" xml:space="preserve">
+    <value>un1 muted un2 in the video chat</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatUnmuted" xml:space="preserve">
+    <value>un1 unmuted un2 in the video chat</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatVolumeChanged" xml:space="preserve">
+    <value>un1 changed the video chat volume of un2 to {0}%</value>
+    <comment>Recent actions</comment>
+  </data>
 </root>

@@ -130,6 +130,30 @@ namespace Unigram.Controls.Messages
                             return UpdatePollStopped(message, pollStopped, active);
                         case ChatEventSlowModeDelayChanged slowModeDelayChanged:
                             return UpdateSlowModeDelayChanged(message, slowModeDelayChanged, active);
+                        case ChatEventMessageAutoDeleteTimeChanged messageAutoDeleteTimeChanged:
+                            return UpdateEventLogSender(message, messageAutoDeleteTimeChanged.NewMessageAutoDeleteTime > 0
+                                ? string.Format(Strings.Additional.EventLogAutoDeleteChanged, Locale.FormatTtl(messageAutoDeleteTimeChanged.NewMessageAutoDeleteTime))
+                                : Strings.Additional.EventLogAutoDeleteDisabled, null, active);
+                        case ChatEventInviteLinkEdited inviteLinkEdited:
+                            return UpdateEventLogSender(message, string.Format(Strings.Additional.EventLogEditedInviteLink, inviteLinkEdited.NewInviteLink?.InviteLink), null, active);
+                        case ChatEventInviteLinkRevoked inviteLinkRevoked:
+                            return UpdateEventLogSender(message, string.Format(Strings.Additional.EventLogRevokedInviteLink, inviteLinkRevoked.InviteLink?.InviteLink), null, active);
+                        case ChatEventInviteLinkDeleted inviteLinkDeleted:
+                            return UpdateEventLogSender(message, string.Format(Strings.Additional.EventLogDeletedInviteLink, inviteLinkDeleted.InviteLink?.InviteLink), null, active);
+                        case ChatEventVideoChatCreated _:
+                            return UpdateEventLogSender(message, Strings.Additional.EventLogStartedVideoChat, null, active);
+                        case ChatEventVideoChatEnded _:
+                            return UpdateEventLogSender(message, Strings.Additional.EventLogEndedVideoChat, null, active);
+                        case ChatEventVideoChatMuteNewParticipantsToggled videoChatMuteNewParticipantsToggled:
+                            return UpdateEventLogSender(message, videoChatMuteNewParticipantsToggled.MuteNewParticipants
+                                ? Strings.Additional.EventLogVideoChatNewParticipantsMuted
+                                : Strings.Additional.EventLogVideoChatNewParticipantsCanSpeak, null, active);
+                        case ChatEventVideoChatParticipantIsMutedToggled videoChatParticipantIsMutedToggled:
+                            return UpdateEventLogSender(message, videoChatParticipantIsMutedToggled.IsMuted
+                                ? Strings.Additional.EventLogVideoChatMuted
+                                : Strings.Additional.EventLogVideoChatUnmuted, videoChatParticipantIsMutedToggled.ParticipantId, active);
+                        case ChatEventVideoChatParticipantVolumeLevelChanged videoChatParticipantVolumeLevelChanged:
+                            return UpdateEventLogSender(message, string.Format(Strings.Additional.EventLogVideoChatVolumeChanged, videoChatParticipantVolumeLevelChanged.VolumeLevel / 100), videoChatParticipantVolumeLevelChanged.ParticipantId, active);
                         default:
                             return (string.Empty, null);
                     }
@@ -159,6 +183,23 @@ namespace Unigram.Controls.Messages
         #endregion
 
         #region Event log
+
+        private static (string Text, IList<TextEntity> Entities) UpdateEventLogSender(MessageViewModel message, string format, MessageSender participant, bool active)
+        {
+            var entities = active ? new List<TextEntity>() : null;
+            var content = ReplaceWithLink(format, "un1", message.GetSender(), ref entities);
+
+            if (participant is MessageSenderUser participantUser)
+            {
+                content = ReplaceWithLink(content, "un2", message.ProtoService.GetUser(participantUser.UserId), ref entities);
+            }
+            else if (participant is MessageSenderChat participantChat)
+            {
+                content = ReplaceWithLink(content, "un2", message.ProtoService.GetChat(participantChat.ChatId), ref entities);
+            }
+
+            return (content, entities);
+        }
 
         private static (string Text, IList<TextEntity> Entities) UpdateSlowModeDelayChanged(MessageViewModel message, ChatEventSlowModeDelayChanged slowModeDelayChanged, bool active)
         {

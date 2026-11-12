@@ -301,4 +301,64 @@
     <value>Автозагрузка голосовых сообщений</value>
     <comment>SettingsDataAutoView</comment>
   </data>
+  <data name="SelectionForward" xml:space="preserve">
+    <value>Переслать выбранное</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="SelectionClear" xml:space="preserve">
+    <value>Очистить выбор</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="SelectionDelete" xml:space="preserve">
+    <value>Удалить выбранное</value>
+    <comment>Context menu if multiple messages are selected</comment>
+  </data>
+  <data name="EventLogAutoDeleteChanged" xml:space="preserve">
+    <value>un1 включил(а) автоудаление сообщений через {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogAutoDeleteDisabled" xml:space="preserve">
+    <value>un1 отключил(а) автоудаление сообщений</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogEditedInviteLink" xml:space="preserve">
+    <value>un1 изменил(а) ссылку-приглашение {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogRevokedInviteLink" xml:space="preserve">
+    <value>un1 отозвал(а) ссылку-приглашение {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogDeletedInviteLink" xml:space="preserve">
+    <value>un1 удалил(а) ссылку-приглашение {0}</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogStartedVideoChat" xml:space="preserve">
+    <value>un1 начал(а) видеочат</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogEndedVideoChat" xml:space="preserve">
+    <value>un1 завершил(а) видеочат</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatNewParticipantsMuted" xml:space="preserve">
+    <value>un1 запретил(а) новым участникам видеочата говорить</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatNewParticipantsCanSpeak" xml:space="preserve">
+    <value>un1 разрешил(а) новым участникам видеочата говорить</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatMuted" xml:space="preserve">
+    <value>un1 выключил(а) микрофон un2 в видеочате</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatUnmuted" xml:space="preserve">
+    <value>un1 включил(а) микрофон un2 в видеочате</value>
+    <comment>Recent actions</comment>
+  </data>
+  <data name="EventLogVideoChatVolumeChanged" xml:space="preserve">
+    <value>un1 изменил(а) громкость un2 в видеочате на {0}%</value>
+    <comment>Recent actions</comment>
+  </data>
 </root>

@@ -1087,6 +1087,12 @@ namespace Unigram.Views
                     ViewModel.ClearReplyCommand.Execute(null);
                     args.Handled = true;
                 }
+
+                if (ViewModel.Autocomplete != null)
+                {
+                    ViewModel.Autocomplete = null;
+                    args.Handled = true;
+                }
             }
             else if ((args.VirtualKey == Windows.System.VirtualKey.PageUp) && !ctrl && !alt && !shift && TextField.Document.Selection.StartPosition == 0 && ViewModel.Autocomplete == null)
             {
@@ -1475,7 +1481,7 @@ namespace Unigram.Views
 
         private void TryGetWebPagePreview(IProtoService protoService, Chat chat, string text, Action<BaseObject> result)
         {
-            if (chat == null)
+            if (chat == null || string.IsNullOrWhiteSpace(text))
             {
                 result(null);
                 return;
@@ -1791,6 +1797,29 @@ namespace Unigram.Views
             }
         }
 
+        private void BotMenu_Click(object sender, RoutedEventArgs e)
+        {
+            TextField.ToggleCommandsMenu();
+        }
+
+        private void ShowHideBotMenu(bool show)
+        {
+            var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (ButtonBotMenu.Visibility == visibility)
+            {
+                return;
+            }
+
+            ButtonBotMenu.Visibility = visibility;
+
+            if (TextFormatting.Visibility == Visibility.Collapsed)
+            {
+                TextField.Padding = new Thickness(show ? 96 : 48, 4, 0, 6);
+            }
+
+            UpdateTextAreaRadius();
+        }
+
         private void Commands_Click(object sender, RoutedEventArgs e)
         {
             TextField.SetText("/", null);
@@ -1993,7 +2022,7 @@ namespace Unigram.Views
                     }
                 }
             }
-            //if (secret)
+            if (user != null || (basicGroup != null && basicGroup.CanDeleteMessages()) || (supergroup != null && supergroup.CanDeleteMessages()))
             {
                 flyout.CreateFlyoutItem(ViewModel.SetTimerCommand, Strings.Resources.SetTimer, new FontIcon { Glyph = Icons.Timer });
             }
@@ -2995,6 +3024,11 @@ namespace Unigram.Views
             ShowVideoNotePreview(btnVoiceMessage.CurrentVideoPreview);
             ShowRecordLockHint();
 
+            if (_stickersMode == StickersPanelMode.Mobile && StickersPanel.Visibility == Visibility.Visible)
+            {
+                Collapse_Click(null, null);
+            }
+
             var slideWidth = (float)SlidePanel.ActualWidth;
             var elapsedWidth = (float)ElapsedPanel.ActualWidth;
 
@@ -3384,6 +3418,9 @@ namespace Unigram.Views
         private void AttachTextAreaExpression()
         {
             AttachTextAreaExpression(ButtonAttach);
+            AttachTextAreaExpression(ButtonBotMenu);
+            AttachTextAreaExpression(ButtonSendAs);
+            AttachTextAreaExpression(ContextMenu);
             AttachTextAreaExpression(FormattingViewer);
             AttachTextAreaExpression(SecondaryButtonsPanel);
             AttachTextAreaExpression(ButtonStickers);
@@ -4578,7 +4615,7 @@ namespace Unigram.Views
                     Grid.SetRow(btnAttach, 1);
                     Grid.SetRow(ButtonsPanel, 1);
                     Grid.SetColumnSpan(TextFieldPanel, 2);
-                    TextField.Padding = new Thickness(48, 4, 0, 6);
+                    TextField.Padding = new Thickness(ButtonBotMenu.Visibility == Visibility.Visible ? 96 : 48, 4, 0, 6);
                 }
 
                 UpdateTextAreaRadius();
@@ -4635,7 +4672,15 @@ namespace Unigram.Views
             var max = ComposerHeader.Visibility == Visibility.Visible
                 || TextFormatting.Visibility == Visibility.Visible ? 4 : min;
 
-            ButtonAttach.Radius = new CornerRadius(max, 4, 4, min);
+            if (ButtonBotMenu.Visibility == Visibility.Visible)
+            {
+                ButtonBotMenu.Radius = new CornerRadius(max, 4, 4, min);
+                ButtonAttach.Radius = new CornerRadius(4);
+            }
+            else
+            {
+                ButtonAttach.Radius = new CornerRadius(max, 4, 4, min);
+            }
             btnVoiceMessage.Radius = new CornerRadius(4, max, min, 4);
             btnSendMessage.Radius = new CornerRadius(4, max, min, 4);
             btnEdit.Radius = new CornerRadius(4, max, min, 4);
@@ -4737,15 +4782,19 @@ namespace Unigram.Views
             var commands = ModernTdlibCompatibility.GetUserFullInfoCommands(fullInfo);
             if (commands.Count > 0)
             {
+                // Private bot chats use the left-hand bot menu instead of the "/" button (as hihain beta).
                 ViewModel.BotCommands = commands.Select(x => new UserCommand(user.Id, x)).ToList();
-                ViewModel.HasBotCommands = ViewModel.BotCommands.Count > 0;
-                ///ShowHideBotCommands(true); //TODO: Test
+                ViewModel.HasBotCommands = false;
+                ShowHideBotMenu(true);
             }
             else
             {
                 ViewModel.BotCommands = null;
                 ViewModel.HasBotCommands = false;
+                ShowHideBotMenu(false);
             }
+
+            ButtonCommands.Visibility = Visibility.Collapsed;
 
             Call.Visibility = /*!secret &&*/ fullInfo.CanBeCalled ? Visibility.Visible : Visibility.Collapsed;
             VideoCall.Visibility = /*!secret &&*/ fullInfo.CanBeCalled ? Visibility.Visible : Visibility.Collapsed;
@@ -4843,6 +4892,7 @@ namespace Unigram.Views
 
             ViewModel.BotCommands = commands;
             ViewModel.HasBotCommands = commands.Count > 0;
+            ShowHideBotMenu(false);
         }
 
 
@@ -5004,6 +5054,7 @@ namespace Unigram.Views
 
             ViewModel.BotCommands = commands;
             ViewModel.HasBotCommands = commands.Count > 0;
+            ShowHideBotMenu(false);
             //ShowHideBotCommands(false); //TODO. Test
         }
 

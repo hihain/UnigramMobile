@@ -320,6 +320,15 @@ namespace Unigram.ViewModels
                     case ChatEventMessageUnpinned messageUnpinned:
                     case ChatEventLinkedChatChanged linkedChatChanged:
                     case ChatEventLocationChanged locationChanged:
+                    case ChatEventMessageAutoDeleteTimeChanged messageAutoDeleteTimeChanged:
+                    case ChatEventInviteLinkEdited inviteLinkEdited:
+                    case ChatEventInviteLinkRevoked inviteLinkRevoked:
+                    case ChatEventInviteLinkDeleted inviteLinkDeleted:
+                    case ChatEventVideoChatCreated videoChatCreated:
+                    case ChatEventVideoChatEnded videoChatEnded:
+                    case ChatEventVideoChatMuteNewParticipantsToggled videoChatMuteNewParticipantsToggled:
+                    case ChatEventVideoChatParticipantIsMutedToggled videoChatParticipantIsMutedToggled:
+                    case ChatEventVideoChatParticipantVolumeLevelChanged videoChatParticipantVolumeLevelChanged:
                         message = GetMessage(_chat.Id, channel, item);
                         message.Content = new MessageChatEvent(item);
                         break;
@@ -351,6 +360,8 @@ namespace Unigram.ViewModels
                         message.Content = new MessageChatChangePhoto(photoChanged.NewPhoto);
                         break;
                     case ChatEventMemberJoined memberJoined:
+                    case ChatEventMemberJoinedByInviteLink memberJoinedByInviteLink:
+                    case ChatEventMemberJoinedByRequest memberJoinedByRequest:
                         message = GetMessage(_chat.Id, channel, item);
                         message.Content = new MessageChatAddMembers(new long[] { item.MemberId is MessageSenderUser senderUser ? senderUser.UserId : 0 });
                         break;

@@ -335,11 +335,11 @@ namespace Unigram.Common
             {
                 NavigateToStickerSet(sticker);
             }
-            else if (username != null)
+            else if (username != null && username.StartsWith("+"))
             {
                 NavigateToInviteLink(protoService, navigation, username.TrimStart('+'));
             }
-            else if (username != null && username.StartsWith("+"))
+            else if (username != null)
             {
                 NavigateToUsername(protoService, navigation, username, botUser ?? botChat, post, comment, game);
             }

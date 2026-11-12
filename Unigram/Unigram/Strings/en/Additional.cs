@@ -709,6 +709,171 @@ namespace Unigram.Strings
             }
         }
         
+        /// <summary>
+        /// Localized resource similar to "Forward Selected"
+        /// </summary>
+        public static string SelectionForward
+        {
+            get
+            {
+                return Resource.GetString("SelectionForward");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Delete Selected"
+        /// </summary>
+        public static string SelectionDelete
+        {
+            get
+            {
+                return Resource.GetString("SelectionDelete");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "Clear Selection"
+        /// </summary>
+        public static string SelectionClear
+        {
+            get
+            {
+                return Resource.GetString("SelectionClear");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 set messages to auto-delete after {0}"
+        /// </summary>
+        public static string EventLogAutoDeleteChanged
+        {
+            get
+            {
+                return Resource.GetString("EventLogAutoDeleteChanged");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 disabled auto-delete"
+        /// </summary>
+        public static string EventLogAutoDeleteDisabled
+        {
+            get
+            {
+                return Resource.GetString("EventLogAutoDeleteDisabled");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 edited invite link {0}"
+        /// </summary>
+        public static string EventLogEditedInviteLink
+        {
+            get
+            {
+                return Resource.GetString("EventLogEditedInviteLink");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 revoked invite link {0}"
+        /// </summary>
+        public static string EventLogRevokedInviteLink
+        {
+            get
+            {
+                return Resource.GetString("EventLogRevokedInviteLink");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 deleted invite link {0}"
+        /// </summary>
+        public static string EventLogDeletedInviteLink
+        {
+            get
+            {
+                return Resource.GetString("EventLogDeletedInviteLink");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 started a video chat"
+        /// </summary>
+        public static string EventLogStartedVideoChat
+        {
+            get
+            {
+                return Resource.GetString("EventLogStartedVideoChat");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 ended the video chat"
+        /// </summary>
+        public static string EventLogEndedVideoChat
+        {
+            get
+            {
+                return Resource.GetString("EventLogEndedVideoChat");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 muted new video chat participants"
+        /// </summary>
+        public static string EventLogVideoChatNewParticipantsMuted
+        {
+            get
+            {
+                return Resource.GetString("EventLogVideoChatNewParticipantsMuted");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 allowed new video chat participants to speak"
+        /// </summary>
+        public static string EventLogVideoChatNewParticipantsCanSpeak
+        {
+            get
+            {
+                return Resource.GetString("EventLogVideoChatNewParticipantsCanSpeak");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 muted un2 in the video chat"
+        /// </summary>
+        public static string EventLogVideoChatMuted
+        {
+            get
+            {
+                return Resource.GetString("EventLogVideoChatMuted");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 unmuted un2 in the video chat"
+        /// </summary>
+        public static string EventLogVideoChatUnmuted
+        {
+            get
+            {
+                return Resource.GetString("EventLogVideoChatUnmuted");
+            }
+        }
+        
+        /// <summary>
+        /// Localized resource similar to "un1 changed the video chat volume of un2 to {0}%"
+        /// </summary>
+        public static string EventLogVideoChatVolumeChanged
+        {
+            get
+            {
+                return Resource.GetString("EventLogVideoChatVolumeChanged");
+            }
+        }
+        
         public static void Initialize()
         {
             string executingAssemblyName;
