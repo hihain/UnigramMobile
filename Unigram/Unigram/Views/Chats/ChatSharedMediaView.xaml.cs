@@ -485,7 +485,13 @@ namespace Unigram.Views.Chats
 
         private void OnChoosingItemContainer(ListViewBase sender, ChoosingItemContainerEventArgs args)
         {
-            if (args.ItemContainer == null)
+            var isHeader = args.Item is Message item && item.Content is MessageHeaderDate;
+            var style = isHeader
+                ? (Style)Resources[sender is ListView ? "HeaderListViewItemStyle" : "HeaderGridViewItemStyle"]
+                : sender.ItemContainerStyle;
+
+            // Headers and media need different containers, so don't reuse one across kinds.
+            if (args.ItemContainer == null || args.ItemContainer.Style != style)
             {
                 if (sender is ListView)
                 {
@@ -496,8 +502,12 @@ namespace Unigram.Views.Chats
                     args.ItemContainer = new ChatGridViewItem(ViewModel.ProtoService);
                 }
 
-                args.ItemContainer.Style = sender.ItemContainerStyle;
-                args.ItemContainer.ContextRequested += Message_ContextRequested;
+                args.ItemContainer.Style = style;
+
+                if (!isHeader)
+                {
+                    args.ItemContainer.ContextRequested += Message_ContextRequested;
+                }
             }
 
             args.ItemContainer.ContentTemplate = sender.ItemTemplateSelector.SelectTemplate(args.Item, args.ItemContainer);
@@ -518,9 +528,6 @@ namespace Unigram.Views.Chats
             {
                 return;
             }
-
-            // Containers are recycled between headers and media, so reset this every time.
-            UpdateSelectionCheckMark(args.ItemContainer, !(message.Content is MessageHeaderDate));
 
             if (args.ItemContainer.ContentTemplateRoot is SimpleHyperlinkButton hyperlink)
             {
@@ -565,26 +572,6 @@ namespace Unigram.Views.Chats
             if (args.ItemContainer.ContentTemplateRoot is FrameworkElement element)
             {
                 element.Tag = message;
-            }
-        }
-
-        private static void UpdateSelectionCheckMark(Windows.UI.Xaml.Controls.Primitives.SelectorItem container, bool enabled)
-        {
-            container.ApplyTemplate();
-
-            if (Windows.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(container) == 0)
-            {
-                return;
-            }
-
-            var root = Windows.UI.Xaml.Media.VisualTreeHelper.GetChild(container, 0);
-            if (root is Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter listPresenter)
-            {
-                listPresenter.SelectionCheckMarkVisualEnabled = enabled;
-            }
-            else if (root is Windows.UI.Xaml.Controls.Primitives.GridViewItemPresenter gridPresenter)
-            {
-                gridPresenter.SelectionCheckMarkVisualEnabled = enabled;
             }
         }
 
