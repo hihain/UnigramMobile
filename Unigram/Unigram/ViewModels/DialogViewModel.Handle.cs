@@ -21,7 +21,9 @@ namespace Unigram.ViewModels
         IHandle<UpdateChatReadInbox>,
         //IHandle<UpdateChatDraftMessage>,
         IHandle<UpdateChatDefaultDisableNotification>,
-        //IHandle<UpdateChatDefaultMessageSenderId>, //TODO: Cool stuff for the future. ;)
+#if MODERN_TDLIB
+        IHandle<UpdateChatMessageSender>,
+#endif
         IHandle<UpdateChatActionBar>,
         IHandle<UpdateChatHasScheduledMessages>,
 
@@ -348,6 +350,16 @@ namespace Unigram.ViewModels
                 BeginOnUIThread(() => Delegate?.UpdateChatDefaultDisableNotification(_chat, update.DefaultDisableNotification));
             }
         }
+
+#if MODERN_TDLIB
+        public void Handle(UpdateChatMessageSender update)
+        {
+            if (update.ChatId == _chat?.Id)
+            {
+                BeginOnUIThread(() => Delegate?.UpdateChatMessageSender(_chat, update.MessageSenderId));
+            }
+        }
+#endif
 
 
 

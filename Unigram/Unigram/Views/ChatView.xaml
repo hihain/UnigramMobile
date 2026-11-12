@@ -1148,7 +1148,22 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+
+                        <!-- Button to choose the message sender (Send As), groups/channels with alternatives only -->
+                        <controls:ProfilePicture
+                            x:Name="ButtonSendAs"
+                            Click="SendAs_Click"
+                            AllowFocusOnInteraction="False"
+                            Width="32"
+                            Height="32"
+                            Margin="8,0,8,8"
+                            VerticalAlignment="Bottom"
+                            Visibility="Collapsed"
+                            AutomationProperties.Name="Send message as"
+                            ToolTipService.ToolTip="Send message as"
+                            Grid.Column="3"/>
 
                         <!-- Button to access scheduled messages -->
                         <Border x:Name="btnScheduled">

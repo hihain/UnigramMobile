@@ -3863,7 +3863,80 @@ namespace Unigram.Views
             Call.Visibility = Visibility.Collapsed;
             VideoCall.Visibility = Visibility.Collapsed;
 
+#if MODERN_TDLIB
+            UpdateChatMessageSender(chat, chat.MessageSenderId);
+#endif
             UpdateChatPermissions(chat);
+        }
+
+#if MODERN_TDLIB
+        public void UpdateChatMessageSender(Chat chat, MessageSender messageSenderId)
+        {
+            if (messageSenderId == null || ViewModel.Type == DialogType.EventLog || ViewModel.Type == DialogType.Pinned)
+            {
+                ButtonSendAs.Source = null;
+                ButtonSendAs.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ButtonSendAs.Source = PlaceholderHelper.GetMessageSender(ViewModel.ProtoService, messageSenderId, 32);
+                ButtonSendAs.Visibility = Visibility.Visible;
+            }
+        }
+#endif
+
+        private async void SendAs_Click(object sender, RoutedEventArgs e)
+        {
+#if MODERN_TDLIB
+            var chat = ViewModel.Chat;
+            if (chat == null)
+            {
+                return;
+            }
+
+            var response = await ViewModel.ProtoService.SendAsync(new GetChatAvailableMessageSenders(chat.Id));
+            if (response is ChatMessageSenders senders && senders.Senders.Count > 0 && StillValid(chat))
+            {
+                var current = chat.MessageSenderId;
+                var flyout = new MenuFlyout();
+
+                foreach (var item in senders.Senders)
+                {
+                    string title;
+                    if (ViewModel.ProtoService.TryGetUser(item.Sender, out User senderUser))
+                    {
+                        title = senderUser.GetFullName();
+                    }
+                    else if (ViewModel.ProtoService.TryGetChat(item.Sender, out Chat senderChat))
+                    {
+                        title = senderChat.Title;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    var option = new ToggleMenuFlyoutItem
+                    {
+                        Text = item.NeedsPremium ? title + " (Premium)" : title,
+                        IsChecked = current != null && current.IsEqual(item.Sender),
+                        IsEnabled = !item.NeedsPremium,
+                        Command = ViewModel.SetMessageSenderCommand,
+                        CommandParameter = item.Sender
+                    };
+
+                    flyout.Items.Add(option);
+                }
+
+                if (flyout.Items.Count > 0)
+                {
+                    flyout.Placement = FlyoutPlacementMode.Top;
+                    flyout.ShowAt(ButtonSendAs);
+                }
+            }
+#else
+            await System.Threading.Tasks.Task.CompletedTask;
+#endif
         }
 
         public void UpdateChatPermissions(Chat chat)

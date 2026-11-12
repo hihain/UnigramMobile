@@ -16,6 +16,9 @@ namespace Unigram.ViewModels.Delegates
         void UpdateChatReplyMarkup(Chat chat, MessageViewModel message);
         void UpdateChatUnreadMentionCount(Chat chat, int unreadMentionCount);
         void UpdateChatDefaultDisableNotification(Chat chat, bool defaultDisableNotification);
+#if MODERN_TDLIB
+        void UpdateChatMessageSender(Chat chat, MessageSender messageSenderId);
+#endif
         void UpdateChatOnlineMemberCount(Chat chat, int count);
 
         void UpdatePinnedMessage();

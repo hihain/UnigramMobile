@@ -186,6 +186,9 @@ namespace Unigram.ViewModels
             ActionCommand = new RelayCommand(ActionExecuteAsync);
             OpenMessageCommand = new RelayCommand<Message>(OpenMessageExecute);
             ScheduledCommand = new RelayCommand(ScheduledExecute);
+#if MODERN_TDLIB
+            SetMessageSenderCommand = new RelayCommand<MessageSender>(SetMessageSenderExecute);
+#endif
 
             MessagesForwardCommand = new RelayCommand(MessagesForwardExecute, MessagesForwardCanExecute);
             MessagesDeleteCommand = new RelayCommand(MessagesDeleteExecute, MessagesDeleteCanExecute);
@@ -2957,6 +2960,24 @@ namespace Unigram.ViewModels
 */
             //ProtoService.Send(new SendMessage())
         }
+
+#if MODERN_TDLIB
+        #region Set message sender (Send As)
+
+        public RelayCommand<MessageSender> SetMessageSenderCommand { get; }
+        private void SetMessageSenderExecute(MessageSender messageSender)
+        {
+            var chat = _chat;
+            if (chat == null || messageSender == null)
+            {
+                return;
+            }
+
+            ProtoService.Send(new SetChatMessageSender(chat.Id, messageSender));
+        }
+
+        #endregion
+#endif
 
         #region Join channel
 
