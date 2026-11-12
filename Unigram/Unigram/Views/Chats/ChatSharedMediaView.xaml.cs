@@ -394,9 +394,17 @@ namespace Unigram.Views.Chats
 
         private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            var list = (ListViewBase)sender;
+
+            // Month headers are list items too, but must never be part of a selection.
+            foreach (var header in e.AddedItems.OfType<Message>().Where(x => x.Content is MessageHeaderDate).ToList())
+            {
+                list.SelectedItems.Remove(header);
+            }
+
             if (ViewModel.SelectionMode == ListViewSelectionMode.Multiple)
             {
-                ViewModel.SelectedItems = new List<Message>(((ListViewBase)sender).SelectedItems.Cast<Message>());
+                ViewModel.SelectedItems = new List<Message>(list.SelectedItems.Cast<Message>().Where(x => !(x.Content is MessageHeaderDate)));
             }
         }
 
@@ -414,6 +422,11 @@ namespace Unigram.Views.Chats
 
             var element = sender as FrameworkElement;
             var message = element.Tag as Message;
+            if (message == null || message.Content is MessageHeaderDate)
+            {
+                args.Handled = true;
+                return;
+            }
 
             var selected = ViewModel.SelectedItems;
             if (selected.Count > 0)
@@ -505,6 +518,10 @@ namespace Unigram.Views.Chats
             {
                 return;
             }
+
+            // Containers are recycled between headers and media, so reset this every time.
+            UpdateSelectionCheckMark(args.ItemContainer, !(message.Content is MessageHeaderDate));
+
             if (args.ItemContainer.ContentTemplateRoot is SimpleHyperlinkButton hyperlink)
             {
                 if (message.Content is MessagePhoto photoMessage)
@@ -548,6 +565,26 @@ namespace Unigram.Views.Chats
             if (args.ItemContainer.ContentTemplateRoot is FrameworkElement element)
             {
                 element.Tag = message;
+            }
+        }
+
+        private static void UpdateSelectionCheckMark(Windows.UI.Xaml.Controls.Primitives.SelectorItem container, bool enabled)
+        {
+            container.ApplyTemplate();
+
+            if (Windows.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(container) == 0)
+            {
+                return;
+            }
+
+            var root = Windows.UI.Xaml.Media.VisualTreeHelper.GetChild(container, 0);
+            if (root is Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter listPresenter)
+            {
+                listPresenter.SelectionCheckMarkVisualEnabled = enabled;
+            }
+            else if (root is Windows.UI.Xaml.Controls.Primitives.GridViewItemPresenter gridPresenter)
+            {
+                gridPresenter.SelectionCheckMarkVisualEnabled = enabled;
             }
         }
 
