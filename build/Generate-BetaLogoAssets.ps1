@@ -112,11 +112,11 @@ function Draw-MonochromeMessageBubble {
     $upperWing = @(
         [System.Drawing.PointF]::new($X + ($Width * 0.50), $Y + ($bodyHeight * 0.24)),
         $gliderNose,
-        [System.Drawing.PointF]::new($X + ($Width * 0.46), $Y + ($bodyHeight * 0.45)))
+        [System.Drawing.PointF]::new($X + ($Width * 0.46), $Y + ($bodyHeight * 0.47)))
     $lowerWing = @(
         [System.Drawing.PointF]::new($X + ($Width * 0.50), $Y + ($bodyHeight * 0.76)),
         $gliderNose,
-        [System.Drawing.PointF]::new($X + ($Width * 0.46), $Y + ($bodyHeight * 0.55)))
+        [System.Drawing.PointF]::new($X + ($Width * 0.46), $Y + ($bodyHeight * 0.53)))
     $Graphics.DrawPolygon($pen, $upperWing)
     $Graphics.DrawPolygon($pen, $lowerWing)
 
@@ -173,11 +173,11 @@ function Draw-MessageBubble {
     $upperWing = @(
         [System.Drawing.PointF]::new($x + ($designWidth * 0.50), $y + ($bodyHeight * 0.24)),
         $gliderNose,
-        [System.Drawing.PointF]::new($x + ($designWidth * 0.46), $y + ($bodyHeight * 0.45)))
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.46), $y + ($bodyHeight * 0.47)))
     $lowerWing = @(
         [System.Drawing.PointF]::new($x + ($designWidth * 0.50), $y + ($bodyHeight * 0.76)),
         $gliderNose,
-        [System.Drawing.PointF]::new($x + ($designWidth * 0.46), $y + ($bodyHeight * 0.55)))
+        [System.Drawing.PointF]::new($x + ($designWidth * 0.46), $y + ($bodyHeight * 0.53)))
     $Graphics.FillPolygon($blueBrush, $upperWing)
     $Graphics.FillPolygon($blueBrush, $lowerWing)
 
