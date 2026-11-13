@@ -564,11 +564,13 @@ namespace Unigram.Services
                     break;
                 case NotificationTypeNewMessage newMessage:
                     WriteForegroundTileDiagnostic("managed.tile.notification", "result=dispatch;type=new_message");
-                    ProcessNewMessage(group, notification.Id, newMessage.Message, notification.Date, notification.IsSilent);
+                    BackgroundSync.BeginNotification();
+                    TrackNotification(ProcessNewMessageAsync(group, notification.Id, newMessage.Message, notification.Date, notification.IsSilent));
                     break;
                 case NotificationTypeNewPushMessage newPushMessage:
                     WriteForegroundTileDiagnostic("managed.tile.notification", "result=dispatch;type=new_push_message");
-                    ProcessNewPushMessage(group, notification.Id, chatId, newPushMessage, notification.Date, notification.IsSilent);
+                    BackgroundSync.BeginNotification();
+                    TrackNotification(ProcessNewPushMessageAsync(group, notification.Id, chatId, newPushMessage, notification.Date, notification.IsSilent));
                     break;
                 case NotificationTypeNewSecretChat newSecretChat:
                     WriteForegroundTileDiagnostic("managed.tile.notification", "result=ignored;type=new_secret_chat");
@@ -579,8 +581,30 @@ namespace Unigram.Services
             }
         }
 
-        private async void ProcessNewPushMessage(int groupId, int id, long chatId, NotificationTypeNewPushMessage message, int date, bool silent)
+        private async void TrackNotification(Task task)
         {
+            try
+            {
+                await task;
+            }
+            catch (Exception ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.message.failed", ex);
+            }
+            finally
+            {
+                BackgroundSync.EndNotification();
+            }
+        }
+
+        private static string GetToastTimestamp(int date)
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(date).UtcDateTime.ToString("s", CultureInfo.InvariantCulture) + "Z";
+        }
+
+        private async Task ProcessNewPushMessageAsync(int groupId, int id, long chatId, NotificationTypeNewPushMessage message, int date, bool silent)
+        {
+            var watch = Stopwatch.StartNew();
             var chat = _protoService.GetChat(chatId);
             if (chat == null)
             {
@@ -597,7 +621,7 @@ namespace Unigram.Services
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
             var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat, message.SenderId);
-            var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
+            var dateTime = GetToastTimestamp(date);
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
@@ -611,6 +635,8 @@ namespace Unigram.Services
 
                 canReply = false;
             }
+
+            WriteForegroundTileDiagnostic("managed.tile.prepared", $"picture={!string.IsNullOrEmpty(picture)};elapsed_ms={watch.ElapsedMilliseconds}");
 
             await UpdateAsync(chat, async () =>
             {
@@ -626,8 +652,9 @@ namespace Unigram.Services
             });
         }
 
-        private async void ProcessNewMessage(int groupId, int id, Message message, int date, bool silent)
+        private async Task ProcessNewMessageAsync(int groupId, int id, Message message, int date, bool silent)
         {
+            var watch = Stopwatch.StartNew();
             var chat = _protoService.GetChat(message.ChatId);
             if (chat == null)
             {
@@ -644,7 +671,7 @@ namespace Unigram.Services
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
             var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat, message.SenderId);
-            var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
+            var dateTime = GetToastTimestamp(date);
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
             var user = _protoService.GetUser(_protoService.Options.MyId);
@@ -658,6 +685,8 @@ namespace Unigram.Services
 
                 canReply = false;
             }
+
+            WriteForegroundTileDiagnostic("managed.tile.prepared", $"picture={!string.IsNullOrEmpty(picture)};elapsed_ms={watch.ElapsedMilliseconds}");
 
             await UpdateAsync(chat, async () =>
             {
@@ -1265,7 +1294,8 @@ namespace Unigram.Services
 
                 if (senderPhoto != null)
                 {
-                    if (senderPhoto.Local.IsDownloadingCompleted)
+                    senderPhoto = await DownloadPhotoAsync(senderPhoto, "sender");
+                    if (senderPhoto != null)
                     {
                         var picture = await CachePhotoAsync(senderPhoto, "sender");
                         if (!string.IsNullOrEmpty(picture))
@@ -1273,24 +1303,74 @@ namespace Unigram.Services
                             return picture;
                         }
                     }
-                    else
+                }
+            }
+
+            if (chat.Photo != null)
+            {
+                var chatPhoto = await DownloadPhotoAsync(chat.Photo.Small, "chat");
+                if (chatPhoto != null)
+                {
+                    var picture = await CachePhotoAsync(chatPhoto, "chat");
+                    if (!string.IsNullOrEmpty(picture))
                     {
-                        WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;source=sender;reason=not_downloaded");
-                        if (senderPhoto.Local.CanBeDownloaded && !senderPhoto.Local.IsDownloadingActive)
-                        {
-                            _protoService.DownloadFile(senderPhoto.Id, 1);
-                        }
+                        return picture;
                     }
                 }
             }
 
-            if (chat.Photo == null || !chat.Photo.Small.Local.IsDownloadingCompleted)
+            return await CreatePlaceholderAsync(chat);
+        }
+
+        private static readonly TimeSpan PhotoDownloadTimeout = TimeSpan.FromSeconds(4);
+
+        private async Task<Telegram.Td.Api.File> DownloadPhotoAsync(Telegram.Td.Api.File photo, string source)
+        {
+            if (photo.Local.IsDownloadingCompleted)
             {
-                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;source=chat;reason=not_downloaded");
-                return string.Empty;
+                return photo;
             }
 
-            return await CachePhotoAsync(chat.Photo.Small, "chat");
+            if (!photo.Local.CanBeDownloaded)
+            {
+                WriteForegroundTileDiagnostic("managed.tile.avatar", $"result=unavailable;source={source};reason=cannot_download");
+                return null;
+            }
+
+            var download = _protoService.SendAsync(new DownloadFile(photo.Id, 32, 0, 0, true));
+            var completed = await Task.WhenAny(download, Task.Delay(PhotoDownloadTimeout));
+            if (completed == download && download.Status == TaskStatus.RanToCompletion && download.Result is Telegram.Td.Api.File file && file.Local.IsDownloadingCompleted)
+            {
+                WriteForegroundTileDiagnostic("managed.tile.avatar", $"result=downloaded;source={source}");
+                return file;
+            }
+
+            WriteForegroundTileDiagnostic("managed.tile.avatar", $"result=unavailable;source={source};reason={(completed == download ? "download_failed" : "download_timeout")}");
+            return null;
+        }
+
+        private async Task<string> CreatePlaceholderAsync(Chat chat)
+        {
+            try
+            {
+                var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("tile-avatars", CreationCollisionOption.OpenIfExists);
+                var fileName = $"tile-placeholder-{chat.Id}.png";
+                var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+
+                using (var stream = await file.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    Unigram.Native.PlaceholderImageHelper.Current.DrawProfilePlaceholder(PlaceholderHelper.GetColor(chat), InitialNameStringConverter.Convert(chat), stream);
+                }
+
+                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=cached;source=placeholder");
+                return "ms-appdata:///local/tile-avatars/" + Uri.EscapeDataString(fileName);
+            }
+            catch (Exception ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.avatar.failed", ex);
+            }
+
+            return string.Empty;
         }
 
         private async Task<string> CachePhotoAsync(Telegram.Td.Api.File photo, string source)

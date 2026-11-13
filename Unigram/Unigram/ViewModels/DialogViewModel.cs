@@ -670,6 +670,11 @@ namespace Unigram.ViewModels
 
         protected Stack<long> _goBackStack = new Stack<long>();
 
+        public void ClearGoBackStack()
+        {
+            _goBackStack.Clear();
+        }
+
         public async virtual Task LoadNextSliceAsync(bool force = false, bool init = false)
         {
             if (_type != DialogType.History && _type != DialogType.Thread && _type != DialogType.Pinned)
@@ -1291,6 +1296,13 @@ namespace Unigram.ViewModels
             if (_type != DialogType.History && _type != DialogType.Thread && _type != DialogType.Pinned)
             {
                 return;
+            }
+
+            // Remember where a reply/pinned jump started so the down arrow returns there
+            // first, instead of jumping to the newest message and marking everything read.
+            if (previousId.HasValue && previousId.Value != maxId && (_goBackStack.Count == 0 || _goBackStack.Peek() != previousId.Value))
+            {
+                _goBackStack.Push(previousId.Value);
             }
 
             if (direction == null)

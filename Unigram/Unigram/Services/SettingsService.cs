@@ -211,7 +211,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "**Live Tile & notifications**\n• Group messages now show the sender's photo, falling back to the group photo";
+        public static readonly string CurrentChangelog = "**Live Tile & notifications**\n• Background checks now wait for toasts and the Live Tile to finish before the app sleeps\n• Contacts without a photo now show their initials on the Live Tile and toasts\n• Profile photos not yet downloaded are fetched before the toast is shown\n\n**Chats**\n• After jumping to a replied message, the down arrow now returns to where you were instead of the newest message";
 
         public int Session => _session;
 

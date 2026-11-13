@@ -32,6 +32,23 @@ namespace Unigram.Common
             return new SolidColorBrush(_colors[Math.Abs(i % _colors.Length)]);
         }
 
+        public static Color GetColor(Chat chat)
+        {
+            switch (chat.Type)
+            {
+                case ChatTypePrivate privata:
+                    return _colors[Math.Abs(privata.UserId % _colors.Length)];
+                case ChatTypeSecret secret:
+                    return _colors[Math.Abs(secret.UserId % _colors.Length)];
+                case ChatTypeBasicGroup basic:
+                    return _colors[Math.Abs(basic.BasicGroupId % _colors.Length)];
+                case ChatTypeSupergroup super:
+                    return _colors[Math.Abs(super.SupergroupId % _colors.Length)];
+                default:
+                    return _colors[Math.Abs(chat.Id % _colors.Length)];
+            }
+        }
+
         public static ImageSource GetIdenticon(IList<byte> hash, int side)
         {
             var bitmap = new BitmapImage();

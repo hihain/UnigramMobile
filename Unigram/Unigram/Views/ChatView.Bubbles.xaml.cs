@@ -58,6 +58,11 @@ namespace Unigram.Views
             {
                 Arrow.Visibility = Visibility.Collapsed;
                 //VisualUtilities.SetIsVisible(Arrow, false);
+
+                if (!e.IsIntermediate)
+                {
+                    ViewModel.ClearGoBackStack();
+                }
             }
             else if (ViewModel.Type == DialogType.History || ViewModel.Type == DialogType.Thread)
             {

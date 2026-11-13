@@ -37,8 +37,13 @@ namespace Unigram.Common
         private static readonly TimeSpan NotificationSettle = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
+        // Toasts and tiles still being prepared must finish before the deferral completes,
+        // otherwise the process is suspended mid-way and nothing is shown.
+        private static readonly TimeSpan NotificationDeadline = TimeSpan.FromSeconds(25);
+
         private static int _running;
         private static int _notificationGroups;
+        private static int _pendingNotifications;
 
         public static bool IsRunning => Volatile.Read(ref _running) == 1;
 
@@ -66,6 +71,16 @@ namespace Unigram.Common
             {
                 Interlocked.Increment(ref _notificationGroups);
             }
+        }
+
+        public static void BeginNotification()
+        {
+            Interlocked.Increment(ref _pendingNotifications);
+        }
+
+        public static void EndNotification()
+        {
+            Interlocked.Decrement(ref _pendingNotifications);
         }
 
         public static void Unregister()
@@ -227,6 +242,11 @@ namespace Unigram.Common
                     // the connection becomes ready; give them time to reach the toast APIs.
                     await Task.Delay(NotificationSettle, cancellation.Token);
                 }
+
+                while (Volatile.Read(ref _pendingNotifications) > 0 && watch.Elapsed < NotificationDeadline)
+                {
+                    await Task.Delay(PollInterval, cancellation.Token);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -244,7 +264,7 @@ namespace Unigram.Common
 
                 // The CTS has no timer, so it is left to the GC rather than disposed; a late
                 // Canceled callback racing with this block could otherwise hit a disposed source.
-                Logs.PushDiagnostics.Write("background.sync.result", $"result={result};sessions={sessions.Count};ready={ready};signed_out={signedOut};notification_groups={Volatile.Read(ref _notificationGroups)};elapsed_ms={watch.ElapsedMilliseconds}");
+                Logs.PushDiagnostics.Write("background.sync.result", $"result={result};sessions={sessions.Count};ready={ready};signed_out={signedOut};notification_groups={Volatile.Read(ref _notificationGroups)};pending_notifications={Volatile.Read(ref _pendingNotifications)};elapsed_ms={watch.ElapsedMilliseconds}");
             }
         }
 
