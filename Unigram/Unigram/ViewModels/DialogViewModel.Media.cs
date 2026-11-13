@@ -452,13 +452,18 @@ namespace Unigram.ViewModels
                     picker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
                     picker.FileTypeFilter.AddRange(Constants.MediaTypes);
 
+                    Logs.PushDiagnostics.Write("attach.picker", "step=open;kind=media");
                     var files = await picker.PickMultipleFilesAsync();
+                    Logs.PushDiagnostics.Write("attach.picker", $"step=result;kind=media;count={files?.Count ?? 0}");
                     if (files != null && files.Count > 0)
                     {
                         SendFileExecute(files);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("attach.picker.failed", ex, "kind=media");
+                }
             } else
             {
                 EditMediaExecute();

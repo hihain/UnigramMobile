@@ -102,6 +102,7 @@ namespace Unigram.Controls
                 detailPage.OnBackRequested(args);
                 if (args.Handled)
                 {
+                    WriteBackDiagnostic("detail_page");
                     return;
                 }
             }
@@ -110,12 +111,36 @@ namespace Unigram.Controls
             // but if it is 0 it means that the control is not loaded, and the event shouldn't be handled
             if (CanGoBack && ActualWidth > 0 /*&& type == BackStackType.Navigation*/)
             {
+                WriteBackDiagnostic("detail_go_back");
                 DetailFrame.GoBack();
+                args.Handled = true;
+            }
+            else if (ActualWidth > 0 && CurrentState == MasterDetailState.Minimal && DetailFrame.CurrentSourcePageType != null && DetailFrame.CurrentSourcePageType != BlankPageType)
+            {
+                // A page opened during activation (e.g. a toast that switched account) can end up
+                // with no BlankPage beneath it, which left the back arrow doing nothing. Restore the
+                // entry and go back normally so the chat list is shown again.
+                WriteBackDiagnostic("blank_fallback");
+                try
+                {
+                    DetailFrame.BackStack.Insert(0, new PageStackEntry(BlankPageType, null, null));
+                    DetailFrame.GoBack();
+                }
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("nav.back.failed", ex, "branch=blank_fallback");
+                    DetailFrame.Navigate(BlankPageType);
+                    DetailFrame.BackStack.Clear();
+                    IsMasterHidden = false;
+                    MasterPresenter.Visibility = Visibility.Visible;
+                }
+
                 args.Handled = true;
             }
             else if (ParentFrame.Content is INavigablePage masterPage /*&& type == BackStackType.Hamburger*/)
             {
                 masterPage.OnBackRequested(args);
+                WriteBackDiagnostic(args.Handled ? "master_page" : "unhandled");
                 if (args.Handled)
                 {
                     return;
@@ -123,9 +148,23 @@ namespace Unigram.Controls
             }
             else if (ParentFrame.CanGoBack && ActualWidth > 0)
             {
+                WriteBackDiagnostic("parent_go_back");
                 ParentFrame.GoBack();
                 args.Handled = true;
             }
+            else
+            {
+                WriteBackDiagnostic("unhandled");
+            }
+        }
+
+        private void WriteBackDiagnostic(string branch)
+        {
+            try
+            {
+                Logs.PushDiagnostics.Write("nav.back", $"branch={branch};state={CurrentState};detail={DetailFrame?.CurrentSourcePageType?.Name ?? "none"};depth={DetailFrame?.BackStackDepth ?? -1};width={(ActualWidth > 0 ? 1 : 0)}");
+            }
+            catch { }
         }
 
         #endregion
@@ -255,7 +294,10 @@ namespace Unigram.Controls
                         DetailFrame.BackStack.Insert(0, new PageStackEntry(BlankPageType, null, null));
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("nav.detail.template.failed", ex);
+                }
             }
 
             if (ActualWidth > 0)

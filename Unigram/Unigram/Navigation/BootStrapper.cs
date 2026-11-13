@@ -341,10 +341,14 @@ namespace Unigram.Navigation
                     }
 
                     if (handled = args.Handled)
+                    {
+                        Logs.PushDiagnostics.Write("nav.back.route", $"handler=popup;type={popup.Child.GetType().Name}");
                         return;
+                    }
                 }
                 else if (popup.Child is ContentDialog dialog)
                 {
+                    Logs.PushDiagnostics.Write("nav.back.route", $"handler=dialog;type={dialog.GetType().Name}");
                     dialog.Hide();
                     return;
                 }
@@ -365,7 +369,12 @@ namespace Unigram.Navigation
 
             if (NavigationService?.CanGoBack ?? false)
             {
+                Logs.PushDiagnostics.Write("nav.back.route", "handler=root_go_back");
                 NavigationService?.GoBack();
+            }
+            else
+            {
+                Logs.PushDiagnostics.Write("nav.back.route", "handler=none");
             }
         }
 

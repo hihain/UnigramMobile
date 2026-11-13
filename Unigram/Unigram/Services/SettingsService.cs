@@ -211,7 +211,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "**Chats**\n• Swipe left to reply is more responsive: the message now follows your finger, an arrow shows when reply will trigger, and a quick flick also works\n• Swipe right to forward gets the same improvements\n\n**Stickers**\n• Trending Stickers in Settings › Stickers and Masks loads again";
+        public static readonly string CurrentChangelog = "**Navigation**\n• The back arrow works again after opening a notification from your other account\n\n**Notifications**\n• Fixed a possible freeze or close when a message arrives while you are picking a photo or file";
 
         public int Session => _session;
 

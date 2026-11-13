@@ -77,6 +77,22 @@ namespace Unigram.Common
 
         public int Id => _id;
 
+        public async Task<bool> IsChatOpenAsync(int session, long chatId)
+        {
+            var open = false;
+            await Dispatcher.DispatchAsync(() =>
+            {
+                var service = this.NavigationServices?.GetByFrameId("Main" + session);
+                open = service != null
+                    && ActivationMode == CoreWindowActivationMode.ActivatedInForeground
+                    && service.CurrentPageType == typeof(ChatPage)
+                    && service.CurrentPageParam is long current
+                    && current == chatId;
+            });
+
+            return open;
+        }
+
         public bool IsChatOpen(int session, long chatId)
         {
             return Dispatcher.Dispatch(() =>

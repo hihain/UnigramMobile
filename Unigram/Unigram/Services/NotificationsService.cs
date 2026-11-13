@@ -709,7 +709,7 @@ namespace Unigram.Services
 
         private async Task UpdateAsync(Chat chat, Func<Task> action)
         { //TODO: Simplified active chat logic?
-            var open = WindowContext.ActiveWrappers.Cast<TLWindowContext>().Any(x => x.IsChatOpen(_protoService.SessionId, chat.Id));
+            var open = await IsChatOpenAsync(chat.Id);
             if (open && !BackgroundSync.IsActiveInBackground)
             {
                 WriteForegroundTileDiagnostic("managed.tile.gate", "result=skipped;reason=chat_open");
@@ -720,6 +720,40 @@ namespace Unigram.Services
             await action();
             WriteForegroundTileDiagnostic("managed.tile.gate", "result=complete");
         }
+
+        private async Task<bool> IsChatOpenAsync(long chatId)
+        {
+            // This used to block the notification thread on a synchronous UI dispatch. While the
+            // UI thread is busy or covered (e.g. by the file picker) that wait never finishes, so
+            // the check is now asynchronous and bounded; on timeout the chat counts as not open.
+            try
+            {
+                var windows = WindowContext.ActiveWrappers.OfType<TLWindowContext>().ToArray();
+
+                foreach (var window in windows)
+                {
+                    var check = window.IsChatOpenAsync(_protoService.SessionId, chatId);
+                    if (await Task.WhenAny(check, Task.Delay(ChatOpenCheckTimeout)) != check)
+                    {
+                        WriteForegroundTileDiagnostic("managed.tile.gate", "step=check;result=timeout");
+                        continue;
+                    }
+
+                    if (await check)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteForegroundTileDiagnosticException("managed.tile.gate.failed", ex);
+            }
+
+            return false;
+        }
+
+        private static readonly TimeSpan ChatOpenCheckTimeout = TimeSpan.FromSeconds(2);
 
         private async Task UpdateToast(string caption, string message, string account, string sound, string launch, string tag, string group, string picture, string date, bool canReply)
         {
