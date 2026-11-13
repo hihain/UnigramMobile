@@ -1383,29 +1383,17 @@ namespace Unigram.Views
             else
             {
                 var data = Toast.SplitArguments(parameter);
-                if (data.ContainsKey("from_id") && int.TryParse(data["from_id"], out int from_id))
+                var function = Toast.GetChatFunction(data, out string kind);
+                if (function != null)
                 {
-                    var response = await ViewModel.ProtoService.SendAsync(new CreatePrivateChat(from_id, false));
+                    var response = await ViewModel.ProtoService.SendAsync(function);
                     if (response is Chat chat)
                     {
                         MasterDetail.NavigationService.NavigateToChat(chat, force: false);
                     }
-                }
-                else if (data.ContainsKey("chat_id") && int.TryParse(data["chat_id"], out int chat_id))
-                {
-                    var response = await ViewModel.ProtoService.SendAsync(new CreateBasicGroupChat(chat_id, false));
-                    if (response is Chat chat)
-                    {
-                        MasterDetail.NavigationService.NavigateToChat(chat, force: false);
-                    }
-                }
-                else if (data.ContainsKey("channel_id") && int.TryParse(data["channel_id"], out int channel_id))
-                {
-                    var response = await ViewModel.ProtoService.SendAsync(new CreateSupergroupChat(channel_id, false));
-                    if (response is Chat chat)
-                    {
-                        MasterDetail.NavigationService.NavigateToChat(chat, force: false);
-                    }
+#if MODERN_TDLIB
+                    Logs.PushDiagnostics.Write("toast.activate", $"target={kind};result={(response is Chat ? "opened" : "chat_not_found")}");
+#endif
                 }
             }
         }

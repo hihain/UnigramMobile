@@ -1216,21 +1216,17 @@ namespace Unigram.Services
             if (data.TryGetValue("action", out string action))
             {
                 var chat = default(Chat);
-                if (data.TryGetValue("from_id", out string from_id) && int.TryParse(from_id, out int fromId))
+                var function = Toast.GetChatFunction(data, out string kind);
+                if (function != null)
                 {
-                    chat = await _protoService.SendAsync(new CreatePrivateChat(fromId, false)) as Chat;
-                }
-                else if (data.TryGetValue("channel_id", out string channel_id) && int.TryParse(channel_id, out int channelId))
-                {
-                    chat = await _protoService.SendAsync(new CreateSupergroupChat(channelId, false)) as Chat;
-                }
-                else if (data.TryGetValue("chat_id", out string chat_id) && int.TryParse(chat_id, out int chatId))
-                {
-                    chat = await _protoService.SendAsync(new CreateBasicGroupChat(chatId, false)) as Chat;
+                    chat = await _protoService.SendAsync(function) as Chat;
                 }
 
                 if (chat == null)
                 {
+#if MODERN_TDLIB
+                    Logs.PushDiagnostics.Write("toast.action", $"session={_sessionService.Id};target={kind};result=chat_not_found");
+#endif
                     return;
                 }
 

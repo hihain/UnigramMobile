@@ -32,7 +32,7 @@ namespace Unigram
 				concurrency::task<void> UpdateToastAndTiles(String^ content /*, std::wofstream* log*/);
 				String^ GetCaption(JsonArray^ loc_args, String^ loc_key);
 				String^ GetMessage(JsonArray^ loc_args, String^ loc_key);
-				String^ GetLaunch(JsonObject^ custom, String^ loc_key);
+				String^ GetLaunch(JsonObject^ custom, String^ loc_key, String^ session);
 				String^ GetTag(JsonObject^ custom);
 				String^ GetGroup(JsonObject^ custom);
 				String^ GetPicture(JsonObject^ custom, String^ group, String^ session);

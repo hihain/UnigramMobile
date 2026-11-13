@@ -172,7 +172,7 @@ task<void> NotificationTask::UpdateToastAndTiles(String^ content /*, std::wofstr
 			auto caption = GetCaption(loc_args, loc_key);
 			auto message = GetMessage(loc_args, loc_key);
 			auto sound = data->GetNamedString("sound", "Default");
-			auto launch = GetLaunch(custom, loc_key);
+			auto launch = GetLaunch(custom, loc_key, sessionMapped ? session : nullptr);
 			auto group = GetGroup(custom);
 			auto isSecretChat = IsSecretChatPush(loc_key);
 			String^ picture = isSecretChat ? nullptr : GetPicture(custom, group, session);
@@ -272,9 +272,18 @@ String^ NotificationTask::GetMessage(JsonArray^ loc_args, String^ loc_key)
 	return nullptr;
 }
 
-String^ NotificationTask::GetLaunch(JsonObject^ custom, String^ loc_key)
+String^ NotificationTask::GetLaunch(JsonObject^ custom, String^ loc_key, String^ session)
 {
 	std::wstring launch = L"";
+	// Without the owning account, activation (open chat, quick reply, mark as read)
+	// falls back to whichever account is active. Omit it when the receiver was not
+	// mapped rather than guessing account 0.
+	if (session != nullptr)
+	{
+		launch += L"session=";
+		launch += session->Data();
+		launch += L"&amp;";
+	}
 	if (custom)
 	{
 		if (custom->HasKey("msg_id"))

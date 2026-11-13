@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Telegram.Td.Api;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.Background;
@@ -216,6 +218,45 @@ namespace Unigram.Common
             }
 
             return dictionary;
+        }
+
+        /// <summary>
+        /// Builds the request that resolves the chat a toast or tile points to, or null
+        /// when the arguments carry no chat. Modern TDLib user and group IDs are 64-bit;
+        /// parsing them as int silently dropped chats with IDs above 2^31.
+        /// </summary>
+        public static Function GetChatFunction(IDictionary<string, string> data, out string kind)
+        {
+#if MODERN_TDLIB
+            if (data.TryGetValue("from_id", out string fromId) && long.TryParse(fromId, NumberStyles.Integer, CultureInfo.InvariantCulture, out long userId))
+#else
+            if (data.TryGetValue("from_id", out string fromId) && int.TryParse(fromId, NumberStyles.Integer, CultureInfo.InvariantCulture, out int userId))
+#endif
+            {
+                kind = "private";
+                return new CreatePrivateChat(userId, false);
+            }
+#if MODERN_TDLIB
+            if (data.TryGetValue("channel_id", out string channelId) && long.TryParse(channelId, NumberStyles.Integer, CultureInfo.InvariantCulture, out long supergroupId))
+#else
+            if (data.TryGetValue("channel_id", out string channelId) && int.TryParse(channelId, NumberStyles.Integer, CultureInfo.InvariantCulture, out int supergroupId))
+#endif
+            {
+                kind = "supergroup";
+                return new CreateSupergroupChat(supergroupId, false);
+            }
+#if MODERN_TDLIB
+            if (data.TryGetValue("chat_id", out string chatId) && long.TryParse(chatId, NumberStyles.Integer, CultureInfo.InvariantCulture, out long basicGroupId))
+#else
+            if (data.TryGetValue("chat_id", out string chatId) && int.TryParse(chatId, NumberStyles.Integer, CultureInfo.InvariantCulture, out int basicGroupId))
+#endif
+            {
+                kind = "basic_group";
+                return new CreateBasicGroupChat(basicGroupId, false);
+            }
+
+            kind = "none";
+            return null;
         }
 
         public static Dictionary<string, string> SplitArguments(string arguments)

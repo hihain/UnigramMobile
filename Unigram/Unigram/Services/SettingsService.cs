@@ -211,7 +211,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "**Navigation**\n• The back arrow works again after opening a notification from your other account\n\n**Notifications**\n• Fixed a possible freeze or close when a message arrives while you are picking a photo or file";
+        public static readonly string CurrentChangelog = "**Notifications**\n• Tapping a notification opens its chat again, including when the app was closed\n• Notifications for newer accounts, groups and channels open the right chat\n• Tapping, replying to or marking a notification as read uses the account it was sent to";
 
         public int Session => _session;
 

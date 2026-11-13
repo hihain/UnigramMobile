@@ -230,14 +230,32 @@ namespace Unigram.Common
 
         private INavigationService _service;
         private IActivatedEventArgs _args;
+#if MODERN_TDLIB
+        // Activation that arrived before TDLib reported its first authorization state
+        // (cold start from a toast or tile). Replayed once the session is Ready so the
+        // target chat opens instead of only the chat list.
+        private IActivatedEventArgs _deferredArgs;
+        private int _deferredSession;
+#endif
 
         public void SetActivatedArgs(IActivatedEventArgs args, INavigationService service)
         {
             _args = args;
             _service = service = WindowContext.GetForCurrentView().NavigationServices.GetByFrameId(_lifetime.ActiveItem.Id.ToString());
+#if MODERN_TDLIB
+            _deferredArgs = null;
+#endif
 
             UseActivatedArgs(args, service, _lifetime.ActiveItem.ProtoService.GetAuthorizationState());
         }
+
+#if MODERN_TDLIB
+        private void DeferActivatedArgs(IActivatedEventArgs args)
+        {
+            _deferredArgs = args;
+            _deferredSession = _lifetime.ActiveItem.Id;
+        }
+#endif
 
         private async void UseActivatedArgs(IActivatedEventArgs args, INavigationService service, AuthorizationState state)
         {
@@ -257,6 +275,7 @@ namespace Unigram.Common
                         }
                         else
                         {
+                            DeferActivatedArgs(args);
                             PushDiagnostics.Write("startup.navigate", "state=null;target=deferred;first_run=0");
                         }
                         break;
@@ -270,6 +289,7 @@ namespace Unigram.Common
                         }
                         else
                         {
+                            DeferActivatedArgs(args);
                             PushDiagnostics.Write("startup.navigate", "state=WaitTdlibParameters;target=deferred;first_run=0");
                         }
 #else
@@ -565,6 +585,19 @@ namespace Unigram.Common
             Dispatcher.Dispatch(() =>
             {
                 var root = NavigationServices.FirstOrDefault(x => x.SessionId == session.Id && x.FrameFacade.FrameId == $"{session.Id}") as IHandle<UpdateAuthorizationState>;
+#if MODERN_TDLIB
+                if (update.AuthorizationState is AuthorizationStateReady && _deferredArgs != null && _deferredSession == session.Id && root is INavigationService rootService)
+                {
+                    var deferred = _deferredArgs;
+                    _deferredArgs = null;
+
+                    // Same route a Ready state takes at activation: opens MainPage and
+                    // applies the toast/tile/protocol arguments.
+                    PushDiagnostics.Write("startup.activate.deferred", $"kind={deferred.Kind};result=replayed");
+                    UseActivatedArgs(deferred, rootService);
+                    return;
+                }
+#endif
                 if (root != null)
                 {
                     root.Handle(update);
