@@ -596,7 +596,7 @@ namespace Unigram.Services
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat, message.SenderId);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
@@ -643,7 +643,7 @@ namespace Unigram.Services
             var content = GetContent(chat, message);
             var sound = silent ? "silent" : string.Empty;
             var launch = GetLaunch(chat, message);
-            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat);
+            var picture = isSecretChat ? string.Empty : await GetPhotoAsync(chat, message.SenderId);
             var dateTime = BindConvert.Current.DateTime(date).ToUniversalTime().ToString("s") + "Z";
             var canReply = !(chat.Type is ChatTypeSupergroup super && super.IsChannel);
 
@@ -1246,31 +1246,72 @@ namespace Unigram.Services
             return UpdateFromLabel(chat, message) + GetBriefLabel(chat, message);
         }
 
-        private async Task<string> GetPhotoAsync(Chat chat)
+        private async Task<string> GetPhotoAsync(Chat chat, MessageSender sender)
         {
+            // In groups the sender is more useful than the group itself, so prefer the
+            // sender's picture and fall back to the group's when it isn't available yet.
+            var isGroup = chat.Type is ChatTypeBasicGroup || (chat.Type is ChatTypeSupergroup supergroup && !supergroup.IsChannel);
+            if (isGroup && sender != null)
+            {
+                Telegram.Td.Api.File senderPhoto = null;
+                if (_protoService.TryGetUser(sender, out User senderUser))
+                {
+                    senderPhoto = senderUser.ProfilePhoto?.Small;
+                }
+                else if (_protoService.TryGetChat(sender, out Chat senderChat) && senderChat.Id != chat.Id)
+                {
+                    senderPhoto = senderChat.Photo?.Small;
+                }
+
+                if (senderPhoto != null)
+                {
+                    if (senderPhoto.Local.IsDownloadingCompleted)
+                    {
+                        var picture = await CachePhotoAsync(senderPhoto, "sender");
+                        if (!string.IsNullOrEmpty(picture))
+                        {
+                            return picture;
+                        }
+                    }
+                    else
+                    {
+                        WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;source=sender;reason=not_downloaded");
+                        if (senderPhoto.Local.CanBeDownloaded && !senderPhoto.Local.IsDownloadingActive)
+                        {
+                            _protoService.DownloadFile(senderPhoto.Id, 1);
+                        }
+                    }
+                }
+            }
+
             if (chat.Photo == null || !chat.Photo.Small.Local.IsDownloadingCompleted)
             {
-                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;reason=not_downloaded");
+                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;source=chat;reason=not_downloaded");
                 return string.Empty;
             }
 
-            var extension = Path.GetExtension(chat.Photo.Small.Local.Path);
+            return await CachePhotoAsync(chat.Photo.Small, "chat");
+        }
+
+        private async Task<string> CachePhotoAsync(Telegram.Td.Api.File photo, string source)
+        {
+            var extension = Path.GetExtension(photo.Local.Path);
             if (!string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase))
             {
-                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=unavailable;reason=unsupported_format");
+                WriteForegroundTileDiagnostic("managed.tile.avatar", $"result=unavailable;source={source};reason=unsupported_format");
                 return string.Empty;
             }
 
             try
             {
                 var folder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("tile-avatars", CreationCollisionOption.OpenIfExists);
-                var fileName = $"tile-avatar-{chat.Photo.Small.Id}{extension.ToLowerInvariant()}";
-                var source = await StorageFile.GetFileFromPathAsync(chat.Photo.Small.Local.Path);
-                await source.CopyAsync(folder, fileName, NameCollisionOption.ReplaceExisting);
+                var fileName = $"tile-avatar-{photo.Id}{extension.ToLowerInvariant()}";
+                var file = await StorageFile.GetFileFromPathAsync(photo.Local.Path);
+                await file.CopyAsync(folder, fileName, NameCollisionOption.ReplaceExisting);
 
-                WriteForegroundTileDiagnostic("managed.tile.avatar", "result=cached");
+                WriteForegroundTileDiagnostic("managed.tile.avatar", $"result=cached;source={source}");
                 return "ms-appdata:///local/tile-avatars/" + Uri.EscapeDataString(fileName);
             }
             catch (IOException ex)
