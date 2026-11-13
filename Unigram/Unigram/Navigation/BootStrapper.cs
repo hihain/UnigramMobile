@@ -718,18 +718,34 @@ namespace Unigram.Navigation
 
         async void CallHandleSuspendingAsync(object sender, SuspendingEventArgs e)
         {
-            var deferral = e.SuspendingOperation.GetDeferral();
+            // This is async void: anything escaping it is a process-fatal crash. A process that
+            // was started only for a background task has no frames, and WinRT can reject
+            // suspension work there with 0x8007139F, so failures are recorded and swallowed.
+            SuspendingDeferral deferral = null;
             try
             {
-                if (AutoSuspendAllFrames)
+                deferral = e.SuspendingOperation.GetDeferral();
+
+                if (AutoSuspendAllFrames && WindowContext.ActiveWrappers.Count > 0)
                 {
                     await _LifecycleLogic.AutoSuspendAllFramesAsync(sender, e, AutoExtendExecutionSession);
                 }
                 await OnSuspendingAsync(sender, e, PrelaunchActivated);
             }
+            catch (Exception ex)
+            {
+                Logs.PushDiagnostics.WriteException("app.suspending.failed", ex);
+            }
             finally
             {
-                deferral.Complete();
+                try
+                {
+                    deferral?.Complete();
+                }
+                catch (Exception ex)
+                {
+                    Logs.PushDiagnostics.WriteException("app.suspending.deferral_failed", ex);
+                }
             }
         }
 

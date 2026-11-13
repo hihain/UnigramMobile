@@ -110,6 +110,13 @@ namespace Unigram.Common
             }
         }
 
+        private static int _databaseLocked;
+
+        public static void NotifyDatabaseLocked()
+        {
+            Volatile.Write(ref _databaseLocked, 1);
+        }
+
         public static async Task RunAsync(IBackgroundTaskInstance taskInstance, bool appInForeground)
         {
             if (!IsEnabled)
@@ -197,6 +204,12 @@ namespace Unigram.Common
                     if (pending == 0)
                     {
                         result = "synced";
+                        break;
+                    }
+
+                    if (Volatile.Read(ref _databaseLocked) != 0)
+                    {
+                        result = "locked";
                         break;
                     }
 

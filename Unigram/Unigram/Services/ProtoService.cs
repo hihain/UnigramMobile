@@ -469,6 +469,13 @@ namespace Unigram.Services
 
                     _client.Send(request, result =>
                     {
+                        if (result is Error lockError && lockError.Code == 400 && lockError.Message != null && lockError.Message.StartsWith("Can't lock file", StringComparison.Ordinal))
+                        {
+                            // Another instance of the app still owns this database; background
+                            // sync can never become ready in this process and must stop waiting.
+                            Common.BackgroundSync.NotifyDatabaseLocked();
+                        }
+
                         PushDiagnostics.Write("tdlib.parameters", result is Error error
                             ? $"result=error;code={error.Code};message={PushDiagnostics.SanitizeErrorMessage(error.Message)}"
                             : "result=ok");
