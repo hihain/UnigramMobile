@@ -14,7 +14,7 @@
             VerticalScrollBarVisibility="Auto"
             VerticalScrollMode="Auto"
             Grid.Row="1">
-            <StackPanel Padding="0,16,0,24">
+            <StackPanel Padding="0,16,0,12">
                 <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
                     <contract7Present:Grid.BackgroundTransition>
                         <contract7Present:BrushTransition/>
@@ -228,7 +228,8 @@
                         Content="{CustomResource PrivacyPolicy}"
                         HorizontalAlignment="Left"
                         FontSize="12"
-                        Margin="12,0,12,8"/>
+                        Padding="0"
+                        Margin="12,4,12,0"/>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>

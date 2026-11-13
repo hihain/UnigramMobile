@@ -211,7 +211,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "**BETA app icon**\n• Balanced folded-glider wings across app tiles and the splash screen\n• Transparent tile and splash backgrounds";
+        public static readonly string CurrentChangelog = "**BETA app icon**\n• Balanced folded-glider wings across app tiles and the splash screen\n• Transparent tile and splash backgrounds\n\n**Settings**\n• Privacy Policy link no longer overlaps the app version";
 
         public int Session => _session;
 
