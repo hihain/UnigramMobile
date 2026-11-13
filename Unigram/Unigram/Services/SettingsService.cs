@@ -211,7 +211,7 @@ namespace Unigram.Services
         #region App version
 
         // Keep this in sync with Package.appxmanifest for every shipped build.
-        public static readonly string CurrentChangelog = "**Live Tile & notifications**\n• Background checks now wait for toasts and the Live Tile to finish before the app sleeps\n• Contacts without a photo now show their initials on the Live Tile and toasts\n• Profile photos not yet downloaded are fetched before the toast is shown\n\n**Chats**\n• After jumping to a replied message, the down arrow now returns to where you were instead of the newest message";
+        public static readonly string CurrentChangelog = "**Chats**\n• Swipe left to reply is more responsive: the message now follows your finger, an arrow shows when reply will trigger, and a quick flick also works\n• Swipe right to forward gets the same improvements\n\n**Stickers**\n• Trending Stickers in Settings › Stickers and Masks loads again";
 
         public int Session => _session;
 

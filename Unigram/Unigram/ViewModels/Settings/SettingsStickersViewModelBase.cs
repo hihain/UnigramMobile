@@ -71,7 +71,11 @@ namespace Unigram.ViewModels.Settings
 
             ProtoService.Send(ModernTdlibCompatibility.GetTrendingStickerSets(), result =>
             {
+#if MODERN_TDLIB
+                if (result is TrendingStickerSets stickerSets)
+#else
                 if (result is StickerSets stickerSets)
+#endif
                 {
                     BeginOnUIThread(() => FeaturedStickersCount = stickerSets.TotalCount);
                 }
@@ -133,7 +137,11 @@ namespace Unigram.ViewModels.Settings
 
         public void Handle(UpdateTrendingStickerSets update)
         {
+#if MODERN_TDLIB
+            if (_masks || !(update.StickerType is StickerTypeRegular))
+#else
             if (_masks)
+#endif
             {
                 return;
             }

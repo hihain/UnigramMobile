@@ -20,7 +20,11 @@ namespace Unigram.ViewModels.Settings
         {
             ProtoService.Send(ModernTdlibCompatibility.GetTrendingStickerSets(), result =>
             {
+#if MODERN_TDLIB
+                if (result is TrendingStickerSets stickerSets)
+#else
                 if (result is StickerSets stickerSets)
+#endif
                 {
                     BeginOnUIThread(() => Items.ReplaceWith(stickerSets.Sets));
                 }

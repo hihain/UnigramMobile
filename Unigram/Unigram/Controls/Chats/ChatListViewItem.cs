@@ -8,6 +8,7 @@ using Unigram.ViewModels;
 using Windows.Foundation;
 using Windows.UI.Composition;
 using Windows.UI.Composition.Interactions;
+using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
@@ -21,6 +22,10 @@ namespace Unigram.Controls.Chats
     public class ChatListViewItem : LazoListViewItem, IInteractionTrackerOwner
     {
         private readonly ChatListView _parent;
+
+        private const float SwipeTrigger = 56;
+        private const float SwipeFlickDistance = 24;
+        private const float SwipeFlickVelocity = 600;
 
         private SpriteVisual _hitTest;
         private ContainerVisual _container;
@@ -120,7 +125,7 @@ namespace Unigram.Controls.Chats
             _tracker.Properties.InsertBoolean("CanReply", _reply);
             _tracker.Properties.InsertBoolean("CanForward", _forward);
 
-            //ConfigureAnimations(_visual, null);
+            ConfigureAnimations(_visual, null);
             ConfigureRestingPoints();
         }
 
@@ -136,7 +141,7 @@ namespace Unigram.Controls.Chats
         private void ConfigureAnimations(Visual visual, Visual indicator)
         {
             // Create an animation that changes the offset of the photoVisual and shadowVisual based on the manipulation progress
-            var offsetExp = _visual.Compositor.CreateExpressionAnimation("(tracker.Position.X > 0 && !tracker.CanReply) || (tracker.Position.X <= 0 && !tracker.CanForward) ? 0 : -tracker.Position.X");
+            var offsetExp = _visual.Compositor.CreateExpressionAnimation("(tracker.Position.X > 0 && !tracker.CanReply) || (tracker.Position.X <= 0 && !tracker.CanForward) ? 0 : Max(-72, Min(72, -tracker.Position.X))");
             //var photoOffsetExp = _visual.Compositor.CreateExpressionAnimation("tracker.Position.X > 0 && !tracker.CanReply || tracker.Position.X <= 0 && !tracker.CanForward ? 0 : Max(-72, Min(72, -tracker.Position.X))");
             //var photoOffsetExp = _visual.Compositor.CreateExpressionAnimation("-tracker.Position.X");
             offsetExp.SetReferenceParameter("tracker", _tracker);
@@ -283,46 +288,16 @@ namespace Unigram.Controls.Chats
 
         public void ValuesChanged(InteractionTracker sender, InteractionTrackerValuesChangedArgs args)
         {
-            if (_indicator == null && ApiInfo.CanUseDirectComposition && (_tracker.Position.X > 0.0001f || _tracker.Position.X < -0.0001f) /*&& Math.Abs(e.Cumulative.Translation.X) >= 45*/)
+            if (_indicator == null && (_tracker.Position.X > 0.0001f || _tracker.Position.X < -0.0001f))
             {
-                var sprite = _visual.Compositor.CreateSpriteVisual();
-                sprite.Size = new Vector2(30, 30);
-                sprite.CenterPoint = new Vector3(15);
-
-                var surface = LoadedImageSurface.StartLoadFromUri(new Uri("ms-appx:///Assets/Images/Reply.png"));
-                surface.LoadCompleted += (s, e) =>
-                {
-                    sprite.Brush = _visual.Compositor.CreateSurfaceBrush(s);
-                };
-
-                var ellipse = _visual.Compositor.CreateEllipseGeometry();
-                ellipse.Radius = new Vector2(15);
-
-                var ellipseShape = _visual.Compositor.CreateSpriteShape(ellipse);
-                ellipseShape.FillBrush = _visual.Compositor.CreateColorBrush((Windows.UI.Color)App.Current.Resources["MessageServiceBackgroundColor"]);
-                ellipseShape.Offset = new Vector2(15);
-
-                var shape = _visual.Compositor.CreateShapeVisual();
-                shape.Shapes.Add(ellipseShape);
-                shape.Size = new Vector2(30, 30);
-
-                _indicator = _visual.Compositor.CreateContainerVisual();
-                _indicator.Children.InsertAtBottom(shape);
-                _indicator.Children.InsertAtTop(sprite);
-                _indicator.Size = new Vector2(30, 30);
-                _indicator.CenterPoint = new Vector3(15);
-                _indicator.Scale = new Vector3();
-
+                _indicator = CreateIndicator();
                 _container.Children.InsertAtTop(_indicator);
-
-                //ElementCompositionPreview.SetElementChildVisual(this, _indicator);
-                //ElementCompositionPreview.SetElementChildVisual(this, _container);
             }
 
-            var offset = (_tracker.Position.X > 0 && !_reply) || (_tracker.Position.X <= 0 && !_forward) ? 0 : Math.Max(0, Math.Min(72, Math.Abs(_tracker.Position.X)));
+            var offset = (_tracker.Position.X > 0 && !_reply) || (_tracker.Position.X <= 0 && !_forward) ? 0 : Math.Max(0, Math.Min(SwipeTrigger, Math.Abs(_tracker.Position.X)));
 
             var abs = Math.Abs(offset);
-            var percent = abs / 72f;
+            var percent = abs / SwipeTrigger;
 
             var width = (float)ActualWidth;
             var height = (float)ActualHeight;
@@ -335,15 +310,68 @@ namespace Unigram.Controls.Chats
             }
         }
 
+        private ContainerVisual CreateIndicator()
+        {
+            var compositor = _visual.Compositor;
+
+            var sprite = compositor.CreateSpriteVisual();
+            sprite.Size = new Vector2(30, 30);
+            sprite.CenterPoint = new Vector3(15);
+
+            var indicator = compositor.CreateContainerVisual();
+            indicator.Size = new Vector2(30, 30);
+            indicator.CenterPoint = new Vector3(15);
+            indicator.Scale = new Vector3();
+            indicator.Opacity = 0;
+
+            var surface = LoadedImageSurface.StartLoadFromUri(new Uri("ms-appx:///Assets/Images/Reply.png"));
+
+            if (ApiInfo.CanUseDirectComposition)
+            {
+                surface.LoadCompleted += (s, e) =>
+                {
+                    sprite.Brush = compositor.CreateSurfaceBrush(s);
+                };
+
+                var ellipse = compositor.CreateEllipseGeometry();
+                ellipse.Radius = new Vector2(15);
+
+                var ellipseShape = compositor.CreateSpriteShape(ellipse);
+                ellipseShape.FillBrush = compositor.CreateColorBrush((Windows.UI.Color)App.Current.Resources["MessageServiceBackgroundColor"]);
+                ellipseShape.Offset = new Vector2(15);
+
+                var shape = compositor.CreateShapeVisual();
+                shape.Shapes.Add(ellipseShape);
+                shape.Size = new Vector2(30, 30);
+
+                indicator.Children.InsertAtBottom(shape);
+            }
+            else
+            {
+                // Shape visuals need contract 7; W10M draws the white arrow tinted with the accent color instead.
+                var mask = compositor.CreateMaskBrush();
+                mask.Source = compositor.CreateColorBrush(new UISettings().GetColorValue(UIColorType.Accent));
+                mask.Mask = compositor.CreateSurfaceBrush(surface);
+
+                sprite.Brush = mask;
+            }
+
+            indicator.Children.InsertAtTop(sprite);
+            return indicator;
+        }
+
         public void InertiaStateEntered(InteractionTracker sender, InteractionTrackerInertiaStateEnteredArgs args)
         {
             if (ContentTemplateRoot is FrameworkElement element && element.Tag is MessageViewModel message)
             {
-                if (_tracker.Position.X >= 72 && _reply)
+                var position = _tracker.Position.X;
+                var velocity = args.PositionVelocityInPixelsPerSecond.X;
+
+                if (_reply && (position >= SwipeTrigger || (position >= SwipeFlickDistance && velocity >= SwipeFlickVelocity)))
                 {
                     _parent.ViewModel.MessageReplyCommand.Execute(message);
                 }
-                else if (_tracker.Position.X <= -72 && _forward)
+                else if (_forward && (position <= -SwipeTrigger || (position <= -SwipeFlickDistance && velocity <= -SwipeFlickVelocity)))
                 {
                     _parent.ViewModel.MessageForwardCommand.Execute(message);
                 }
