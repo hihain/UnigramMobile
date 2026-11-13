@@ -214,15 +214,22 @@
                                           FontFamily="{StaticResource TelegramThemeFontFamily}"/>
                 </StackPanel>
                 
-                <Grid>
-                    <TextBlock
-                        x:Name="Diagnostics"
-                        Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Margin="12,8,12,0"/>
-                    <Button Click="Diagnostics_Click" Opacity="0" Style="{StaticResource EmptyButtonStyle}"/>
-                    <HyperlinkButton NavigateUri="https://zunetracks.github.io/UnigramMobileUWP/privacy" Content="{CustomResource PrivacyPolicy}" HorizontalAlignment="Right" FontSize="12" Margin="0,0,12,0" />
-                </Grid>
+                <StackPanel>
+                    <Grid>
+                        <TextBlock
+                            x:Name="Diagnostics"
+                            Foreground="{ThemeResource SystemControlDisabledChromeDisabledLowBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Margin="12,8,12,0"/>
+                        <Button Click="Diagnostics_Click" Opacity="0" Style="{StaticResource EmptyButtonStyle}"/>
+                    </Grid>
+                    <HyperlinkButton
+                        NavigateUri="https://zunetracks.github.io/UnigramMobileUWP/privacy"
+                        Content="{CustomResource PrivacyPolicy}"
+                        HorizontalAlignment="Left"
+                        FontSize="12"
+                        Margin="12,0,12,8"/>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>
