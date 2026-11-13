@@ -1034,3 +1034,16 @@ A new `emoji.animated` record is written once per batch, not once per message:
 text, no identifiers. This confirms on the next device log both that single
 emoji really do arrive as this content type and how often the null-sticker
 fallback is taken.
+
+## Exporting a VSIX (Extension SDK)
+
+`Export-TdlibVsix.ps1` packages the built ARM output as `Telegram.Td.UWP-<version>-ARM.vsix`
+(default output: `%LOCALAPPDATA%\UnigramTdlibExperiment\artifacts\vsix`). It uses the layout and
+manifests from TDLib's `example/uwp` (`export-vsix`), restricted to ARM, and includes the build
+manifest and the binding-generator patches. The app itself does not consume the VSIX; it references
+the build output directly. Projects using the VSIX reference it as
+`<SDKReference Include="Telegram.Td.UWP, Version=1.0" />` together with `Microsoft.VCLibs, Version=14.0`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\tdlib\Export-TdlibVsix.ps1
+```
